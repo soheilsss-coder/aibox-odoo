@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+
+    <!-- Roadmap item #17 (Model Registry): the vision-capable model's
+         endpoint used to be a hardcoded VISION_API_BASE constant in
+         vision_analysis.py. That's now only the fallback; the value
+         actually used at runtime is this ir.config_parameter, so a
+         customer whose GB10 serves the vision model on a different
+         port (or a different host entirely) can be reconfigured from
+         Settings > Technical > System Parameters without touching
+         code or restarting Odoo. Mirrors how the text model's
+         endpoint is already set on the llm.provider record in
+         llm_agent_data.xml (api_base=http://127.0.0.1:8000/v1) -
+         same idea, different mechanism because the vision call is a
+         raw requests.post from Python, not a provider-backed
+         llm.thread. -->
+    <record id="vision_api_base_param" model="ir.config_parameter">
+        <field name="key">company_ai_demo.vision_api_base</field>
+        <field name="value">http://127.0.0.1:8001/v1</field>
+    </record>
+
+</odoo>

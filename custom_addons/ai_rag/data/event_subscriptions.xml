@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <record id="sub_document_created_rag" model="ai.integration.subscription">
+    <field name="event_type">document.created</field>
+    <field name="target">rag</field>
+    <field name="handler_key">document_created_rag_v44</field>
+    <field name="subscriber_model">ai.rag.event.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">50</field>
+    <field name="max_attempts">8</field>
+  </record>
+  <record id="sub_document_updated_rag" model="ai.integration.subscription">
+    <field name="event_type">document.updated</field>
+    <field name="target">rag</field>
+    <field name="handler_key">document_updated_rag_v44</field>
+    <field name="subscriber_model">ai.rag.event.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">50</field>
+    <field name="max_attempts">8</field>
+  </record>
+</odoo>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+
+    <!-- RISK 0: read-only, same class as list_documents/get_document -->
+    <record id="risk_search_documents_semantic" model="ai.gateway.tool.risk">
+        <field name="tool_name">search_documents_semantic</field>
+        <field name="risk_level">0</field>
+        <field name="description">Read-only semantic search - access filter applied before vector search, see ai.document.chunk.search_similar</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="ai_gateway_approval_view_list" model="ir.ui.view">
+        <field name="name">ai.gateway.approval.list</field>
+        <field name="model">ai.gateway.approval</field>
+        <field name="arch" type="xml">
+            <list decoration-warning="state == 'pending'">
+                <field name="name"/>
+                <field name="requested_by_id"/>
+                <field name="approver_group_id"/>
+                <field name="state"/>
+                <field name="decided_by_id"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="ai_gateway_approval_view_form" model="ir.ui.view">
+        <field name="name">ai.gateway.approval.form</field>
+        <field name="model">ai.gateway.approval</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_approve" type="object" string="Approve"
+                            class="btn-primary" invisible="state != 'pending'"/>
+                    <button name="action_reject" type="object" string="Reject"
+                            invisible="state != 'pending'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="requested_by_id"/>
+                        <field name="approver_group_id"/>
+                        <field name="action_model"/>
+                        <field name="action_res_id"/>
+                        <field name="decided_by_id"/>
+                        <field name="decision_note"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="ai_gateway_approval_action" model="ir.actions.act_window">
+        <field name="name">AI Approvals</field>
+        <field name="res_model">ai.gateway.approval</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="ai_gateway_approval_menu"
+              name="AI Approvals"
+              action="ai_gateway_approval_action"
+              parent="base.menu_administration"
+              sequence="50"/>
+
+</odoo>

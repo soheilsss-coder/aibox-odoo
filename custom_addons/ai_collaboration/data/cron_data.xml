@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+
+    <!-- Continues the "scheduled jobs are NOT admin" convention from
+         ai_business_tools: this listener reads only channels that have
+         an active opt-in link and runs as the minimal service user. -->
+    <record id="cron_ai_channel_mentions" model="ir.cron">
+        <field name="name">AI: Reply to opted-in channel mentions</field>
+        <field name="model_id" ref="model_ai_collab_channel_link"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_reply_to_mentions()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="ai_business_tools.ai_automation_service_user"/>
+        <field name="active">True</field>
+    </record>
+
+</odoo>

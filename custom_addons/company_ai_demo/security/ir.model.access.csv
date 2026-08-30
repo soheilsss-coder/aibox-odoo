@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_decree_hr_user,hr.decree.hr_user,model_hr_decree,hr.group_hr_user,1,1,1,0
+access_hr_decree_hr_manager,hr.decree.hr_manager,model_hr_decree,hr.group_hr_manager,1,1,1,1
+access_hr_decree_employee,hr.decree.employee,model_hr_decree,base.group_user,1,0,0,0
+access_ai_agent_memory_record,ai.agent.memory.record,model_ai_agent_memory_record,base.group_user,1,0,0,0
+access_ai_memory_cleanup,ai.memory.cleanup,model_ai_memory_cleanup,base.group_system,1,1,1,1

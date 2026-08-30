@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_integration_adapter,ai.integration.adapter,model_ai_integration_adapter,base.group_system,1,1,1,1
+access_ai_integration_subscription,ai.integration.subscription,model_ai_integration_subscription,base.group_system,1,1,1,1
+access_ai_integration_delivery,ai.integration.event.delivery,model_ai_integration_event_delivery,base.group_system,1,1,1,1
+access_ai_model_profile,ai.model.profile,model_ai_model_profile,base.group_system,1,1,1,1
+access_ai_integration_health,ai.integration.health,model_ai_integration_health,base.group_system,1,0,0,0
+
+access_ai_integration_certification,access.ai.integration.certification,model_ai_integration_certification,base.group_system,1,1,1,1
+access_ai_integration_ai_event,ai.integration.ai.event,model_ai_integration_ai_event,base.group_system,1,1,1,1
+access_ai_integration_operation_admin,ai.integration.operation.admin,model_ai_integration_operation,base.group_system,1,1,1,1
+access_ai_integration_operation_user,ai.integration.operation.user,model_ai_integration_operation,base.group_user,1,0,0,0

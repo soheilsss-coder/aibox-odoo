@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+  <!--
+    De-duplication fix (found while auditing why every event was being
+    delivered twice): audit is now handled uniformly by the universal
+    "matrix_audit" subscription in subscriber_matrix.xml, and buzz by
+    the universal "matrix_buzz" subscription there. The per-event audit
+    rows above and the workflow-notification/task-deadline buzz row
+    below are deactivated (not deleted, for auditability) rather than
+    removed, since they used a different handler_key than the matrix
+    versions and so were never deduplicated against them by the
+    dispatcher - every approval, leave, task, workflow reminder and
+    escalation was producing two audit rows and, for the buzz ones, two
+    real-time pings.
+  -->
+  <record id="sub_leave_approved_calendar" model="ai.integration.subscription"><field name="event_type">leave.approved</field><field name="target">calendar</field><field name="handler_key">calendar:leave.approved</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_calendar</field><field name="description">Leave approval creates/updates calendar automation.</field></record>
+  <record id="sub_leave_approved_notification" model="ai.integration.subscription"><field name="event_type">leave.approved</field><field name="target">notification</field><field name="handler_key">notification:leave.approved</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_notification</field></record>
+  <record id="sub_leave_approved_audit" model="ai.integration.subscription"><field name="event_type">leave.approved</field><field name="target">audit</field><field name="handler_key">audit:leave.approved</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_audit</field><field name="active">0</field></record>
+  <record id="sub_task_created_calendar" model="ai.integration.subscription"><field name="event_type">task.created</field><field name="target">calendar</field><field name="handler_key">calendar:task.created</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_calendar</field></record>
+  <record id="sub_task_created_notification" model="ai.integration.subscription"><field name="event_type">task.created</field><field name="target">notification</field><field name="handler_key">notification:task.created</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_notification</field></record>
+  <record id="sub_task_created_audit" model="ai.integration.subscription"><field name="event_type">task.created</field><field name="target">audit</field><field name="handler_key">audit:task.created</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_audit</field><field name="active">0</field></record>
+  <record id="sub_document_created_rag" model="ai.integration.subscription"><field name="event_type">document.created</field><field name="target">rag</field><field name="handler_key">rag:document.created</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_rag</field></record>
+  <record id="sub_document_updated_rag" model="ai.integration.subscription"><field name="event_type">document.updated</field><field name="target">rag</field><field name="handler_key">rag:document.updated</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_rag</field></record>
+  <record id="sub_workflow_dead_letter_audit" model="ai.integration.subscription"><field name="event_type">workflow.dead_letter</field><field name="target">audit</field><field name="handler_key">audit:workflow.dead_letter</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_audit</field><field name="active">0</field></record>
+  <record id="sub_workflow_dead_letter_notification" model="ai.integration.subscription"><field name="event_type">workflow.dead_letter</field><field name="target">notification</field><field name="handler_key">notification:workflow.dead_letter</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_notification</field></record>
+
+  <!--
+    Roadmap #9 (Calendar Integration: Deadline -> Reminder -> Escalation).
+    Without these, ai_workflow/data/default_workflows.xml
+    ("task_deadline_escalation") would publish "workflow.notification"
+    and "task.deadline_reached" events that no subscriber ever picks up -
+    i.e. the reminder/escalation would run to completion but nobody would
+    actually be notified. _handle_notification resolves the recipient
+    from the event payload's notify_user_ids, which create_task now
+    includes (see ai_business_tools/models/task_tools.py) and which flows
+    through into the workflow run's context automatically.
+  -->
+  <record id="sub_workflow_notification_notification" model="ai.integration.subscription"><field name="event_type">workflow.notification</field><field name="target">notification</field><field name="handler_key">notification:workflow.notification</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_notification</field></record>
+  <record id="sub_workflow_notification_buzz" model="ai.integration.subscription"><field name="event_type">workflow.notification</field><field name="target">buzz</field><field name="handler_key">buzz:workflow.notification</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_buzz</field><field name="active">0</field></record>
+  <record id="sub_task_deadline_reached_notification" model="ai.integration.subscription"><field name="event_type">task.deadline_reached</field><field name="target">notification</field><field name="handler_key">notification:task.deadline_reached</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_notification</field></record>
+  <record id="sub_task_deadline_reached_buzz" model="ai.integration.subscription"><field name="event_type">task.deadline_reached</field><field name="target">buzz</field><field name="handler_key">buzz:task.deadline_reached</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_buzz</field><field name="active">0</field></record>
+  <record id="sub_task_deadline_reached_audit" model="ai.integration.subscription"><field name="event_type">task.deadline_reached</field><field name="target">audit</field><field name="handler_key">audit:task.deadline_reached</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_audit</field><field name="active">0</field></record>
+
+  <!--
+    Closes the loop for ai_workflow's "leave_approved_audit_trail"
+    default workflow (see ai_workflow/data/default_workflows.xml) so its
+    final "event" step's "leave.approval_workflow_completed" marker is
+    actually persisted into the audit trail rather than published to
+    nothing.
+  -->
+  <record id="sub_leave_workflow_completed_audit" model="ai.integration.subscription"><field name="event_type">leave.approval_workflow_completed</field><field name="target">audit</field><field name="handler_key">audit:leave.approval_workflow_completed</field><field name="subscriber_model">ai.integration.event.dispatcher</field><field name="subscriber_method">_handle_audit</field><field name="active">0</field></record>
+</odoo>

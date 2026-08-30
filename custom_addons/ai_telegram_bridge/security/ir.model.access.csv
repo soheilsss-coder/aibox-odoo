@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_gateway_telegram_link_user,ai.gateway.telegram.link.user,model_ai_gateway_telegram_link,base.group_user,1,0,0,0
+access_ai_gateway_telegram_link_admin,ai.gateway.telegram.link.admin,model_ai_gateway_telegram_link,base.group_system,1,1,1,1
+access_ai_gateway_telegram_link_code_user,ai.gateway.telegram.link.code.user,model_ai_gateway_telegram_link_code,base.group_user,1,0,1,0
+access_ai_gateway_telegram_link_code_admin,ai.gateway.telegram.link.code.admin,model_ai_gateway_telegram_link_code,base.group_system,1,1,1,1
+access_ai_gateway_telegram_link_wizard,ai.gateway.telegram.link.wizard,model_ai_gateway_telegram_link_wizard,base.group_user,1,1,1,1

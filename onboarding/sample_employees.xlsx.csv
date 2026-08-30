@@ -1,0 +1,9 @@
+name,email,role,department,job_title,manager_email
+دمو مدیرعامل,ceo@client.com,executive,مدیریت,مدیرعامل,
+دمو مدیر مالی,cfo@client.com,finance_manager,مالی,مدیر مالی,ceo@client.com
+دمو حسابدار,accountant@client.com,finance_staff,مالی,کارشناس حسابداری,cfo@client.com
+دمو مدیر انبار,warehouse-mgr@client.com,warehouse_manager,انبار,مدیر انبار,ceo@client.com
+دمو انباردار,warehouse@client.com,warehouse_staff,انبار,کارشناس انبار,warehouse-mgr@client.com
+دمو مدیر منابع انسانی,hr-mgr@client.com,hr_manager,منابع انسانی,مدیر منابع انسانی,ceo@client.com
+دمو حراست,security@client.com,security,منابع انسانی,کارشناس حراست,hr-mgr@client.com
+علی محمدی,ali@client.com,employee,فروش,کارشناس فروش,ceo@client.com

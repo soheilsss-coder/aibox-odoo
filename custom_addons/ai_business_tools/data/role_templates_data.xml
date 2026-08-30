@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+    <!-- Role Templates (roadmap item #5): each one is a single group
+         to assign a person to, which then automatically grants the
+         real underlying Odoo permission groups via implied_ids - so
+         "give this employee the HR Manager role" is one click/one
+         line in Excel onboarding, not five separate group checkboxes.
+         These are also directly usable as the group_id on
+         company.document (access_level=group) and for department-
+         scoped record rules later.
+
+         IMPORTANT: implied_ids only ADDS groups, it does not remove
+         them if unchecked later - removing a role template from a
+         user does not automatically strip the implied groups it once
+         granted. That is a known Odoo groups_id/implied_ids behavior,
+         not a bug in this file; if you need clean revocation, remove
+         the implied groups explicitly too. -->
+
+    <record id="role_category" model="ir.module.category">
+        <field name="name">AI Role Templates</field>
+        <field name="sequence">1</field>
+    </record>
+
+    <record id="role_employee" model="res.groups">
+        <field name="name">Role: Employee</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Baseline role every internal user has: own leave requests, own tasks, company-wide documents.</field>
+    </record>
+
+    <record id="role_manager" model="res.groups">
+        <field name="name">Role: Manager</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_employee')), (4, ref('project.group_project_manager'))]"/>
+        <field name="comment">Any team lead: can create/assign tasks for their reports, see team documents.</field>
+    </record>
+
+    <record id="role_hr_staff" model="res.groups">
+        <field name="name">Role: HR Staff</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_employee')), (4, ref('hr.group_hr_user'))]"/>
+        <field name="comment">Can view HR records, cannot approve leave or generate decrees.</field>
+    </record>
+
+    <record id="role_hr_manager" model="res.groups">
+        <field name="name">Role: HR Manager</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_hr_staff')), (4, ref('hr.group_hr_manager')), (4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="comment">Can approve/reject leave, review pending HR decrees (approve_leave, reject_leave, ai.gateway.approval).</field>
+    </record>
+
+    <record id="role_finance_staff" model="res.groups">
+        <field name="name">Role: Finance Staff</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_employee')), (4, ref('account.group_account_invoice'))]"/>
+    </record>
+
+    <record id="role_finance_manager" model="res.groups">
+        <field name="name">Role: Finance Manager</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_finance_staff')), (4, ref('account.group_account_manager'))]"/>
+    </record>
+
+    <record id="role_warehouse_staff" model="res.groups">
+        <field name="name">Role: Warehouse Staff</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_employee')), (4, ref('stock.group_stock_user'))]"/>
+    </record>
+
+    <record id="role_warehouse_manager" model="res.groups">
+        <field name="name">Role: Warehouse Manager</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_warehouse_staff')), (4, ref('stock.group_stock_manager'))]"/>
+    </record>
+
+    <record id="role_project_manager" model="res.groups">
+        <field name="name">Role: Project Manager</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_manager')), (4, ref('project.group_project_manager'))]"/>
+    </record>
+
+
+    <record id="role_manufacturing_manager" model="res.groups">
+        <field name="name">Role: Manufacturing Manager</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_manager')), (4, ref('mrp.group_mrp_manager'))]"/>
+    </record>
+
+
+    <record id="role_sales_manager" model="res.groups">
+        <field name="name">Role: Sales Manager</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_manager')), (4, ref('sales_team.group_sale_manager'))]"/>
+    </record>
+
+    <record id="role_purchase_manager" model="res.groups">
+        <field name="name">Role: Purchase Manager</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_manager')), (4, ref('purchase.group_purchase_manager'))]"/>
+    </record>
+
+    <record id="role_executive" model="res.groups">
+        <field name="name">Role: Executive</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_hr_manager')), (4, ref('role_finance_manager')), (4, ref('role_warehouse_manager')), (4, ref('role_project_manager')), (4, ref('role_manufacturing_manager')), (4, ref('role_sales_manager')), (4, ref('role_purchase_manager'))]"/>
+        <field name="comment">CEO-level: everything below, plus is treated as an HR Manager for approve_leave/reject_leave/ai.gateway.approval purposes.</field>
+    </record>
+
+    <record id="role_security" model="res.groups">
+        <field name="name">Role: Security</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('role_employee'))]"/>
+        <field name="comment">Deliberately narrow - security staff get only baseline employee access unless explicitly widened per company.document group assignment.</field>
+    </record>
+
+    <record id="role_system_admin" model="res.groups">
+        <field name="name">Role: System Administrator</field>
+        <field name="category_id" ref="role_category"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_system'))]"/>
+        <field name="comment">Full technical administration - use sparingly, this is NOT the same as Executive.</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="ai_gateway_access_grant_view_list" model="ir.ui.view">
+        <field name="name">ai.gateway.access.grant.list</field>
+        <field name="model">ai.gateway.access.grant</field>
+        <field name="arch" type="xml">
+            <list decoration-info="state == 'active'" decoration-muted="state in ('expired','revoked')">
+                <field name="to_user_id"/>
+                <field name="group_id"/>
+                <field name="delegated_from_id"/>
+                <field name="start_date"/>
+                <field name="expires_on"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="ai_gateway_access_grant_view_form" model="ir.ui.view">
+        <field name="name">ai.gateway.access.grant.form</field>
+        <field name="model">ai.gateway.access.grant</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_revoke_now" type="object" string="Revoke Now"
+                            invisible="state not in ('scheduled', 'active')"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="to_user_id"/>
+                        <field name="group_id"/>
+                        <field name="delegated_from_id"/>
+                        <field name="start_date"/>
+                        <field name="expires_on"/>
+                        <field name="reason"/>
+                        <field name="granted_by_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="ai_gateway_access_grant_action" model="ir.actions.act_window">
+        <field name="name">Temporary / Delegated Access</field>
+        <field name="res_model">ai.gateway.access.grant</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="ai_gateway_access_grant_menu"
+              name="Temporary Access"
+              action="ai_gateway_access_grant_action"
+              parent="base.menu_administration"
+              sequence="51"/>
+
+</odoo>

@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_document_chunk_user,ai.document.chunk.user,model_ai_document_chunk,base.group_user,1,0,0,0
+access_ai_document_chunk_admin,ai.document.chunk.admin,model_ai_document_chunk,base.group_system,1,1,1,1
+access_ai_document_index_job,ai.document.index.job,model_ai_document_index_job,base.group_system,1,1,1,1

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Mirrors ai_business_tools/security/document_rules.xml exactly,
+         just via the document_id relation instead of the fields
+         directly. NOTE: search_similar() on ai.document.chunk does
+         its own pre-filtering through company.document's ORM search
+         (which already applies THAT rule) and never relies on this
+         one, because it queries via raw SQL which bypasses ir.rule
+         entirely - see document_chunk.py's docstring. This rule is
+         the independent second layer for anyone who reads
+         ai.document.chunk directly (e.g. the debug list view under
+         Settings > Technical, or a future tool that queries chunks
+         without going through search_similar). -->
+    <record id="ai_document_chunk_rule_user" model="ir.rule">
+        <field name="name">Document Chunk: scoped by parent document's access_level</field>
+        <field name="model_id" ref="model_ai_document_chunk"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[
+            '|', '|', '|',
+            ('document_id.access_level', '=', 'company'),
+            '&amp;', ('document_id.access_level', '=', 'group'),
+                     ('document_id.group_id', 'in', user.groups_id.ids),
+            '&amp;', ('document_id.access_level', '=', 'department'),
+                     ('document_id.department_id', '=', user.employee_id.department_id.id),
+            '&amp;', ('document_id.access_level', '=', 'personal'),
+                     ('document_id.owner_id', '=', user.id)
+        ]</field>
+    </record>
+
+    <record id="ai_document_chunk_rule_admin" model="ir.rule">
+        <field name="name">Document Chunk: admin full access</field>
+        <field name="model_id" ref="model_ai_document_chunk"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <record id="policy_hr_leave_create_own" model="ai.control.policy"><field name="capability_name">hr.leave.create</field><field name="resource_model">hr.leave</field><field name="scope">own</field><field name="description">Employees may create their own leave request only.</field></record>
+  <record id="policy_hr_attendance_read_company" model="ai.control.policy"><field name="capability_name">hr.attendance.read</field><field name="resource_model">hr.attendance</field><field name="scope">company</field><field name="required_groups" eval="[(4, ref('hr.group_hr_user')), (4, ref('hr.group_hr_manager')), (4, ref('ai_business_tools.role_executive')), (4, ref('ai_business_tools.role_security')), (4, ref('ai_business_tools.role_system_admin'))]"/><field name="description">Attendance reporting is restricted to authorized HR roles.</field></record>
+</odoo>

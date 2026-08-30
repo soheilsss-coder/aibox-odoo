@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <record id="cap_artifact_generate" model="ai.control.capability">
+    <field name="name">artifact.generate</field>
+    <field name="module_name">ai_experience</field>
+    <field name="description">Generate user-owned enterprise artifacts.</field>
+    <field name="operation">create</field>
+    <field name="risk_level">1</field>
+    <field name="source">manual</field>
+  </record>
+</odoo>

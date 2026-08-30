@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_workflow,ai.workflow,model_ai_workflow,base.group_system,1,1,1,1
+access_ai_workflow_run,ai.workflow.run,model_ai_workflow_run,base.group_system,1,1,1,1
+access_ai_workflow_approval,ai.workflow.approval,model_ai_workflow_approval,ai_workflow.group_workflow_approver,1,1,1,0

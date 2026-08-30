@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <!--
+    Default workflow: Task Deadline -> Reminder -> Escalation
+    (roadmap #9, "Calendar Integration": Deadline -> Reminder -> Escalation).
+
+    Wiring note: create_task already publishes a "task.created" event with
+    the task's deadline in the payload (ai_business_tools/models/
+    task_tools.py), and ai_integration's subscriber matrix already turns
+    that same event into a calendar.event. This workflow is the missing
+    second half: it waits until that same deadline and then notifies the
+    assignee and raises a "task.deadline_reached" escalation event, so a
+    Notification/Buzz/Telegram subscriber (or a future one) has something
+    to react to.
+
+    Known, explicit limitation (documented rather than hidden): the
+    workflow DSL currently has no "re-read the record" step type, so this
+    cannot check whether the task was already completed before the
+    deadline arrived - it fires the reminder/escalation unconditionally
+    once the deadline timestamp passes. If per-task "already done, skip
+    the reminder" behaviour is required, add a dedicated read-only tool
+    (e.g. "get_task_status") and a "tool" + "condition" step pair once
+    that tool exists; the engine already supports that pattern (see the
+    "tool" step type in ai_workflow/models/workflow.py).
+  -->
+  <record id="workflow_task_deadline_escalation" model="ai.workflow">
+    <field name="name">Task Deadline Reminder + Escalation</field>
+    <field name="code">task_deadline_escalation</field>
+    <field name="trigger_event">task.created</field>
+    <field name="state">active</field>
+    <field name="max_attempts">5</field>
+    <field name="lock_timeout_seconds">300</field>
+    <field name="definition_json"><![CDATA[
+{
+  "steps": [
+    {"action": "branch", "if": {"value": "$deadline", "operator": "truthy"}, "then": 1, "else": 4},
+    {"action": "wait_until", "datetime": "$deadline", "reason": "waiting for task deadline"},
+    {"action": "notify", "summary": "یادآوری ددلاین تسک", "message": "موعد ددلاین این تسک رسیده است - لطفاً وضعیت را بررسی کنید."},
+    {"action": "escalate", "event_type": "task.deadline_reached", "reason": "ددلاین تسک رسید و نیاز به بررسی/تشدید دارد."},
+    {"action": "noop"}
+  ]
+}
+    ]]></field>
+    <field name="compensation_definition_json"><![CDATA[[]]]></field>
+  </record>
+
+  <!--
+    Default workflow: Leave Approved -> Escalate if not reflected on
+    calendar/notified within a grace window. This is deliberately a thin
+    safety net on top of the direct core_event_subscribers.xml
+    Calendar/Notification subscriptions for "leave.approved" (which now
+    fire correctly - see the corresponding fix in
+    ai_business_tools/models/hr_leave_tools.py, approve_leave() previously
+    never published this event at all). It does not duplicate the
+    calendar-event creation itself; it only raises a durable
+    "leave.approval_workflow_completed" audit trail event so Workflow-run
+    history shows the leave lifecycle end-to-end, independent of whether
+    the Calendar module happens to be installed for this customer.
+  -->
+  <record id="workflow_leave_approved_audit_trail" model="ai.workflow">
+    <field name="name">Leave Approved - Workflow Audit Trail</field>
+    <field name="code">leave_approved_audit_trail</field>
+    <field name="trigger_event">leave.approved</field>
+    <field name="state">active</field>
+    <field name="max_attempts">5</field>
+    <field name="lock_timeout_seconds">300</field>
+    <field name="definition_json"><![CDATA[
+{
+  "steps": [
+    {"action": "audit", "name": "leave_approved_workflow_seen"},
+    {"action": "event", "event_type": "leave.approval_workflow_completed"}
+  ]
+}
+    ]]></field>
+    <field name="compensation_definition_json"><![CDATA[[]]]></field>
+  </record>
+</odoo>

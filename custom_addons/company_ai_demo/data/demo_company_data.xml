@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="demo_user_ceo" model="res.users">
+        <field name="name">دمو مدیرعامل</field>
+        <field name="login">ceo@demo.local</field>
+        <field name="email">ceo@demo.local</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('base.group_user'), ref('base.group_system'),
+            ref('hr.group_hr_manager'), ref('account.group_account_manager'),
+            ref('stock.group_stock_manager'),
+        ])]"/>
+    </record>
+
+    <record id="demo_user_accountant" model="res.users">
+        <field name="name">دمو حسابدار</field>
+        <field name="login">accountant@demo.local</field>
+        <field name="email">accountant@demo.local</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('base.group_user'), ref('account.group_account_manager'),
+        ])]"/>
+    </record>
+
+    <record id="demo_user_warehouse" model="res.users">
+        <field name="name">دمو مسئول انبار</field>
+        <field name="login">warehouse@demo.local</field>
+        <field name="email">warehouse@demo.local</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('base.group_user'), ref('stock.group_stock_manager'),
+        ])]"/>
+    </record>
+
+    <record id="demo_user_hr_security" model="res.users">
+        <field name="name">دمو مسئول حراست</field>
+        <field name="login">security@demo.local</field>
+        <field name="email">security@demo.local</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('base.group_user'), ref('hr.group_hr_user'),
+            ref('hr_attendance.group_hr_attendance_manager'),
+        ])]"/>
+    </record>
+
+    <record id="demo_employee_ceo" model="hr.employee">
+        <field name="name">دمو مدیرعامل</field>
+        <field name="user_id" ref="demo_user_ceo"/>
+    </record>
+    <record id="demo_employee_accountant" model="hr.employee">
+        <field name="name">دمو حسابدار</field>
+        <field name="user_id" ref="demo_user_accountant"/>
+        <field name="parent_id" ref="demo_employee_ceo"/>
+    </record>
+    <record id="demo_employee_warehouse" model="hr.employee">
+        <field name="name">دمو مسئول انبار</field>
+        <field name="user_id" ref="demo_user_warehouse"/>
+        <field name="parent_id" ref="demo_employee_ceo"/>
+    </record>
+    <record id="demo_employee_hr_security" model="hr.employee">
+        <field name="name">دمو مسئول حراست</field>
+        <field name="user_id" ref="demo_user_hr_security"/>
+        <field name="parent_id" ref="demo_employee_ceo"/>
+    </record>
+
+    <record id="demo_attendance_accountant_today" model="hr.attendance">
+        <field name="employee_id" ref="demo_employee_accountant"/>
+        <field name="check_in" eval="(datetime.now()).strftime('%Y-%m-%d 06:15:00')"/>
+    </record>
+
+    <!-- Leave type that doesn't require allocation, so leave requests
+         can be created directly without a separate allocation step -->
+    <record id="demo_leave_type" model="hr.leave.type">
+        <field name="name">مرخصی استحقاقی</field>
+        <field name="requires_allocation">no</field>
+    </record>
+
+</odoo>

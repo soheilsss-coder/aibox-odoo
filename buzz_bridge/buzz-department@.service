@@ -1,0 +1,33 @@
+[Unit]
+Description=Buzz department bot (%i)
+After=network.target
+
+[Service]
+Type=simple
+# Everything this process needs comes from the env file below -
+# deliberately NOT passed as CLI args, since CLI args are visible to
+# any local user via `ps aux`. Required keys in
+# /etc/buzz-department/%i.env (see 19_setup_buzz_departments.sh):
+#   BUZZ_ACP_PRIVATE_KEY   (confirmed accepted as an env var fallback
+#                           by buzz-acp's own docs - avoids a bare
+#                           nsec ever showing up in a CLI arg)
+#   BUZZ_ACP_AGENT_OWNER   (this department's manager's Nostr pubkey -
+#                           "Keep Buzz agents owner-only" per Hermes
+#                           Agent's own official security guidance)
+#   BUZZ_RELAY_URL
+#   ODOO_GATEWAY_URL / ODOO_GATEWAY_API_KEY (read by the bridge)
+EnvironmentFile=/etc/buzz-department/%i.env
+ExecStart=/opt/buzz/target/release/buzz-acp \
+    --relay-url ${BUZZ_RELAY_URL} \
+    --agent-bin /opt/buzz/target/release/buzz-agent \
+    --mcp-server /opt/buzz-bridge/venv/bin/python,/opt/buzz-bridge/hermes_gateway_mcp_server.py \
+    --respond-to owner-only \
+    --heartbeat-interval 3600 \
+    --heartbeat-prompt-file /etc/buzz-department/%i.heartbeat.txt
+Restart=on-failure
+RestartSec=10
+User=buzz-bot
+Group=buzz-bot
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="ai_document_chunk_view_list" model="ir.ui.view">
+        <field name="name">ai.document.chunk.list</field>
+        <field name="model">ai.document.chunk</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false">
+                <field name="document_id" string="سند"/>
+                <field name="sequence" string="ترتیب"/>
+                <field name="content" string="متن" optional="show"/>
+                <field name="content_hash" string="hash" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="ai_document_chunk_action" model="ir.actions.act_window">
+        <field name="name">RAG Document Chunks</field>
+        <field name="res_model">ai.document.chunk</field>
+        <field name="view_mode">list</field>
+        <field name="help">
+            هر ردیف اینجا یک بخش (chunk) از یک سند است که embedding آن
+            محاسبه و ذخیره شده - برای بازبینی کیفیت chunking و اینکه
+            جستجوی معنایی چه چیزی می‌بیند (roadmap #27). دسترسی این
+            لیست از همان قانون company.document پیروی می‌کند
+            (chunk_rules.xml)، به‌علاوه اینکه جستجوی واقعی
+            (search_documents_semantic) قبل از این هم یک فیلتر جدا
+            دارد - این لیست فقط برای بازبینی ادمین است.
+        </field>
+    </record>
+
+    <menuitem id="ai_document_chunk_menu"
+              name="RAG Document Chunks"
+              action="ai_document_chunk_action"
+              parent="base.menu_administration"
+              sequence="52"/>
+
+</odoo>

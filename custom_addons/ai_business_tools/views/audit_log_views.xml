@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="ai_gateway_audit_log_view_list" model="ir.ui.view">
+        <field name="name">ai.gateway.audit.log.list</field>
+        <field name="model">ai.gateway.audit.log</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="not success" create="false" edit="false" delete="false">
+                <field name="create_date" string="زمان"/>
+                <field name="user_id" string="کاربر"/>
+                <field name="source" string="منبع"/>
+                <field name="action" string="عملیات"/>
+                <field name="success" string="موفق"/>
+                <field name="error_message" string="خطا" optional="hide"/>
+                <field name="payload" string="پارامترها" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="ai_gateway_audit_log_view_search" model="ir.ui.view">
+        <field name="name">ai.gateway.audit.log.search</field>
+        <field name="model">ai.gateway.audit.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="user_id"/>
+                <field name="action"/>
+                <field name="source"/>
+                <filter name="failed_only" string="فقط ناموفق‌ها" domain="[('success', '=', False)]"/>
+                <filter name="today" string="امروز"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <separator/>
+                <filter name="source_tool" string="Tool Call" domain="[('source', '=', 'tool')]"/>
+                <filter name="source_rpc" string="Gateway RPC" domain="[('source', '=', 'rpc')]"/>
+                <filter name="source_chat" string="Gateway Chat" domain="[('source', '=', 'chat')]"/>
+                <group expand="0" string="گروه‌بندی">
+                    <filter name="group_by_user" string="کاربر" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_by_action" string="عملیات" context="{'group_by': 'action'}"/>
+                    <filter name="group_by_success" string="موفقیت" context="{'group_by': 'success'}"/>
+                    <filter name="group_by_day" string="روز" context="{'group_by': 'create_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="ai_gateway_audit_log_view_graph" model="ir.ui.view">
+        <field name="name">ai.gateway.audit.log.graph</field>
+        <field name="model">ai.gateway.audit.log</field>
+        <field name="arch" type="xml">
+            <graph type="line" string="AI Gateway - درخواست‌ها در ساعت">
+                <field name="create_date" interval="hour" type="row"/>
+                <field name="id" type="measure" string="تعداد درخواست"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="ai_gateway_audit_log_view_pivot" model="ir.ui.view">
+        <field name="name">ai.gateway.audit.log.pivot</field>
+        <field name="model">ai.gateway.audit.log</field>
+        <field name="arch" type="xml">
+            <pivot string="AI Gateway - جدول محوری">
+                <field name="create_date" interval="day" type="row"/>
+                <field name="action" type="col"/>
+                <field name="id" type="measure" string="تعداد"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="ai_gateway_audit_log_action" model="ir.actions.act_window">
+        <field name="name">AI Audit Log</field>
+        <field name="res_model">ai.gateway.audit.log</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="ai_gateway_audit_log_view_search"/>
+        <field name="context">{'search_default_failed_only': 0}</field>
+        <field name="help">
+            هر عملیاتی که یک ایجنت AI (از طریق ابزار، RPC یا چت) از طرف یک
+            کاربر انجام داده، اینجا ثبت شده - چه موفق چه ناموفق. کاربران
+            عادی فقط عملیات خودشان را می‌بینند؛ نقش‌های Executive / System
+            Administrator / Security همه‌چیز را می‌بینند (roadmap #12).
+        </field>
+    </record>
+
+    <!-- Observability (roadmap #48) - "even a single SQL query showing
+         requests/hour" was the ask; a graph+pivot on the SAME audit
+         log table (no new model, no new data pipeline) is that, made
+         visual. Same record rule as the list view above applies, so
+         a regular user only ever sees their own volume here too. -->
+    <record id="ai_gateway_audit_log_action_observability" model="ir.actions.act_window">
+        <field name="name">AI Observability</field>
+        <field name="res_model">ai.gateway.audit.log</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="search_view_id" ref="ai_gateway_audit_log_view_search"/>
+        <field name="context">{'search_default_today': 0}</field>
+        <field name="help">
+            نمودار درخواست‌ها در طول زمان و جدول محوری بر اساس عملیات -
+            نسخه‌ی بصری همون audit log، برای دیدن سریع «سیستم زنده است و
+            چند درخواست در ساعت می‌گیرد» (roadmap #48). برای اعداد خام
+            (نرخ خطا، میانگین تاخیر) از اندپوینت `/api/metrics` یا
+            اسکریپت `12_observability_report.py` استفاده کن.
+        </field>
+    </record>
+
+    <menuitem id="ai_gateway_audit_log_menu"
+              name="AI Audit Log"
+              action="ai_gateway_audit_log_action"
+              parent="base.menu_administration"
+              sequence="51"/>
+
+    <menuitem id="ai_gateway_observability_menu"
+              name="AI Observability"
+              action="ai_gateway_audit_log_action_observability"
+              parent="base.menu_administration"
+              sequence="52"/>
+
+</odoo>

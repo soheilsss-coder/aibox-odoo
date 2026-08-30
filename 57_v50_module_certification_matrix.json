@@ -1,0 +1,7 @@
+{
+  "release": "v50",
+  "modules": ["purchase","stock","accounting","mrp","crm","hr","hr_holidays","sale","project","documents","calendar","helpdesk","hr_expense"],
+  "gates": ["install","discovery","models","groups","capabilities","adapter","tool","authorization","policy","risk","approval","commit_time","events","workflow","notifications","audit","ai_tools","rag_acl","frontend_capabilities","security","e2e"],
+  "fail_closed": true,
+  "production_requires": "all modules installed in the target customer DB and every gate PASS"
+}

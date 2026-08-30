@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="ai_gateway_telegram_link_wizard_view_form" model="ir.ui.view">
+        <field name="name">ai.gateway.telegram.link.wizard.form</field>
+        <field name="model">ai.gateway.telegram.link.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group invisible="not already_linked_chat_id">
+                    <p>
+                        شما از قبل یک چت تلگرام وصل‌شده دارید. برای وصل‌کردن یک
+                        چت جدید، اول ادمین سیستم باید اتصال قبلی را از
+                        Settings &gt; Technical &gt; Telegram Links حذف کند.
+                    </p>
+                </group>
+                <group invisible="already_linked_chat_id">
+                    <p>
+                        این کد را تا ۱۰ دقیقه‌ی آینده به ربات تلگرام شرکت بفرست
+                        (با یک پیام /link قبلش):
+                    </p>
+                    <field name="code" readonly="1" nolabel="1"
+                           style="font-size: 1.4em; font-weight: bold; letter-spacing: 2px;"/>
+                    <p>
+                        مثال پیام کامل که باید در تلگرام به
+                        <field name="bot_username" readonly="1" nolabel="1" class="oe_inline"/>
+                        بفرستی:
+                    </p>
+                </group>
+                <footer>
+                    <button string="بستن" class="btn-primary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="ai_gateway_telegram_link_wizard_action" model="ir.actions.act_window">
+        <field name="name">Generate Telegram Link Code</field>
+        <field name="res_model">ai.gateway.telegram.link.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Standalone top-level menu, NOT nested under Settings >
+         Administration: every internal user (base.group_user) needs
+         to reach this to link their OWN Telegram chat, not just
+         admins - nesting it under Administration would have hidden it
+         from the exact people who need it. -->
+    <menuitem id="ai_telegram_bridge_root_menu" name="AI Telegram" sequence="95"
+              groups="base.group_user"/>
+    <menuitem id="ai_gateway_telegram_link_wizard_menu"
+              name="Generate Link Code"
+              action="ai_gateway_telegram_link_wizard_action"
+              parent="ai_telegram_bridge_root_menu"
+              sequence="1"/>
+
+</odoo>

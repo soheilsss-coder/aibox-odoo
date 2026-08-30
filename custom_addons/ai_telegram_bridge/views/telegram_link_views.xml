@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="ai_gateway_telegram_link_view_list" model="ir.ui.view">
+        <field name="name">ai.gateway.telegram.link.list</field>
+        <field name="model">ai.gateway.telegram.link</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false">
+                <field name="user_id" string="کاربر"/>
+                <field name="chat_id" string="Telegram chat_id"/>
+                <field name="linked_date" string="تاریخ اتصال"/>
+                <field name="last_message_date" string="آخرین پیام"/>
+                <field name="active" string="فعال"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="ai_gateway_telegram_link_action" model="ir.actions.act_window">
+        <field name="name">Telegram Links</field>
+        <field name="res_model">ai.gateway.telegram.link</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'active_test': False}</field>
+        <field name="help">
+            هر کاربر اودو که چت تلگرام خودش را وصل کرده اینجا لیست شده
+            (roadmap - Telegram Bridge). برای قطع دسترسی یک کارمند از
+            تلگرام، رکورد مربوطه را غیرفعال یا حذف کن - این کار به
+            `ai.gateway.api.key` آن کاربر دست نمی‌زند، فقط مسیر تلگرام
+            را قطع می‌کند.
+        </field>
+    </record>
+
+    <menuitem id="ai_gateway_telegram_link_admin_menu"
+              name="Telegram Links"
+              action="ai_gateway_telegram_link_action"
+              parent="base.menu_administration"
+              sequence="54"/>
+
+</odoo>

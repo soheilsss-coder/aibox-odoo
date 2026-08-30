@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Roadmap item #2 (Department): same pattern as
+         company_document_rule_user (access_level scoped by the
+         viewer's own hr.department), applied to project.task instead
+         of a manually-picked group.
+
+         Role: Manager (role_manager, data/role_templates_data.xml)
+         implies project.group_project_manager, which by itself would
+         let ANY team lead see every task in the whole company - too
+         broad for a plain department-level manager. This rule narrows
+         that down to "only tasks assigned to someone in my own
+         department" for holders of role_manager specifically.
+
+         This is deliberately a GLOBAL rule (no <field name="groups">)
+         so it is AND-ed with every other rule on this model instead of
+         OR-ed - if it were group-scoped like company_document_rule_user,
+         Odoo's own default OR-combination of rules-per-group would let
+         the existing broad project.group_project_manager rule silently
+         cancel this restriction out for anyone holding both groups,
+         which is exactly the mistake this rule exists to avoid.
+         Being global means it must explicitly except every role that
+         legitimately needs company-wide task visibility, or it would
+         wrongly restrict them too - done below via has_group() in the
+         domain expression itself (a standard, safe_eval-supported
+         Odoo idiom, not a hack). -->
+    <record id="project_task_department_rule" model="ir.rule">
+        <field name="name">Project Task: department-scoped for Role: Manager</field>
+        <field name="model_id" ref="project.model_project_task"/>
+        <field name="domain_force">(
+            [('user_ids.employee_id.department_id', '=', user.employee_id.department_id.id)]
+            if (user.has_group('ai_business_tools.role_manager')
+                and not user.has_group('ai_business_tools.role_project_manager')
+                and not user.has_group('ai_business_tools.role_executive')
+                and not user.has_group('ai_business_tools.role_system_admin')
+                and not user.has_group('base.group_system'))
+            else [(1, '=', 1)]
+        )</field>
+    </record>
+
+    <!-- صادقانه (honest note): این قانون فقط برای دارنده‌ی مستقیم
+         Role: Manager اجرا می‌شود؛ اگر بعداً یک Role جدید بسازی که
+         project.group_project_manager را implied می‌کند ولی از این دو
+         گروه (role_manager) نیست، باید آن را هم به لیست استثناها یا
+         به این قانون اضافه کنی - این خودکار برای Roleهای آینده اعمال
+         نمی‌شود، دقیقاً همان محدودیتی که مورد #18 (Policy Registry)
+         درباره‌ی enforce() صریح هم گفته بود. -->
+
+</odoo>

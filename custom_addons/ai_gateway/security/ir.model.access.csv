@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_gateway_api_key_admin,ai.gateway.api.key.admin,model_ai_gateway_api_key,base.group_system,1,1,1,1
+access_ai_gateway_session,ai.gateway.session,model_ai_gateway_session,base.group_system,1,1,1,1
+access_ai_gateway_api_key_history_admin,ai.gateway.api.key.history.admin,model_ai_gateway_api_key_history,base.group_system,1,1,1,0
+access_ai_gateway_agent_identity_admin,ai.gateway.agent.identity.admin,model_ai_gateway_agent_identity,base.group_system,1,1,1,1

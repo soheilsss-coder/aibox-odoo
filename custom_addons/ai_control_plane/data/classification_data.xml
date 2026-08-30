@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <record id="class_hr_attendance" model="ai.control.data.classification">
+    <field name="model_name">hr.attendance</field><field name="classification">pii</field><field name="tenant_scope">company</field>
+    <field name="allowed_groups" eval="[(4, ref('hr.group_hr_user')), (4, ref('hr.group_hr_manager')), (4, ref('ai_business_tools.role_executive')), (4, ref('ai_business_tools.role_security')), (4, ref('ai_business_tools.role_system_admin'))]"/>
+  </record>
+  <record id="class_company_document" model="ai.control.data.classification">
+    <field name="model_name">company.document</field><field name="classification">confidential</field><field name="tenant_scope">company</field>
+  </record>
+</odoo>

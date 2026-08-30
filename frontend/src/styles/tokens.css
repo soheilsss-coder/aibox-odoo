@@ -1,0 +1,43 @@
+/* tokens.css — roadmap #45 (Design System). Originally just a starting
+   palette (colors/spacing/type as CSS variables, no shared components
+   or docs yet - see the phase-7 note in components/README.md for what
+   changed). Now the base layer under a real component library
+   (src/components/) that reads these variables via the ds-* classes
+   in app.css - so re-theming the whole app (a white-label customer,
+   item #55) still means editing values here, nothing else. */
+:root {
+  --color-bg: #0f1115;
+  --color-surface: #171a21;
+  --color-surface-alt: #1e222b;
+  --color-border: #2a2f3a;
+  --color-text: #e8eaed;
+  --color-text-muted: #9aa1ac;
+  --color-primary: #4f8cff;
+  --color-primary-hover: #6ea0ff;
+  --color-danger: #e5484d;
+  --color-success: #3dd68c;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 40px;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-sans: "Vazirmatn", "Segoe UI", system-ui, sans-serif;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-lg: 20px;
+  --font-size-xl: 26px;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* Added in phase 7 for the component library (#45) - the tokens
+     above already covered color/spacing/type; these fill in the two
+     things Button/Card/Modal needed that weren't there yet. */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-modal: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --color-warning: #caa23d;
+  --color-info: #4f8cff;
+}

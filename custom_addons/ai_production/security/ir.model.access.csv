@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_production_check,ai.production.check,model_ai_production_check,base.group_system,1,1,1,1
+access_ai_release_certification,ai.release.certification,model_ai_release_certification,base.group_system,1,1,1,1

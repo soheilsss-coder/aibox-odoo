@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+    <record id="debrand_param_name" model="ir.config_parameter">
+        <field name="key">ai.brand.name</field>
+        <field name="value">Company AI</field>
+    </record>
+    <record id="debrand_param_domain" model="ir.config_parameter">
+        <field name="key">ai.brand.domain</field>
+        <field name="value">https://example.invalid</field>
+    </record>
+    <function model="res.company" name="write">
+        <value model="res.company" eval="obj().search([])"/>
+        <value eval="{'report_footer': 'Company AI'}"/>
+    </function>
+</odoo>

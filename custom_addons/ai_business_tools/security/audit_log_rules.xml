@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- HONEST GAP THIS CLOSES: ir.model.access.csv gives every
+         internal user (base.group_user) perm_read=1 on
+         ai.gateway.audit.log with no accompanying ir.rule - which
+         means, until this file, ANY employee could read EVERY other
+         employee's audit trail (who approved what leave, who was
+         granted what temporary access, etc). A regular user should
+         only ever see their own actions; only privileged
+         (audit/security-relevant) roles should see everyone's. -->
+
+    <record id="audit_log_rule_own_only" model="ir.rule">
+        <field name="name">AI Gateway Audit Log: own entries only</field>
+        <field name="model_id" ref="model_ai_gateway_audit_log"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+
+    <!-- Privileged/audit-relevant roles see every user's entries - the
+         whole point of an audit log is that SOMEONE can see the full
+         picture, not just each person's own actions. -->
+    <record id="audit_log_rule_privileged_full" model="ir.rule">
+        <field name="name">AI Gateway Audit Log: privileged roles see everything</field>
+        <field name="model_id" ref="model_ai_gateway_audit_log"/>
+        <field name="groups" eval="[(4, ref('base.group_system')),
+                                    (4, ref('role_executive')),
+                                    (4, ref('role_system_admin')),
+                                    (4, ref('role_security'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+</odoo>

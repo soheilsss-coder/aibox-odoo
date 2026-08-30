@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Starter allowlist for the generic /api/rpc pass-through (used
+         by a separate dashboard frontend, not by the chat/tool path -
+         the chat path uses the named, audited tools instead and is not
+         limited by this table). Deny-by-default: nothing outside this
+         list is reachable via /api/rpc, no matter what Odoo's own ACL
+         would otherwise allow. Add rows here (Settings > Technical >
+         AI Gateway > Model Allowlist) as you deliberately decide a
+         model/operation SHOULD be dashboard-reachable - never widen it
+         just to make an error go away without thinking it through. -->
+    <record id="policy_partner_read" model="ai.gateway.model.policy">
+        <field name="model_name">res.partner</field>
+        <field name="operation">search_read</field>
+        <field name="notes">Contacts list for dashboard widgets</field>
+    </record>
+    <record id="policy_task_read" model="ai.gateway.model.policy">
+        <field name="model_name">project.task</field>
+        <field name="operation">search_read</field>
+        <field name="notes">Task board / calendar widgets</field>
+    </record>
+    <record id="policy_attendance_read" model="ai.gateway.model.policy">
+        <field name="model_name">hr.attendance</field>
+        <field name="operation">search_read</field>
+        <field name="notes">Attendance widgets</field>
+    </record>
+    <record id="policy_document_read" model="ai.gateway.model.policy">
+        <field name="model_name">company.document</field>
+        <field name="operation">search_read</field>
+        <field name="notes">Document list widget - still filtered by the record rule</field>
+    </record>
+</odoo>

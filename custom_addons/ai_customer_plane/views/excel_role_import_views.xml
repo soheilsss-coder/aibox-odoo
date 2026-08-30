@@ -1,0 +1,66 @@
+<odoo>
+    <record id="view_ai_customer_excel_role_import_form" model="ir.ui.view">
+        <field name="name">ai.customer.excel.role.import.form</field>
+        <field name="model">ai.customer.excel.role.import</field>
+        <field name="arch" type="xml">
+            <form string="Excel Role Import">
+                <header>
+                    <button name="action_validate" type="object" string="Validate / Preview"
+                            class="btn-primary" invisible="state not in ('draft','failed')"/>
+                    <button name="action_dry_run" type="object" string="Dry Run (Simulate, no writes)"
+                            invisible="state not in ('validated','approved')"/>
+                    <button name="action_approve" type="object" string="Approve Import"
+                            class="btn-primary" invisible="state != 'validated'"/>
+                    <button name="action_import" type="object" string="Commit Import"
+                            class="btn-primary" invisible="state != 'approved'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,validated,approved,imported"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="file_name"/>
+                        <field name="file_data" filename="file_name"/>
+                        <field name="file_sha256" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="approved_by" readonly="1"/>
+                        <field name="approved_at" readonly="1"/>
+                        <field name="imported_at" readonly="1"/>
+                        <field name="imported_count" readonly="1"/>
+                        <field name="create_count" readonly="1"/>
+                        <field name="update_count" readonly="1"/>
+                        <field name="unchanged_count" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Preview">
+                            <field name="preview_json" readonly="1"/>
+                        </page>
+                        <page string="Dry Run Summary">
+                            <field name="dry_run_json" readonly="1"/>
+                        </page>
+                        <page string="Errors">
+                            <field name="error_text" readonly="1"/>
+                        </page>
+                        <page string="Warnings">
+                            <field name="warning_text" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_customer_excel_role_import" model="ir.actions.act_window">
+        <field name="name">Excel Role Import</field>
+        <field name="res_model">ai.customer.excel.role.import</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_ai_customer_root" name="Customer Control Plane" sequence="30"/>
+    <menuitem id="menu_ai_customer_excel_role_import"
+              name="Excel Role Import"
+              parent="ai_customer_plane.menu_ai_customer_root"
+              action="action_ai_customer_excel_role_import"
+              sequence="40"/>
+</odoo>

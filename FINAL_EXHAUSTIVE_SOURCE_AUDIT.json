@@ -1,0 +1,384 @@
+{
+  "release": "v57-source-complete",
+  "errors": [],
+  "checks": {
+    "P0-1 generic-tool-deny": {
+      "pass": true,
+      "evidence": "02_install_modules.sh"
+    },
+    "P0-2 gateway-level-risk": {
+      "pass": true,
+      "evidence": "execution_gate.py"
+    },
+    "P0-3 commit-time-target-recheck": {
+      "pass": true,
+      "evidence": "execution_gate.py resolves exact targets and re-authorizes approval replay"
+    },
+    "P0-4 temporary-role-whitelist": {
+      "pass": true,
+      "evidence": "access_grant.py/access_review_tools.py"
+    },
+    "P0-5 no-temporary-group-mutation": {
+      "pass": true,
+      "evidence": "access_grant.py"
+    },
+    "P0-6 role-assignment-five-sources": {
+      "pass": true,
+      "evidence": "role_assignment.py"
+    },
+    "P0-7 delegation-integrated": {
+      "pass": true,
+      "evidence": "authorization.py/delegation.py"
+    },
+    "P0-8 approval-immutable-fields": {
+      "pass": true,
+      "evidence": "approval.py"
+    },
+    "P0-9 approval-history": {
+      "pass": true,
+      "evidence": "approval history model"
+    },
+    "P0-10 approval-commit-recheck": {
+      "pass": true,
+      "evidence": "approval.py"
+    },
+    "P0-11 browser-session-only": {
+      "pass": true,
+      "evidence": "semantic_api.py login"
+    },
+    "P0-12 api-key-hash-expiry-rotation": {
+      "pass": true,
+      "evidence": "api_key.py"
+    },
+    "P0-13 session-rotation": {
+      "pass": true,
+      "evidence": "session.py/semantic_api.py"
+    },
+    "P0-14 rpc-http410": {
+      "pass": true,
+      "evidence": "gateway.py"
+    },
+    "P0-15 adapter-keeps-odoo-acl": {
+      "pass": true,
+      "evidence": "unified_registry.py"
+    },
+    "ADAPTER-hr": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-account": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-stock": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-purchase": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-sale": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-crm": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-project": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-mrp": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-documents": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "ADAPTER-calendar": {
+      "pass": true,
+      "evidence": "adapter_data.xml"
+    },
+    "P0-16 attendance-hierarchy": {
+      "pass": true,
+      "evidence": "hr_decree.py"
+    },
+    "P0-17 elevated-access-before-query": {
+      "pass": true,
+      "evidence": "access_review_tools.py"
+    },
+    "P0-18 identity-review-restricted": {
+      "pass": true,
+      "evidence": "identity_integrity.py"
+    },
+    "P1-1 canonical-memory": {
+      "pass": true,
+      "evidence": "company_ai_demo/models"
+    },
+    "P1-2 encrypted-memory-policy": {
+      "pass": true,
+      "evidence": "memory_record.py"
+    },
+    "P1-3 fga-relations": {
+      "pass": true,
+      "evidence": "fga.py"
+    },
+    "P1-4 auth-fga-scopes": {
+      "pass": true,
+      "evidence": "authorization.py"
+    },
+    "P1-5 role-removal-reconciliation": {
+      "pass": true,
+      "evidence": "role_reconciler.py"
+    },
+    "P1-6 excel-attribute-role-engine": {
+      "pass": true,
+      "evidence": "excel_role_import.py"
+    },
+    "P1-7 excel-unknown-role-block": {
+      "pass": true,
+      "evidence": "excel_role_import.py"
+    },
+    "P1-8 no-credential-export": {
+      "pass": true,
+      "evidence": "onboard_from_excel.py"
+    },
+    "P1-9 frontend-capability-api": {
+      "pass": true,
+      "evidence": "semantic_api.py"
+    },
+    "P1-10 customer-control-plane": {
+      "pass": true,
+      "evidence": "ai_customer_plane/models"
+    },
+    "EVENT-workflow": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "EVENT-ai": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "EVENT-notification": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "EVENT-calendar": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "EVENT-buzz": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "EVENT-telegram": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "EVENT-memory": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "EVENT-audit": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "EVENT-rag": {
+      "pass": true,
+      "evidence": "subscriber_matrix.xml"
+    },
+    "P1-11 durable-event-outbox": {
+      "pass": true,
+      "evidence": "event.py"
+    },
+    "P1-12 workflow-event-driven": {
+      "pass": true,
+      "evidence": "workflow cron is recovery/deadline only"
+    },
+    "P1-13 ambiguous-task-assignment": {
+      "pass": true,
+      "evidence": "task_tools.py"
+    },
+    "P1-14 atomic-idempotency": {
+      "pass": true,
+      "evidence": "idempotency.py"
+    },
+    "P1-15 telegram-race-lock": {
+      "pass": true,
+      "evidence": "telegram_link_code.py"
+    },
+    "P2-1 model-registry-fields": {
+      "pass": true,
+      "evidence": "model_registry.py"
+    },
+    "P2-2 router-benchmark-gated": {
+      "pass": true,
+      "evidence": "model_registry.py"
+    },
+    "P2-3 required-model-profiles": {
+      "pass": true,
+      "evidence": "model_data.xml"
+    },
+    "P2-4 hermes-gateway": {
+      "pass": true,
+      "evidence": "hermes_gateway_mcp_server.py"
+    },
+    "P2-5 no-direct-hermes-erp": {
+      "pass": true,
+      "evidence": "gateway/control-plane architecture"
+    },
+    "DEPLOY-ai_collaboration": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_correspondence": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_workflow": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_integration": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_debrand": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_production": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_experience": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_control_plane": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_semantic_api": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_rag": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_document_intelligence": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_telegram_bridge": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-company_ai_demo": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_business_tools": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_customer_plane": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_gateway": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "P2-6 immutable-dependency-contract": {
+      "pass": true,
+      "evidence": "DEPENDENCY_LOCK.md"
+    },
+    "P2-7 qweb-white-label": {
+      "pass": true,
+      "evidence": "debrand_templates.xml"
+    },
+    "P2-8 cors-fail-closed": {
+      "pass": true,
+      "evidence": "gateway.py"
+    },
+    "P2-9 redis-rate-limit": {
+      "pass": true,
+      "evidence": "rate_limit.py"
+    },
+    "P2-10 audit-context-fields": {
+      "pass": true,
+      "evidence": "audit_log.py"
+    },
+    "P2-11 audit-chain-serialization": {
+      "pass": true,
+      "evidence": "audit_log.py"
+    },
+    "P2-12 context-firewall-pii": {
+      "pass": true,
+      "evidence": "context_firewall.py"
+    },
+    "P2-13 classification-authorization": {
+      "pass": true,
+      "evidence": "data_classification.py/authorization.py"
+    },
+    "P2-14 rag-fga-filter": {
+      "pass": true,
+      "evidence": "document_chunk.py"
+    },
+    "P2-15 rag-async-index": {
+      "pass": true,
+      "evidence": "index_job.py"
+    },
+    "DOC2-9 calendar-automation": {
+      "pass": true,
+      "evidence": "event_dispatch.py"
+    },
+    "DOC2-10 buzz-user-identity": {
+      "pass": true,
+      "evidence": "buzz_identity.py"
+    },
+    "DOC2-11 hermes-production-bridge": {
+      "pass": true,
+      "evidence": "hermes_gateway_mcp_server.py"
+    },
+    "DOC2-12 benchmark-promotion-gate": {
+      "pass": true,
+      "evidence": "benchmark gate"
+    },
+    "DOC2-13 universal-module-certification": {
+      "pass": true,
+      "evidence": "certification.py"
+    },
+    "DOC2-14 customer-control-plane-overview": {
+      "pass": true,
+      "evidence": "Customer Control Plane"
+    },
+    "DOC2-15 sso-scim-real-endpoints": {
+      "pass": true,
+      "evidence": "SSO/SCIM controllers"
+    },
+    "DOC2-16 delegation-audit": {
+      "pass": true,
+      "evidence": "delegation.py"
+    },
+    "DOC2-17 excel-policy-engine": {
+      "pass": true,
+      "evidence": "onboard_from_excel.py"
+    },
+    "DOC2-18 runtime-promotion-fail-closed": {
+      "pass": true,
+      "evidence": "release status"
+    },
+    "PRESERVATION-v52": {
+      "pass": true,
+      "evidence": "v52 source preserved by build procedure"
+    }
+  },
+  "runtime_certification": "REQUIRED_ON_REAL_STACK",
+  "runtime_note": "No source audit may fabricate Odoo/PostgreSQL/Redis/vLLM/IdP/Telegram/Buzz/DGX E2E PASS."
+}

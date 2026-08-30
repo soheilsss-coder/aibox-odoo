@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="rule_ai_control_module_active" model="ir.rule">
+    <field name="name">AI Control Module: active integrations</field>
+    <field name="model_id" ref="model_ai_control_module"/>
+    <field name="domain_force">[("active", "=", True)]</field>
+    <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+  </record>
+</odoo>

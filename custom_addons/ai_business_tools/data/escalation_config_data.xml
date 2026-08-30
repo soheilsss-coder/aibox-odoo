@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+
+    <!-- Roadmap item #35 (Escalation): how many days a task must be
+         overdue before cron_escalate_overdue_tasks (models/
+         task_automation.py) bumps it to the next escalation level.
+         Kept as ir.config_parameter (same pattern as company_ai_demo's
+         vision_api_base) instead of hardcoded, so a customer can tune
+         these from Settings > Technical > System Parameters without
+         touching code - there is no Setup Wizard yet (roadmap #46) to
+         expose this more nicely. -->
+    <record id="escalation_level1_days_param" model="ir.config_parameter">
+        <field name="key">ai_business_tools.escalation_level1_days</field>
+        <field name="value">3</field>
+    </record>
+
+    <record id="escalation_level2_days_param" model="ir.config_parameter">
+        <field name="key">ai_business_tools.escalation_level2_days</field>
+        <field name="value">7</field>
+    </record>
+
+    <record id="escalation_level3_days_param" model="ir.config_parameter">
+        <field name="key">ai_business_tools.escalation_level3_days</field>
+        <field name="value">14</field>
+    </record>
+
+</odoo>

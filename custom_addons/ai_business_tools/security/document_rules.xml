@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Every internal user sees: company-wide docs, docs of any group
+         they belong to, and their own personal docs - nothing else.
+         This single domain is the actual enforcement point; the tool
+         methods in company_document.py never filter by hand, they
+         just search() and let this rule do the filtering, exactly the
+         way the normal web client would. -->
+    <record id="company_document_rule_user" model="ir.rule">
+        <field name="name">Company Document: scoped by access_level</field>
+        <field name="model_id" ref="model_company_document"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[
+            '|', '|', '|', '|', '|',
+            ('access_level', '=', 'company'),
+            '&amp;', ('access_level', '=', 'group'), ('group_id', 'in', user.groups_id.ids),
+            '&amp;', ('access_level', '=', 'team'), ('member_ids', 'in', [user.id]),
+            '&amp;', ('access_level', '=', 'department'), ('department_id', '=', user.employee_id.department_id.id),
+            '&amp;', ('access_level', '=', 'personal'), ('owner_id', '=', user.id),
+            '&amp;', ('access_level', 'in', ['restricted','confidential']), ('allowed_user_ids', 'in', [user.id])
+        ]</field>
+    </record>
+
+    <!-- Administrators (base.group_system) manage everything, including
+         documents that would otherwise be scoped to someone else's
+         group or personal folder - needed for support/onboarding. -->
+    <record id="company_document_rule_admin" model="ir.rule">
+        <field name="name">Company Document: admin full access</field>
+        <field name="model_id" ref="model_company_document"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+</odoo>

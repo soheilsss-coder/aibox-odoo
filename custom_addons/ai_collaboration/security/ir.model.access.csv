@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_workspace,ai.collab.workspace,model_ai_collab_workspace,base.group_user,1,1,1,1
+access_ai_workspace_message,ai.collab.message,model_ai_collab_message,base.group_user,1,1,1,1
+access_ai_buzz_identity_admin,ai.collab.buzz.identity.admin,model_ai_collab_buzz_identity,base.group_system,1,1,1,1
+access_ai_channel_link_user,ai.collab.channel.link.user,model_ai_collab_channel_link,base.group_user,1,1,1,0
+access_ai_channel_link_admin,ai.collab.channel.link.admin,model_ai_collab_channel_link,base.group_system,1,1,1,1

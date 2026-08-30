@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <record id="adapter_hr" model="ai.integration.adapter"><field name="module_name">hr</field><field name="label">Human Resources</field><field name="capability_prefix">hr</field><field name="event_prefix">hr</field></record>
+  <record id="adapter_stock" model="ai.integration.adapter"><field name="module_name">stock</field><field name="label">Inventory</field><field name="capability_prefix">stock</field><field name="event_prefix">stock</field></record>
+  <record id="adapter_account" model="ai.integration.adapter"><field name="module_name">account</field><field name="label">Accounting</field><field name="capability_prefix">account</field><field name="event_prefix">account</field></record>
+  <record id="adapter_purchase" model="ai.integration.adapter"><field name="module_name">purchase</field><field name="label">Purchase</field><field name="capability_prefix">purchase</field><field name="event_prefix">purchase</field></record>
+  <record id="adapter_sale" model="ai.integration.adapter"><field name="module_name">sale</field><field name="label">Sales</field><field name="capability_prefix">sale</field><field name="event_prefix">sale</field></record>
+  <record id="adapter_crm" model="ai.integration.adapter"><field name="module_name">crm</field><field name="label">CRM</field><field name="capability_prefix">crm</field><field name="event_prefix">crm</field></record>
+  <record id="adapter_project" model="ai.integration.adapter"><field name="module_name">project</field><field name="label">Project</field><field name="capability_prefix">project</field><field name="event_prefix">project</field></record>
+  <record id="adapter_mrp" model="ai.integration.adapter"><field name="module_name">mrp</field><field name="label">Manufacturing</field><field name="capability_prefix">mrp</field><field name="event_prefix">mrp</field></record>
+  <record id="adapter_documents" model="ai.integration.adapter"><field name="module_name">documents</field><field name="label">Documents</field><field name="capability_prefix">documents</field><field name="event_prefix">documents</field></record>
+  <!--
+    De-duplication fix: audit is now handled uniformly by the universal
+    "matrix_audit" subscription in subscriber_matrix.xml (event_type="*"),
+    so these three per-event audit rows (which used a different
+    handler_key and therefore were NOT deduplicated against matrix_audit
+    by the dispatcher) are deactivated rather than deleted, to keep the
+    change auditable/reversible. Leaving them active would have produced
+    two audit log rows for every approval, every self-service leave
+    request, and every task creation.
+  -->
+  <record id="sub_approval" model="ai.integration.subscription"><field name="event_type">approval.approved</field><field name="target">audit</field><field name="active">0</field></record>
+  <record id="sub_leave" model="ai.integration.subscription"><field name="event_type">leave.created</field><field name="target">audit</field><field name="active">0</field></record>
+  <record id="sub_task" model="ai.integration.subscription"><field name="event_type">task.created</field><field name="target">audit</field><field name="active">0</field></record>
+
+  <record id="sub_approval_notification" model="ai.integration.subscription"><field name="event_type">approval.approved</field><field name="target">notification</field><field name="handler_key">approval_notification</field><field name="priority">20</field></record>
+  <record id="sub_leave_notification" model="ai.integration.subscription"><field name="event_type">leave.created</field><field name="target">notification</field><field name="handler_key">leave_notification</field><field name="priority">20</field></record>
+  <!--
+    De-duplication fix: duplicates sub_task_created_notification in
+    core_event_subscribers.xml exactly (same event_type/target, different
+    handler_key => not deduplicated by the dispatcher). Deactivated in
+    favour of the core_event_subscribers.xml version.
+  -->
+  <record id="sub_task_notification" model="ai.integration.subscription"><field name="event_type">task.created</field><field name="target">notification</field><field name="handler_key">task_notification</field><field name="priority">20</field><field name="active">0</field></record>
+  <!--
+    De-duplication fix: buzz is now handled uniformly by the universal
+    "matrix_buzz" subscription in subscriber_matrix.xml, so these
+    per-event buzz rows are deactivated for the same reason as the audit
+    rows above (different handler_key => dispatcher did not deduplicate
+    them against matrix_buzz => every leave/task/stage-change/escalation
+    was pinging the user twice in real time).
+  -->
+  <record id="sub_leave_buzz" model="ai.integration.subscription"><field name="event_type">leave.created</field><field name="target">buzz</field><field name="handler_key">leave_buzz</field><field name="priority">10</field><field name="active">0</field></record>
+  <record id="sub_task_buzz" model="ai.integration.subscription"><field name="event_type">task.created</field><field name="target">buzz</field><field name="handler_key">task_buzz</field><field name="priority">10</field><field name="active">0</field></record>
+
+  <record id="sub_task_stage_buzz" model="ai.integration.subscription"><field name="event_type">task.stage_changed</field><field name="target">buzz</field><field name="handler_key">task_stage_buzz</field><field name="active">0</field></record>
+  <record id="sub_task_escalation_buzz" model="ai.integration.subscription"><field name="event_type">task.escalation_changed</field><field name="target">buzz</field><field name="handler_key">task_escalation_buzz</field><field name="active">0</field></record>
+  <record id="sub_approval_rejected_audit" model="ai.integration.subscription"><field name="event_type">approval.rejected</field><field name="target">audit</field><field name="handler_key">approval_rejected_audit</field><field name="active">0</field></record>
+  <record id="sub_approval_cancelled_audit" model="ai.integration.subscription"><field name="event_type">approval.cancelled</field><field name="target">audit</field><field name="handler_key">approval_cancelled_audit</field><field name="active">0</field></record>
+  <record id="adapter_calendar" model="ai.integration.adapter"><field name="module_name">calendar</field><field name="label">Calendar</field><field name="capability_prefix">calendar</field><field name="event_prefix">calendar</field></record>
+  <record id="adapter_hr_attendance" model="ai.integration.adapter"><field name="module_name">hr_attendance</field><field name="label">Attendance</field><field name="capability_prefix">hr.attendance</field><field name="event_prefix">hr.attendance</field></record>
+  <record id="adapter_hr_expense" model="ai.integration.adapter"><field name="module_name">hr_expense</field><field name="label">Expenses</field><field name="capability_prefix">hr.expense</field><field name="event_prefix">hr.expense</field></record>
+  <record id="adapter_helpdesk" model="ai.integration.adapter"><field name="module_name">helpdesk</field><field name="label">Helpdesk</field><field name="capability_prefix">helpdesk</field><field name="event_prefix">helpdesk</field></record>
+  <record id="adapter_pos" model="ai.integration.adapter"><field name="module_name">point_of_sale</field><field name="label">Point of Sale</field><field name="capability_prefix">pos</field><field name="event_prefix">pos</field></record>
+  <record id="adapter_hr_holidays" model="ai.integration.adapter"><field name="module_name">hr_holidays</field><field name="label">Leave Management</field><field name="capability_prefix">hr.leave</field><field name="event_prefix">leave</field></record>
+  <!--
+    De-duplication fix: these two duplicate sub_task_created_calendar and
+    sub_leave_approved_calendar in core_event_subscribers.xml exactly
+    (same event_type, same target, same underlying _handle_calendar call,
+    different handler_key => not deduplicated). Deactivated in favour of
+    the core_event_subscribers.xml versions, which are kept as the single
+    source of truth for calendar automation.
+  -->
+  <record id="sub_task_calendar" model="ai.integration.subscription">
+    <field name="event_type">task.created</field>
+    <field name="target">calendar</field>
+    <field name="handler_key">task_calendar_v44</field>
+    <field name="subscriber_model">ai.integration.calendar.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">30</field>
+    <field name="active">0</field>
+  </record>
+  <record id="sub_leave_calendar" model="ai.integration.subscription">
+    <field name="event_type">leave.approved</field>
+    <field name="target">calendar</field>
+    <field name="handler_key">leave_calendar_v44</field>
+    <field name="subscriber_model">ai.integration.calendar.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">30</field>
+    <field name="active">0</field>
+  </record>
+  <record id="sub_memory_capture" model="ai.integration.subscription">
+    <field name="event_type">memory.capture.requested</field>
+    <field name="target">memory</field>
+    <field name="handler_key">memory_capture_v44</field>
+    <field name="subscriber_model">ai.integration.memory.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">20</field>
+  </record>
+</odoo>

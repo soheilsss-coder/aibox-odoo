@@ -1,0 +1,25 @@
+# Ignore Node.js dependencies
+/node_modules/
+
+# Ignore generated files
+/*.pid
+/*.pid.lock
+*.pyc
+__.pycache__/
+*.egg-info/
+*.dist-info/
+*.wbxml
+*.rc
+
+# Ignore Linux line endings notes
+*eol*
+
+# Ignore some common IDE files
+.idea/
+.vscode/
+*.suo
+*.ntds
+
+# Ignore deployment scripts that may not need to be versioned
+0*.sh
+0*_production_install.sh

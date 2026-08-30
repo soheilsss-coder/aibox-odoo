@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <!-- Auto-discovery of newly installed Odoo modules. post_init_hook only
+       runs once, at install of ai_control_plane itself, so it cannot see a
+       module that gets installed two days later. A real ir.cron is the
+       Odoo-native way to detect "a module was installed since the last
+       sync" and (via ai_integration.models.discovery) create the minimum
+       READ capability for every model it ships - idempotently, with no
+       manual admin step. Runs as the minimal ai_automation_service_user,
+       not as an admin. -->
+  <record id="cron_discover_modules" model="ir.cron">
+    <field name="name">AI: Discover newly installed modules (READ capabilities)</field>
+    <field name="model_id" ref="model_ai_control_module"/>
+    <field name="state">code</field>
+    <field name="code">model.sync_now()</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">hours</field>
+    <field name="user_id" ref="ai_automation_service_user"/>
+    <field name="active">True</field>
+  </record>
+</odoo>

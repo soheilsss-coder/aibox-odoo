@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <record id="risk_generate_artifact" model="ai.gateway.tool.risk">
+    <field name="tool_name">generate_artifact</field>
+    <field name="risk_level">1</field>
+    <field name="capability_name">artifact.generate</field>
+    <field name="description">Creates a user-owned report/artifact without mutating ERP business records.</field>
+  </record>
+</odoo>

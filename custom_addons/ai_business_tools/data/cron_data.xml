@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+
+    <!-- Dedicated, minimal-privilege service account. Scheduled/
+         autonomous jobs must NOT run as an admin - if this account is
+         ever compromised or a job's logic has a bug, the blast radius
+         is whatever base.group_user can see, not the whole system. -->
+    <record id="ai_automation_service_user" model="res.users">
+        <field name="name">AI Automation Service</field>
+        <field name="login">ai-automation@service.local</field>
+        <field name="email">ai-automation@service.local</field>
+        <field name="active">True</field>
+        <field name="groups_id" eval="[(6, 0, [ref('base.group_user')])]"/>
+    </record>
+
+    <record id="cron_notify_overdue_tasks" model="ir.cron">
+        <field name="name">AI: Notify overdue tasks</field>
+        <field name="model_id" ref="model_llm_tool"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_notify_overdue_tasks()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="user_id" ref="ai_automation_service_user"/>
+        <field name="active">True</field>
+    </record>
+
+    <record id="cron_escalate_overdue_tasks" model="ir.cron">
+        <field name="name">AI: Escalate overdue tasks (level 1-3)</field>
+        <field name="model_id" ref="project.model_project_task"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_escalate_overdue_tasks()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="user_id" ref="ai_automation_service_user"/>
+        <field name="active">True</field>
+    </record>
+
+    <record id="cron_apply_and_expire_grants" model="ir.cron">
+        <field name="name">AI: Apply/expire temporary access grants</field>
+        <field name="model_id" ref="model_ai_gateway_access_grant"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_apply_and_expire_grants()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="user_id" ref="ai_automation_service_user"/>
+        <field name="active">True</field>
+    </record>
+
+</odoo>

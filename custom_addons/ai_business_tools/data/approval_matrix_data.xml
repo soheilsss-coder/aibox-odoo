@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+
+    <record id="matrix_hr_decree" model="ai.gateway.approval.matrix">
+        <field name="process">hr_decree</field>
+        <field name="min_amount">0</field>
+        <field name="approver_group_id" ref="role_hr_manager"/>
+        <field name="notes">Any HR decree, regardless of amount - always needs a second HR Manager's approval</field>
+    </record>
+
+    <!-- EXAMPLE ROWS (commented out - a future purchase/expense tool
+         would use these as a starting point):
+
+    <record id="matrix_purchase_low" model="ai.gateway.approval.matrix">
+        <field name="process">purchase</field>
+        <field name="min_amount">0</field>
+        <field name="max_amount">1000</field>
+        <field name="approver_group_id" ref="role_manager"/>
+    </record>
+    <record id="matrix_purchase_mid" model="ai.gateway.approval.matrix">
+        <field name="process">purchase</field>
+        <field name="min_amount">1000</field>
+        <field name="max_amount">10000</field>
+        <field name="approver_group_id" ref="role_finance_manager"/>
+    </record>
+    <record id="matrix_purchase_high" model="ai.gateway.approval.matrix">
+        <field name="process">purchase</field>
+        <field name="min_amount">10000</field>
+        <field name="approver_group_id" ref="role_executive"/>
+    </record>
+    -->
+
+</odoo>

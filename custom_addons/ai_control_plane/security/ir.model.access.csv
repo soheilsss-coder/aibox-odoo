@@ -1,0 +1,14 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_control_capability_user,ai.control.capability.user,model_ai_control_capability,base.group_user,1,0,0,0
+access_ai_control_module_user,ai.control.module.user,model_ai_control_module,base.group_user,1,0,0,0
+access_ai_control_event_user,ai.control.event.user,model_ai_control_event,base.group_user,0,0,0,0
+access_ai_control_capability_admin,ai.control.capability.admin,model_ai_control_capability,base.group_system,1,1,1,1
+access_ai_control_module_admin,ai.control.module.admin,model_ai_control_module,base.group_system,1,1,1,1
+access_ai_control_event_admin,ai.control.event.admin,model_ai_control_event,base.group_system,1,1,1,1
+access_ai_control_relation,ai.control.relation,model_ai_control_relation,base.group_system,1,1,1,1
+access_ai_control_relation_user,ai.control.relation.user,model_ai_control_relation,base.group_user,1,0,0,0
+access_ai_control_relation_admin,ai.control.relation.admin,model_ai_control_relation,base.group_system,1,1,1,1
+access_ai_data_classification_admin,access.ai.data.classification,model_ai_control_data_classification,base.group_system,1,1,1,1
+access_ai_tool_binding_admin,ai.control.tool.binding.admin,model_ai_control_tool_binding,base.group_system,1,1,1,1
+access_ai_control_policy_admin,ai.control.policy.admin,model_ai_control_policy,base.group_system,1,1,1,1
+access_ai_control_policy_user,ai.control.policy.user,model_ai_control_policy,base.group_user,1,0,0,0

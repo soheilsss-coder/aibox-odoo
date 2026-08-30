@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <!--
+    Universal ("*") fallback subscribers.
+
+    Design intent, and the real bug found and fixed here: this file is
+    meant to be a catch-all safety net so that even event types with no
+    dedicated subscription still get audited/ai-ingested/buzzed/
+    telegrammed. It is NOT meant to duplicate targets that already have a
+    dedicated, precisely-scoped subscription in adapter_data.xml or
+    core_event_subscribers.xml - but because the dispatcher's dedup key is
+    (event_key + handler_key), and every record here used its own distinct
+    handler_key, every event that ALSO had a dedicated subscription for the
+    same target was being delivered twice (e.g. two calendar.event records
+    per approved leave, two to-do activities per created task, two audit
+    log rows per approval). On top of that, "matrix_workflow" delegated to
+    a dispatcher method (_handle_workflow) that was never implemented,
+    which made it fail with AttributeError on literally every event in the
+    system, forever (retried, then dead-lettered, then repeated on the
+    next event - a permanent background error, not a crash of the actual
+    business logic since each delivery fails independently, but real
+    log/DB noise that has no business being in a product handed to a
+    customer).
+
+    Fix applied: keep this file's role strictly to targets that have NO
+    other subscriber anywhere (ai, buzz, telegram, audit) and deactivate
+    the entries that duplicate a dedicated subscription (notification,
+    calendar, memory, rag) or that were simply broken (workflow - which
+    also does not need this: ai_workflow.models.workflow.py's
+    enqueue_for_event() is already invoked unconditionally for every
+    matching active workflow definition, independent of any subscription
+    row - see ai_integration/models/event_dispatch.py _materialize_events()).
+  -->
+  <record id="matrix_workflow" model="ai.integration.subscription">
+    <field name="event_type">*</field>
+    <field name="target">workflow</field>
+    <field name="handler_key">workflow_matrix</field>
+    <field name="subscriber_model">ai.integration.workflow.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">5</field>
+    <field name="active">0</field>
+  </record>
+  <record id="matrix_ai" model="ai.integration.subscription">
+    <field name="event_type">*</field>
+    <field name="target">ai</field>
+    <field name="handler_key">ai_event_ingest</field>
+    <field name="subscriber_model">ai.integration.ai.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">5</field>
+  </record>
+  <record id="matrix_notification" model="ai.integration.subscription">
+    <field name="event_type">*</field>
+    <field name="target">notification</field>
+    <field name="handler_key">notification_matrix</field>
+    <field name="subscriber_model">ai.integration.notification.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">10</field>
+    <field name="active">0</field>
+  </record>
+  <record id="matrix_calendar" model="ai.integration.subscription">
+    <field name="event_type">*</field>
+    <field name="target">calendar</field>
+    <field name="handler_key">calendar_matrix</field>
+    <field name="subscriber_model">ai.integration.calendar.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">10</field>
+    <field name="active">0</field>
+  </record>
+  <record id="matrix_buzz" model="ai.integration.subscription">
+    <field name="event_type">*</field>
+    <field name="target">buzz</field>
+    <field name="handler_key">buzz_matrix</field>
+    <field name="subscriber_model">ai.integration.buzz.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">10</field>
+  </record>
+  <record id="matrix_telegram" model="ai.integration.subscription">
+    <field name="event_type">*</field>
+    <field name="target">telegram</field>
+    <field name="handler_key">telegram_matrix</field>
+    <field name="subscriber_model">ai.integration.telegram.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">15</field>
+  </record>
+  <record id="matrix_memory" model="ai.integration.subscription">
+    <field name="event_type">memory.*</field>
+    <field name="target">memory</field>
+    <field name="handler_key">memory_matrix</field>
+    <field name="subscriber_model">ai.integration.memory.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">10</field>
+    <field name="active">0</field>
+  </record>
+  <record id="matrix_audit" model="ai.integration.subscription">
+    <field name="event_type">*</field>
+    <field name="target">audit</field>
+    <field name="handler_key">audit_matrix</field>
+    <field name="subscriber_model">ai.integration.audit.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">1</field>
+  </record>
+  <record id="matrix_rag" model="ai.integration.subscription">
+    <field name="event_type">document.*</field>
+    <field name="target">rag</field>
+    <field name="handler_key">rag_matrix</field>
+    <field name="subscriber_model">ai.integration.rag.subscriber</field>
+    <field name="subscriber_method">_handle_event</field>
+    <field name="priority">10</field>
+    <field name="active">0</field>
+  </record>
+</odoo>

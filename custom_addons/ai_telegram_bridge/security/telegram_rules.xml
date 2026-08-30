@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <!-- A regular employee can see (read-only, per the access CSV) only
+         their OWN link row - never anyone else's chat_id. Matches the
+         same "own records only" pattern already used for
+         ai.gateway.audit.log (see custom_addons/ai_business_tools). -->
+    <record id="ai_gateway_telegram_link_rule_own" model="ir.rule">
+        <field name="name">Telegram Link: own record only</field>
+        <field name="model_id" ref="model_ai_gateway_telegram_link"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="ai_gateway_telegram_link_rule_admin" model="ir.rule">
+        <field name="name">Telegram Link: admins see all</field>
+        <field name="model_id" ref="model_ai_gateway_telegram_link"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+    </record>
+
+    <record id="ai_gateway_telegram_link_code_rule_own" model="ir.rule">
+        <field name="name">Telegram Link Code: own record only</field>
+        <field name="model_id" ref="model_ai_gateway_telegram_link_code"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+</odoo>

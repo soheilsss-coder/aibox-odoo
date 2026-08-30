@@ -1,0 +1,13 @@
+<odoo>
+  <!-- Cron is recovery/deadline maintenance only. New workflows are triggered by the durable Event Bus. -->
+  <record id="ir_cron_ai_workflow_recovery" model="ir.cron">
+    <field name="name">AI Workflow Recovery / Deadlines</field>
+    <field name="model_id" ref="model_ai_workflow_run"/>
+    <field name="state">code</field>
+    <field name="code">model.recover_due(100)</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">minutes</field>
+    <field name="numbercall">-1</field>
+    <field name="active">True</field>
+  </record>
+</odoo>
