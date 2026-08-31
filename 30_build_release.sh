@@ -44,5 +44,5 @@ else
   exit 1
 fi
 
-echo "SOURCE_RELEASE_VERIFICATION_PASS: static audits, 16 contract tests, frontend build, and dependency audit completed."
+echo "SOURCE_RELEASE_VERIFICATION_PASS: static audits, 22 contract tests, frontend build, and dependency audit completed."
 echo "RUNTIME_CERTIFICATION_REQUIRED: run 48_auto_integration_certification.py and DGX benchmark on the native target."

@@ -110,6 +110,36 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("if adapters is not None", source)
         self.assertIn("if subscriptions is not None", source)
 
+    def test_universal_onboarding_is_automatic_and_statused(self):
+        discovery = (ADDONS / "ai_integration/models/discovery.py").read_text()
+        module = (ADDONS / "ai_control_plane/models/integration.py").read_text()
+        sync = (ADDONS / "ai_control_plane/models/module_sync.py").read_text()
+        cron = (ADDONS / "ai_control_plane/data/cron_data.xml").read_text()
+        for marker in (
+            "_ensure_discovered_operation", "_ensure_event_mappings", "menu_names_json",
+            "view_names_json", "scope_json", "certification_state", "discovered_read", "adapter-required",
+            "unavailable_mutations_json",
+        ):
+            self.assertIn(marker, discovery + module)
+        self.assertIn("postcommit.add", sync)
+        self.assertIn('<field name="interval_type">minutes</field>', cron)
+
+    def test_discovered_reads_and_mutations_have_separate_contracts(self):
+        registry = (ADDONS / "ai_integration/models/unified_registry.py").read_text()
+        certification = (ADDONS / "ai_integration/models/certification.py").read_text()
+        discovery = (ADDONS / "ai_integration/models/discovery.py").read_text()
+        event_outbox = (ADDONS / "ai_integration/models/module_event.py").read_text()
+        self.assertIn("discovered_model_read", registry)
+        self.assertIn("('source', '=', 'discovered')", registry)
+        self.assertIn("('coverage', '=', 'discovered_read')", registry)
+        self.assertIn("reviewed_operational", certification)
+        self.assertIn("business_operations_registered", certification)
+        self.assertIn("ai_integration_change_outbox", event_outbox)
+        self.assertIn("jsonb_build_object", event_outbox)
+        self.assertIn("_ensure_event_mappings", discovery)
+        self.assertNotIn("Model.create(args", registry)
+        self.assertNotIn("Model.write(args", registry)
+
     def test_scim_has_exception_import_and_standard_contract_markers(self):
         source = (ADDONS / "ai_customer_plane/models/scim.py").read_text()
         api = (ADDONS / "ai_customer_plane/controllers/scim_api.py").read_text()
@@ -208,7 +238,7 @@ class SourceContracts(unittest.TestCase):
 
     def test_release_manifest_matches_current_entries(self):
         manifest = json.loads((ROOT / "SHA256MANIFEST.json").read_text())
-        self.assertEqual(len(manifest), 407)
+        self.assertEqual(len(manifest), 411)
         missing = [path for path in manifest if not (ROOT / path).is_file()]
         self.assertEqual(missing, [])
         mismatched = [

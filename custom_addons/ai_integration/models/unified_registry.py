@@ -40,10 +40,22 @@ class AiUnifiedOperation(models.Model):
         ('pos_restaurant_table_status', 'Read Restaurant Table Status'),
         ('pos_restaurant_order_note_update', 'Update Restaurant Order Note'),
         ('module_read_summary', 'Read Reviewed Module Summary'),
+        ('discovered_model_read', 'Read Automatically Discovered Model Summary'),
     ], required=True)
     active = fields.Boolean(default=True)
     description = fields.Text()
     contract_version = fields.Integer(default=1, required=True)
+    source = fields.Selection([
+        ("reviewed", "Source-reviewed operation"),
+        ("discovered", "Automatically discovered read operation"),
+    ], default="reviewed", required=True, index=True)
+    coverage = fields.Selection([
+        ("reviewed_read", "Reviewed read adapter"),
+        ("reviewed_operational", "Reviewed operational adapter"),
+        ("discovered_read", "Discovered read-only fallback"),
+    ], default="reviewed_operational", required=True, index=True)
+    model_name = fields.Char(index=True)
+    field_names_json = fields.Text(default="[]")
 
     _sql_constraints = [
         ('tool_unique', 'unique(tool_name)', 'Each tool must have exactly one unified operation registry entry.'),
@@ -277,6 +289,46 @@ class AiUnifiedAdapterService(models.AbstractModel):
         self._emit_business_event('pos.restaurant.order_note.updated', {'record_id': order.id}, user)
         return {'record_id': order.id, 'model': 'pos.order', 'status': 'updated'}
 
+    def _handle_discovered_model_read(self, args, user):
+        """Execute only the model/field contract created by discovery.
+
+        The caller can request a bounded row count, but cannot choose a model,
+        field, method, domain, or ORM operation. Odoo ACLs and record rules
+        still run in the authenticated user's environment.
+        """
+        operation_name = self.env.context.get('ai_adapter_operation', '')
+        operation = self.env['ai.integration.operation'].sudo().search([
+            ('tool_name', '=', operation_name), ('active', '=', True),
+            ('source', '=', 'discovered'), ('coverage', '=', 'discovered_read'),
+        ], limit=1)
+        if not operation or not operation.model_name or operation.model_name not in self.env:
+            raise UserError('discovered read operation is unavailable')
+        try:
+            limit = min(max(int(args.get('limit', 20)), 1), 100)
+        except (TypeError, ValueError):
+            limit = 20
+        try:
+            fields_json = json.loads(operation.field_names_json or '[]')
+        except (TypeError, ValueError):
+            raise UserError('discovered read field contract is invalid')
+        if not isinstance(fields_json, list) or not fields_json:
+            raise UserError('discovered read field contract is empty')
+        Model = self._model(operation.model_name)
+        safe_fields = [
+            name for name in fields_json
+            if isinstance(name, str) and (name == 'id' or name in Model._fields)
+            and (name == 'id' or Model._fields[name].type not in ('binary', 'html', 'one2many', 'many2many'))
+        ]
+        if not safe_fields:
+            raise UserError('no safe discovered fields are available')
+        records = Model.search([], order='id desc', limit=limit)
+        return {
+            'status': 'ok', 'model': operation.model_name,
+            'fields': safe_fields, 'count': len(records),
+            'records': records.read(safe_fields),
+            'integration_level': 'baseline-only',
+        }
+
     _MODULE_READ_MODELS = {
         'event': 'event.event',
         'lunch': 'lunch.order',
@@ -349,6 +401,10 @@ class AiUnifiedRegistry(models.AbstractModel):
         cap = self.env['ai.control.capability'].sudo().search([('name', '=', op.capability_name), ('active', '=', True)], limit=1)
         if not risk or not cap:
             raise AccessError('incomplete execution contract: %s' % tool_name)
+        if op.adapter_id.state == 'blocked' or (
+            op.coverage != 'discovered_read' and op.adapter_id.state != 'ready'
+        ):
+            raise AccessError('adapter is not certified for this operation: %s' % tool_name)
         if risk.capability_name != op.capability_name or int(risk.risk_level or 0) != int(op.risk_level or 0):
             raise AccessError('execution contract mismatch: %s' % tool_name)
         if cap.module_name != op.module_name:
@@ -370,4 +426,5 @@ class AiUnifiedRegistry(models.AbstractModel):
         return [{
             'tool': r.tool_name, 'module': r.module_name, 'capability': r.capability_name,
             'operation': r.operation, 'risk_level': r.risk_level, 'handler': r.handler_key,
+            'source': r.source, 'coverage': r.coverage,
         } for r in rows]

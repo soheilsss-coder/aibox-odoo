@@ -11,3 +11,4 @@ from . import certification
 from . import event_subscribers
 
 from . import generic_read
+from . import module_event

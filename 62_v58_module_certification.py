@@ -58,6 +58,10 @@ def main(env, output=None):
         module_ops = operations.filtered(lambda op: op.module_name == name)
         module_caps = capabilities.filtered(lambda cap: cap.module_name == name)
         reviewed = bool(adapter and adapter.state == "ready")
+        reviewed_operations = module_ops.filtered(
+            lambda op: op.source == "reviewed" and op.coverage == "reviewed_operational"
+        )
+        discovered_operations = module_ops.filtered(lambda op: op.coverage == "discovered_read")
         contracts = []
         for op in module_ops:
             try:
@@ -71,13 +75,17 @@ def main(env, output=None):
             and not name.startswith("ai_")
             and name != "company_ai_demo"
         )
-        if business and not (reviewed and module_ops and contracts and all(contracts)):
+        if business and not (reviewed and reviewed_operations and contracts and all(contracts)):
             status = "blocked"
             blocked.append(name)
-        elif reviewed and module_ops and all(contracts):
+        elif reviewed and reviewed_operations and all(contracts):
             status = "reviewed_operational"
         else:
             status = "discovered_read_only"
+        try:
+            unavailable_mutations = json.loads(item.unavailable_mutations_json or "[]") if item else []
+        except (TypeError, ValueError):
+            unavailable_mutations = [{"status": "blocked", "reason": "invalid registry metadata"}]
         rows.append({
             "technical_name": name,
             "installed_version": module.installed_version or module.latest_version or "",
@@ -87,7 +95,12 @@ def main(env, output=None):
             "discovered_groups": item.discovered_groups if item else 0,
             "capability_count": len(module_caps),
             "adapter": adapter.module_name if adapter else None,
+            "adapter_state": adapter.state if adapter else "missing",
+            "integration_level": item.integration_level if item else "blocked",
             "operation_count": len(module_ops),
+            "discovered_read_operation_count": len(discovered_operations),
+            "reviewed_operational_operation_count": len(reviewed_operations),
+            "unavailable_mutations": unavailable_mutations,
             "operation_contracts_pass": bool(module_ops) and bool(contracts) and all(contracts),
             "active_event_targets": sorted(set(subscriptions.mapped("target"))),
             "status": status,

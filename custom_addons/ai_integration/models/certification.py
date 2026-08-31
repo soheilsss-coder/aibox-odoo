@@ -37,13 +37,19 @@ class AiUniversalCertification(models.AbstractModel):
         checks = []
         installed = self.env['ir.module.module'].sudo().search([('name', '=', module_name), ('state', '=', 'installed')], limit=1)
         self._check(checks, 'module_installed', bool(installed))
+        module_record = self.env['ai.control.module'].sudo().search([('technical_name', '=', module_name)], limit=1)
         adapter = self.env['ai.integration.adapter'].sudo().for_module(module_name)
-        self._check(checks, 'reviewed_adapter', bool(adapter and adapter.module_name == module_name))
+        reviewed_adapter = bool(adapter and adapter.module_name == module_name and adapter.state == 'ready')
+        self._check(checks, 'reviewed_adapter', reviewed_adapter)
         cap = self.env['ai.control.capability'].sudo().search([('module_name', '=', module_name), ('active', '=', True)])
         self._check(checks, 'capabilities_registered', bool(cap))
         ops = self.env['ai.integration.operation'].sudo().search([('module_name', '=', module_name), ('active', '=', True)])
-        self._check(checks, 'business_operations_registered', bool(ops))
+        discovered_reads = ops.filtered(lambda op: op.coverage == 'discovered_read')
+        reviewed_ops = ops.filtered(lambda op: op.coverage == 'reviewed_operational' and op.source == 'reviewed')
+        self._check(checks, 'baseline_read_operations', bool(discovered_reads or ops), 'Automatic read baseline is allowed; it is not business certification')
+        self._check(checks, 'business_operations_registered', bool(reviewed_ops and reviewed_adapter), 'Mutations require a source-reviewed operational adapter')
         self._check(checks, 'unified_registry_contract', bool(ops), 'Capability→Tool contract must exist for every operation')
+        self._check(checks, 'module_event_audit_baseline', bool(module_record and module_record.automatic_events and module_record.automatic_audit), 'Database change triggers and audit baseline must be active')
         for op in ops:
             risk = self.env['ai.gateway.tool.risk'].sudo().search([('tool_name', '=', op.tool_name)], limit=1)
             capability = self.env['ai.control.capability'].sudo().search([('name', '=', op.capability_name), ('active', '=', True)], limit=1)
@@ -81,6 +87,13 @@ class AiUniversalCertification(models.AbstractModel):
             'checks_json': json.dumps(checks, ensure_ascii=False),
             'error': False if passed else 'Production activation blocked until every certification check is PASS.',
         })
+        if module_record:
+            module_record.write({
+                'certification_state': 'runtime_certified' if passed and live_runtime else (
+                    'baseline_ready' if reviewed_ops and reviewed_adapter and module_record.automatic_read and module_record.automatic_events and module_record.automatic_audit
+                    else 'adapter_required' if installed and module_record.automatic_read else 'blocked'
+                ),
+            })
         return {'module': module_name, 'status': status, 'production_eligible': passed, 'checks': checks}
 
 

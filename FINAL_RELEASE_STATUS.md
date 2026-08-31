@@ -6,7 +6,7 @@
 
 The source release currently passes:
 
-- `16/16` upgrade contract tests.
+- `22/22` upgrade contract tests.
 - `25_static_audit.py`, `28_release_audit.py`, `29_production_e2e.py`.
 - `50_v47_static_security_tests.py` and `59_v57_hardening_audit.py` (`21/21`).
 - `FINAL_PRODUCTION_GATE.py` (`94` checks) and
@@ -14,7 +14,7 @@ The source release currently passes:
 - Queue self-test (`10/10`) and inference-policy self-test.
 - Native frontend dependency install, Vite build in a temporary directory,
   and high-severity dependency audit.
-- SHA256 release manifest (`407` listed entries, zero hash mismatch).
+- SHA256 release manifest (`411` listed entries, zero hash mismatch).
 
 ## v58 product changes
 
@@ -31,6 +31,9 @@ The source release currently passes:
   revision.
 - Real API-backed Calendar, Tasks, Documents, Approvals, Notifications,
   Integrations and Chat surfaces with visible loading/error/empty states.
+- Universal automatic module onboarding: model/menu/view/security-group and
+  scope discovery, bounded read-only contracts, metadata-only change outbox,
+  event mappings, and explicit `adapter-required` certification for mutations.
 - Live installed-module certification harness for reviewed adapters,
   capabilities, risk contracts, handlers and promotion status.
 

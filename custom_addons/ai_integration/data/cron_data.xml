@@ -10,4 +10,28 @@
     <field name="numbercall">-1</field>
     <field name="active">True</field>
   </record>
+
+  <record id="cron_universal_module_change_events" model="ir.cron">
+    <field name="name">AI: Publish universal module audit events</field>
+    <field name="model_id" ref="model_ai_integration_change_outbox"/>
+    <field name="state">code</field>
+    <field name="code">model.process_pending()</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">minutes</field>
+    <field name="numbercall">-1</field>
+    <field name="user_id" ref="ai_automation_service_user"/>
+    <field name="active">True</field>
+  </record>
+
+  <record id="cron_universal_module_change_cleanup" model="ir.cron">
+    <field name="name">AI: Retain universal module event metadata</field>
+    <field name="model_id" ref="model_ai_integration_change_outbox"/>
+    <field name="state">code</field>
+    <field name="code">model.cron_cleanup()</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">days</field>
+    <field name="numbercall">-1</field>
+    <field name="user_id" ref="ai_automation_service_user"/>
+    <field name="active">True</field>
+  </record>
 </odoo>

@@ -1071,6 +1071,14 @@ class AiSemanticApiController(http.Controller):
 from odoo import http as _http
 
 
+def _module_registry_json(value, default):
+    try:
+        parsed = _json.loads(value or _json.dumps(default))
+        return parsed if isinstance(parsed, type(default)) else default
+    except (TypeError, ValueError):
+        return default
+
+
 class AiControlPlaneSemanticController(_http.Controller):
     @http.route("/api/me/capabilities", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def my_capabilities(self, **kwargs):
@@ -1095,12 +1103,33 @@ class AiControlPlaneSemanticController(_http.Controller):
         if not env.user.has_group("base.group_system"):
             return _json_response({"error": "access denied"}, status=403)
         modules = env["ai.control.module"].sudo().search([], order="name")
-        return _json_response({"integrations": [{
-            "name": m.name, "technical_name": m.technical_name, "version": m.version,
-            "state": m.state, "models": m.discovered_models, "groups": m.discovered_groups,
-            "capabilities": m.capability_count, "last_sync": m.last_sync,
-            "status": getattr(m, "integration_status", "ready"),
-        } for m in modules]})
+        rows = []
+        for m in modules:
+            adapter = env["ai.integration.adapter"].sudo().for_module(m.technical_name) if "ai.integration.adapter" in env else False
+            mappings = env["ai.integration.event.mapping"].sudo().search([("module_name", "=", m.technical_name), ("active", "=", True)]) if "ai.integration.event.mapping" in env else []
+            rows.append({
+                "name": m.name, "technical_name": m.technical_name, "version": m.version,
+                "state": m.state, "integration_level": m.integration_level,
+                "certification_state": m.certification_state,
+                "adapter_state": adapter.state if adapter else "missing",
+                "models": _module_registry_json(getattr(m, "model_names_json", "[]"), []),
+                "groups": _module_registry_json(getattr(m, "group_names_json", "[]"), []),
+                "menus": _module_registry_json(getattr(m, "menu_names_json", "[]"), []),
+                "views": _module_registry_json(getattr(m, "view_names_json", "[]"), []),
+                "scope": _module_registry_json(getattr(m, "scope_json", "{}"), {}),
+                "capabilities": m.capability_count,
+                "discovered_operations": m.discovered_operation_count,
+                "reviewed_operations": m.reviewed_operation_count,
+                "event_mappings": [{"model": x.model_name, "operation": x.operation, "event_type": x.event_type, "source": x.source} for x in mappings],
+                "unavailable_mutations": _module_registry_json(getattr(m, "unavailable_mutations_json", "[]"), []),
+                "automatic_read": m.automatic_read,
+                "automatic_events": m.automatic_events,
+                "automatic_audit": m.automatic_audit,
+                "last_sync": m.last_sync,
+                "status": getattr(m, "integration_status", "ready"),
+                "error": m.last_error,
+            })
+        return _json_response({"integrations": rows})
 
 class AiIntegrationRegistrySemanticController(http.Controller):
     """Read-only semantic surfaces for the Integration/Capability UI."""
@@ -1118,6 +1147,7 @@ class AiIntegrationRegistrySemanticController(http.Controller):
         return _json_response({'operations': [{
             'tool': r.tool_name, 'module': r.module_name, 'capability': r.capability_name,
             'operation': r.operation, 'risk_level': r.risk_level, 'handler': r.handler_key,
+            'source': r.source, 'coverage': r.coverage,
         } for r in rows]})
 
     @http.route('/api/integrations/certification', type='http', auth='none', csrf=False, methods=['GET', 'OPTIONS'])

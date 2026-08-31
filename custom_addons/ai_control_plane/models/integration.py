@@ -14,9 +14,32 @@ class AiIntegrationModule(models.Model):
         ("error", "Error")
     ], default="installed", required=True)
     adapter_key = fields.Char()
+    integration_level = fields.Selection([
+        ("discovered_read_only", "Discovered / Read-only"),
+        ("reviewed_operational", "Reviewed / Operational"),
+        ("blocked", "Blocked until reviewed"),
+    ], default="discovered_read_only", required=True, index=True)
+    certification_state = fields.Selection([
+        ("discovered", "Discovered"),
+        ("baseline_ready", "Baseline ready"),
+        ("adapter_required", "Adapter required"),
+        ("runtime_certified", "Runtime certified"),
+        ("blocked", "Blocked"),
+    ], default="discovered", required=True, index=True)
+    automatic_read = fields.Boolean(default=True)
+    automatic_events = fields.Boolean(default=True)
+    automatic_audit = fields.Boolean(default=True)
     discovered_models = fields.Integer(default=0)
     discovered_groups = fields.Integer(default=0)
+    discovered_menus = fields.Integer(default=0)
+    discovered_views = fields.Integer(default=0)
+    menu_names_json = fields.Text(default="[]")
+    view_names_json = fields.Text(default="[]")
+    scope_json = fields.Text(default="{}")
     capability_count = fields.Integer(default=0)
+    discovered_operation_count = fields.Integer(default=0)
+    reviewed_operation_count = fields.Integer(default=0)
+    unavailable_mutations_json = fields.Text(default="[]")
     last_sync = fields.Datetime()
     last_error = fields.Text()
     active = fields.Boolean(default=True)
@@ -50,7 +73,10 @@ class AiIntegrationModule(models.Model):
             except Exception as exc:
                 vals.update({"state": "error", "last_error": str(exc)})
                 (rec or self.sudo().create(vals)).write(vals)
-        self.sudo().search([("technical_name", "not in", list(installed_names))]).write({"state": "not_installed"})
+        self.sudo().search([("technical_name", "not in", list(installed_names))]).write({
+            "state": "not_installed", "integration_level": "blocked", "certification_state": "blocked",
+            "automatic_read": False, "automatic_events": False, "automatic_audit": False,
+        })
         return True
 
     @api.model
