@@ -87,4 +87,6 @@
     <field name="subscriber_method">_handle_event</field>
     <field name="priority">20</field>
   </record>
+  <!-- Optional Restaurant extension; requires point_of_sale at runtime. -->
+  <record id="adapter_pos_restaurant" model="ai.integration.adapter"><field name="module_name">pos_restaurant</field><field name="label">Restaurant Operations</field><field name="capability_prefix">pos.restaurant</field><field name="event_prefix">pos.restaurant</field><field name="notes">Requires Point of Sale plus the Restaurant extension at runtime.</field></record>
 </odoo>

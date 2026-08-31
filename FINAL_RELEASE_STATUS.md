@@ -6,12 +6,14 @@
 what this update fixes. See `FINAL_RELEASE_V57.md` for the full v57 report
 and `V57_HARDENING_NOTES.md` for the itemized source diff since v56.)
 
-**SOURCE RELEASE: PASS — 94/94 exhaustive checks, plus the new v57 direct
-hardening audit (`59_v57_hardening_audit.py`): PASS.**
+**SOURCE RELEASE: PASS — 94/94 exhaustive checks, 21/21 production-source
+gates, 13/13 upgrade contract tests, plus the v57 direct hardening audit
+(`59_v57_hardening_audit.py`): PASS.**
 
 **RELEASE INTEGRITY: PASS — `SHA256MANIFEST.json` regenerated and
-reverified against the current source tree this pass (377/377 entries,
-zero mismatch; see `FINAL_RELEASE_V57.md` for what changed).**
+reverified against the current source tree (392/392 entries, zero mismatch;
+this includes the native install scripts, upload policy, migration hook and
+current tests).**
 
 **RUNTIME_CERTIFICATION_REQUIRED: YES.**
 

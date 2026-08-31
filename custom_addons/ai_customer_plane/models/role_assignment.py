@@ -22,7 +22,10 @@ class AiRoleAssignment(models.Model):
     active = fields.Boolean(default=True, index=True)
     priority = fields.Integer(default=10)
     reason = fields.Char()
-    managed_by = fields.Selection([("admin", "Admin"), ("scim", "SCIM"), ("excel", "Excel"), ("system", "System")], default="admin", required=True, index=True)
+    managed_by = fields.Selection([
+        ("admin", "Admin"), ("scim", "SCIM"), ("sso", "SSO"),
+        ("excel", "Excel"), ("system", "System")
+    ], default="admin", required=True, index=True)
 
     @api.constrains("source", "user_id", "department_id", "position_id", "grant_id")
     def _check_source(self):

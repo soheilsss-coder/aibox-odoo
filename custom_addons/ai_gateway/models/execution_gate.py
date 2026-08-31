@@ -29,15 +29,14 @@ class AiGatewayExecutionGate(models.AbstractModel):
         # the Capability→Tool→Risk contract. The legacy risk registry remains
         # for compatibility but may not define an executable tool by itself.
         if "ai.integration.unified.registry" in self.env:
-            try:
-                return self.env["ai.integration.unified.registry"].execution_contract(tool_name)
-            except AccessError:
-                # Native llm.tool methods (memory, file reading, internet
-                # search, etc.) are first-class product tools too, but they do
-                # not all mutate ERP records and therefore do not need a
-                # Business Adapter handler. They still MUST have a central
-                # risk-registry entry; unknown tools remain denied.
-                pass
+            registry = self.env["ai.integration.unified.registry"]
+            # Only fall back to the native-tool risk registry when the tool is
+            # not a reviewed business operation. A registered operation with
+            # a missing/mismatched risk or capability contract must fail closed;
+            # treating its AccessError as a native-tool fallback would bypass
+            # the unified contract.
+            if registry.resolve(tool_name):
+                return registry.execution_contract(tool_name)
         if "ai.gateway.tool.risk" not in self.env:
             return None
         risk = self.env["ai.gateway.tool.risk"].sudo().search(

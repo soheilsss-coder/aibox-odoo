@@ -6,12 +6,15 @@ import logging
 import os
 import tempfile
 from datetime import datetime
+from urllib.parse import quote as _quote_filename
 
 from odoo import http
 from odoo.http import request
 
 from odoo.addons.ai_semantic_api.controllers.semantic_api import _require_auth, _json_response, _require_privileged
 from odoo.addons.ai_gateway.controllers.gateway import _audit, _cors_preflight_response
+from odoo.addons.ai_gateway.controllers.file_policy import validate_upload, MAX_UPLOAD_BYTES
+from odoo.addons.ai_gateway.controllers.output_firewall import scrub_public_text
 
 _logger = logging.getLogger(__name__)
 
@@ -253,8 +256,16 @@ class AiExperienceApi(http.Controller):
         model = _model(env, "ai.model.profile")
         out=[]
         if model:
+            labels = {
+                "chat": "دستیار گفتگو", "reasoning": "دستیار تحلیل",
+                "vision": "تحلیل تصویر", "embedding": "جستجوی دانش",
+            }
             for m in model.sudo().search([], order="purpose,name"):
-                out.append({"id": m.id, "name": m.name, "provider": m.provider, "model_id": m.model_id, "purpose": m.purpose, "quantization": m.quantization, "production": m.production, "active": m.active})
+                # Keep infrastructure/provider/model identifiers out of the
+                # customer-facing capability surface.
+                out.append({"label": labels.get(m.purpose, "قابلیت هوشمند"),
+                            "purpose": m.purpose, "available": bool(m.active),
+                            "production": bool(m.production)})
         return _json_response({"models": out})
 
 
@@ -265,9 +276,12 @@ class AiExperienceApi(http.Controller):
         if err: return err
         try:
             payload = json.loads(request.httprequest.data or b"{}")
+            if not isinstance(payload, dict):
+                return _json_response({"error": "JSON body must be an object"}, status=400)
             filename = _safe_name(payload.get("filename", "file"), "file")
             raw = base64.b64decode(payload.get("data_base64", ""), validate=True)
-            question = payload.get("question", "خلاصه و نکات مهم این فایل را توضیح بده")
+            validate_upload(filename, raw, max_bytes=MAX_UPLOAD_BYTES)
+            question = str(payload.get("question") or "خلاصه و نکات مهم این فایل را توضیح بده")[:4000]
             lower = filename.lower()
             text = ""
             if lower.endswith((".txt", ".md", ".csv", ".json")):
@@ -276,7 +290,14 @@ class AiExperienceApi(http.Controller):
                 try:
                     from pypdf import PdfReader
                     reader = PdfReader(io.BytesIO(raw))
-                    text = "\n".join((page.extract_text() or "") for page in reader.pages)
+                    if len(reader.pages) > 100:
+                        return _json_response({"error": "PDF exceeds the page limit"}, status=413)
+                    chunks = []
+                    for page in reader.pages:
+                        chunks.append(page.extract_text() or "")
+                        if sum(len(chunk) for chunk in chunks) >= 60000:
+                            break
+                    text = "\n".join(chunks)
                 except ImportError:
                     return _json_response({"error": "PDF reader is not installed"}, status=501)
             elif lower.endswith(".docx"):
@@ -285,7 +306,9 @@ class AiExperienceApi(http.Controller):
                     doc = Document(io.BytesIO(raw)); text = "\n".join(p.text for p in doc.paragraphs)
                 except ImportError:
                     return _json_response({"error": "DOCX reader is not installed"}, status=501)
-            elif lower.endswith((".xlsx", ".xls")):
+            elif lower.endswith(".xls"):
+                return _json_response({"error": "legacy XLS extraction is not available"}, status=501)
+            elif lower.endswith(".xlsx"):
                 try:
                     import openpyxl
                     wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
@@ -302,11 +325,13 @@ class AiExperienceApi(http.Controller):
                 mime = "image/png" if lower.endswith(".png") else "image/jpeg"
                 resp = requests.post(f"{base}/chat/completions", json={"model":env["ai.model.router"].route(purpose="vision").model_id,"messages":[{"role":"user","content":[{"type":"text","text":question},{"type":"image_url","image_url":{"url":f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],"max_tokens":1500}, timeout=90)
                 resp.raise_for_status(); answer=resp.json()["choices"][0]["message"]["content"]
-                return _json_response({"filename": filename, "kind": "vision", "analysis": answer})
+                return _json_response({"filename": filename, "kind": "vision", "analysis": scrub_public_text(answer)})
             else:
                 return _json_response({"error": "unsupported file type"}, status=415)
             text = text[:60000]
-            return _json_response({"filename": filename, "kind": "text", "analysis": text if text else "No extractable text was found.", "question": question})
+            return _json_response({"filename": filename, "kind": "text", "analysis": scrub_public_text(text if text else "No extractable text was found."), "question": scrub_public_text(question)})
+        except (TypeError, ValueError):
+            return _json_response({"error": "invalid or unsupported file upload"}, status=400)
         except Exception:
             _logger.exception("file analysis failed")
             return _json_response({"error": "file analysis failed, try again later"}, status=500)
@@ -321,7 +346,11 @@ class AiExperienceApi(http.Controller):
         if not att.exists() or att.res_model != "res.users" or att.res_id != env.user.id:
             return _json_response({"error": "artifact not found or access denied"}, status=404)
         data = base64.b64decode(att.datas or b"")
-        headers = [("Content-Type", att.mimetype or "application/octet-stream"), ("Content-Disposition", f'attachment; filename="{att.name}"'), ("Content-Length", str(len(data)))]
+        headers = [
+            ("Content-Type", att.mimetype or "application/octet-stream"),
+            ("Content-Disposition", "attachment; filename*=UTF-8''%s" % _quote_filename(att.name or "artifact")),
+            ("Content-Length", str(len(data))),
+        ]
         return request.make_response(data, headers=headers)
 
     @http.route("/api/artifacts/generate", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])

@@ -9,6 +9,7 @@ from odoo.exceptions import AccessError, UserError
 from odoo.sql_db import db_connect
 from .rate_limit import check as _shared_rate_limit, blocked as _shared_rate_blocked
 from .chat_queue import get_chat_pool
+from .output_firewall import scrub_public_text
 from werkzeug.wrappers import Response
 
 
@@ -301,7 +302,7 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
            duration_ms=int((time.time() - t0) * 1000),
            token_count=_estimate_tokens(message, last_message.body))
     reply_html = last_message.body or ""
-    reply_text = re.sub(r"<[^>]+>", "", reply_html).strip()
+    reply_text = scrub_public_text(re.sub(r"<[^>]+>", "", reply_html).strip())
 
     return {
         "thread_id": thread.id,
@@ -388,12 +389,10 @@ class AiGatewayController(http.Controller):
         def serialize_menu(menu):
             action = None
             if menu.action:
-                act = menu.action
-                action = {
-                    "type": act._name,
-                    "model": getattr(act, "res_model", False),
-                    "view_mode": getattr(act, "view_mode", False),
-                }
+                # Bootstrap is a customer-facing contract. Do not expose ORM
+                # model names or internal action types to the browser; the
+                # frontend receives only a navigable/visible marker.
+                action = {"available": True}
             children = env["ir.ui.menu"].search(
                 [("parent_id", "=", menu.id)], order="sequence"
             )
@@ -410,9 +409,15 @@ class AiGatewayController(http.Controller):
             return bool(m["action"]) or any(has_content(c) for c in m["children"])
         menus = [m for m in menus if has_content(m)]
 
-        installed_modules = env["ir.module.module"].sudo().search(
-            [("state", "=", "installed")]
-        ).mapped("name")
+        # Expose only product labels from the central integration registry.
+        # The technical module inventory is an admin/control-plane concern and
+        # must not leak through the customer bootstrap response.
+        available_domains = []
+        if "ai.control.module" in env:
+            available_domains = env["ai.control.module"].sudo().search(
+                [("state", "=", "installed"), ("active", "=", True)],
+                order="name",
+            ).mapped("name")
 
         return _json_response({
             "user": {"id": user.id, "name": user.name, "login": user.login},
@@ -420,7 +425,7 @@ class AiGatewayController(http.Controller):
             "lang": env.user.lang or "en_US",
             "timezone": env.user.tz or "UTC",
             "menus": menus,
-            "installed_modules": installed_modules,
+            "available_domains": available_domains,
         })
 
     @http.route("/api/health", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])

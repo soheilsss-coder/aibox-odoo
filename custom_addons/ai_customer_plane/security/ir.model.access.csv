@@ -1,6 +1,9 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_customer_profile_admin,customer profile admin,model_ai_customer_configuration_profile,base.group_system,1,1,1,1
+access_customer_profile_executive,customer profile executive,model_ai_customer_configuration_profile,ai_business_tools.role_executive,1,1,1,0
+access_customer_profile_system_admin,customer profile system admin,model_ai_customer_configuration_profile,ai_business_tools.role_system_admin,1,1,1,1
 access_deployment_wizard_admin,deployment wizard admin,model_ai_customer_deployment_wizard,base.group_system,1,1,1,1
+access_deployment_wizard_executive,deployment wizard executive,model_ai_customer_deployment_wizard,ai_business_tools.role_executive,1,1,1,0
 access_delegation_admin,delegation admin,model_ai_customer_delegation,base.group_system,1,1,1,1
 access_access_review_admin,access review admin,model_ai_customer_access_review,base.group_system,1,1,1,1
 access_access_review_line_admin,access review line admin,model_ai_customer_access_review_line,base.group_system,1,1,1,1
@@ -9,6 +12,10 @@ access_scim_token_admin,scim token admin,model_ai_customer_scim_token,base.group
 access_scim_group_map_admin,scim group map admin,model_ai_customer_scim_group,base.group_system,1,1,1,1
 access_ai_customer_excel_role_import,ai.customer.excel.role.import,model_ai_customer_excel_role_import,base.group_system,1,1,1,1
 access_ai_customer_designer,access.ai.customer.designer,model_ai_customer_designer,base.group_system,1,1,1,1
+access_ai_customer_designer_executive,access.ai.customer.designer.executive,model_ai_customer_designer,ai_business_tools.role_executive,1,1,1,0
+access_ai_customer_designer_system_admin,access.ai.customer.designer.system_admin,model_ai_customer_designer,ai_business_tools.role_system_admin,1,1,1,1
 access_ai_customer_role_assignment,access.ai.customer.role.assignment,model_ai_customer_role_assignment,base.group_system,1,1,1,1
+access_ai_customer_role_assignment_executive,access.ai.customer.role.assignment.executive,model_ai_customer_role_assignment,ai_business_tools.role_executive,1,1,1,0
 access_ai_customer_external_identity,access.ai.customer.external.identity,model_ai_customer_external_identity,base.group_system,1,1,1,1
 access_ai_customer_role_policy,access.ai.customer.role.policy,model_ai_customer_role_policy,base.group_system,1,1,1,1
+access_ai_customer_role_policy_executive,access.ai.customer.role.policy.executive,model_ai_customer_role_policy,ai_business_tools.role_executive,1,1,1,0

@@ -1,5 +1,6 @@
 # Ignore Node.js dependencies
 /node_modules/
+**/node_modules/
 
 # Ignore generated files
 /*.pid

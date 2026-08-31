@@ -56,11 +56,15 @@ class AiChannelLink(models.Model):
             ], order="id asc", limit=200)
             for msg in messages:
                 body = msg.body or ""
-                if link.trigger_text and link.trigger_text not in body:
-                    continue
-                if self._reply_to_channel_message(link, channel, msg):
-                    replied += 1
-                link.last_seen_message_id = max(link.last_seen_message_id, msg.id)
+                if link.trigger_text and link.trigger_text in body:
+                    if self._reply_to_channel_message(link, channel, msg):
+                        replied += 1
+                # Advance the durable cursor for every inspected message,
+                # including non-trigger messages and failed attempts.  The
+                # previous code re-scanned the same first 200 messages forever
+                # whenever a channel contained ordinary traffic, creating a
+                # needless DB/cron hot loop.
+                link.write({"last_seen_message_id": max(link.last_seen_message_id, msg.id)})
         return replied
 
     def _reply_to_channel_message(self, link, channel, msg):
@@ -74,7 +78,7 @@ class AiChannelLink(models.Model):
         # Generate as the MENTIONING user (their tool privileges / thread
         # ownership), but post the reply with the assistant's own identity.
         try:
-            from custom_addons.ai_gateway.controllers.gateway import _run_chat_env  # noqa: PLC0415
+            from odoo.addons.ai_gateway.controllers.gateway import _run_chat_env  # noqa: PLC0415
             result = _run_chat_env(self.env(user=user.id), msg.body or "")
         except Exception as exc:  # noqa: BLE001
             _logger.warning("channel reply generation failed: %s", exc)

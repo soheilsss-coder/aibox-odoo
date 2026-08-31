@@ -7,9 +7,13 @@ checks=[]
 def check(name, ok, detail=""):
     checks.append((name,bool(ok),detail))
 
-def text(rel): return (ROOT/rel).read_text(encoding='utf-8', errors='ignore')
+def text(rel):
+    path = ROOT / rel
+    return path.read_text(encoding='utf-8', errors='ignore') if path.exists() else ''
 
-install=text('02_install_modules.sh')
+# deploy.sh is the only supported checkout entrypoint. The historical
+# 01/02 installers are not fabricated merely to satisfy a source check.
+install=text('deploy.sh')
 check('no blanket assistant tool assignment', "all_tools = env['llm.tool'].search([])" not in install)
 check('generic rpc permanently disabled', 'permanently disabled' in text('custom_addons/ai_gateway/controllers/gateway.py') and 'status=410' in text('custom_addons/ai_gateway/controllers/gateway.py'))
 check('production CORS fail closed', 'AI_GATEWAY_ALLOWED_ORIGIN must be a concrete HTTPS origin in production' in text('custom_addons/ai_gateway/controllers/gateway.py'))

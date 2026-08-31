@@ -26,6 +26,7 @@ Phase 7 additions (roadmap #46 Admin Console, #47 Document Center):
   privilege concept was invented for this - it reuses the one that
   already existed, on purpose.
 """
+import base64
 import json as _json
 import logging
 import os
@@ -47,6 +48,7 @@ from odoo.addons.ai_gateway.controllers.gateway import (
     _record_auth_failure,
     _CORS_HEADERS,
 )
+from odoo.addons.ai_gateway.controllers.file_policy import validate_upload, MAX_UPLOAD_BYTES
 from werkzeug.wrappers import Response
 from urllib.parse import quote as _quote_filename
 
@@ -97,9 +99,12 @@ def _require_privileged():
 
 def _read_json_body():
     try:
-        return _json.loads(request.httprequest.data or b"{}"), None
+        body = _json.loads(request.httprequest.data or b"{}")
     except ValueError:
         return None, _json_response({"error": "invalid JSON body"}, status=400)
+    if not isinstance(body, dict):
+        return None, _json_response({"error": "JSON body must be an object"}, status=400)
+    return body, None
 
 
 class AiSemanticApiController(http.Controller):
@@ -141,8 +146,8 @@ class AiSemanticApiController(http.Controller):
         body, err = _read_json_body()
         if err:
             return err
-        login_id = (body.get("login") or "").strip()
-        password = body.get("password") or ""
+        login_id = str(body.get("login") or "").strip()
+        password = str(body.get("password") or "")
         if not login_id or not password:
             return _json_response({"error": "login and password are both required"}, status=400)
 
@@ -397,8 +402,17 @@ class AiSemanticApiController(http.Controller):
             "owner_id": env.user.id,
         }
         if payload.get("file_base64"):
+            try:
+                raw = base64.b64decode(payload["file_base64"], validate=True)
+                upload = validate_upload(
+                    payload.get("file_name") or name,
+                    raw,
+                    max_bytes=MAX_UPLOAD_BYTES,
+                )
+            except (TypeError, ValueError):
+                return _json_response({"error": "invalid or unsupported file upload"}, status=400)
             values["file"] = payload["file_base64"]
-            values["file_name"] = payload.get("file_name", name)
+            values["file_name"] = upload["filename"]
 
         # A user may only restrict a document to a group they are
         # themselves a member of, or a department they can name -
@@ -532,25 +546,18 @@ class AiSemanticApiController(http.Controller):
         content = doc.file
         if not content:
             return _json_response({"error": "document has no file"}, status=404)
-        raw = content
-        if isinstance(raw, bytes):
-            pass
-        elif hasattr(raw, "encode"):
-            raw = raw.encode("latin1", errors="surrogateescape")
-        else:
-            raw = bytes(raw)
-        import os as _os
-        filename = doc.file_name or (doc.name or "document")
-        _, ext = _os.path.splitext(filename)
-        mimetype = {"pdf": "application/pdf", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-                    "txt": "text/plain", "csv": "text/csv", "md": "text/markdown"}.get(
-            (ext or "").lstrip(".").lower(), "application/octet-stream")
+        try:
+            # Odoo Binary fields are base64 encoded at the ORM boundary. Do
+            # not stream the encoded representation as if it were the file.
+            raw = base64.b64decode(content, validate=True)
+            filename = doc.file_name or (doc.name or "document")
+            upload = validate_upload(filename, raw, max_bytes=MAX_UPLOAD_BYTES)
+        except (TypeError, ValueError):
+            return _json_response({"error": "stored document content is invalid"}, status=415)
         return Response(
             raw,
             headers=[
-                ("Content-Type", mimetype),
+                ("Content-Type", upload["mimetype"]),
                 ("Content-Disposition", "inline; filename*=UTF-8''%s" % _quote_filename(filename)),
             ] + _CORS_HEADERS,
             status=200,
@@ -826,20 +833,20 @@ class AiSemanticApiController(http.Controller):
             for a in env["llm.assistant"].sudo().search([]):
                 assistants.append({
                     "name": a.name,
-                    "model": a.model_id.name if getattr(a, "model_id", False) else None,
-                    "provider": a.model_id.provider_id.name
-                                if getattr(a, "model_id", False) and a.model_id.provider_id else None,
+                    # Infrastructure identifiers are intentionally not part of
+                    # the product/admin API; only capability and health state
+                    # are customer-visible.
                     "tool_count": len(a.tool_ids) if hasattr(a, "tool_ids") else None,
                     "active": a.active,
                 })
 
-        vision_api_base = env["ir.config_parameter"].sudo().get_param(
-            "company_ai_demo.vision_api_base", None)
+        vision_configured = bool(env["ir.config_parameter"].sudo().get_param(
+            "company_ai_demo.vision_api_base", None))
 
         return _json_response({
             "tools": tools,
             "assistants": assistants,
-            "vision_api_base": vision_api_base,
+            "vision_configured": vision_configured,
         })
 
     @http.route("/api/admin/branding", type="http", auth="none", csrf=False, methods=["GET", "POST", "OPTIONS"])

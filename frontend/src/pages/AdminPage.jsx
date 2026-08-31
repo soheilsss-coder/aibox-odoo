@@ -245,15 +245,13 @@ function AgentsTab() {
           <Table
             columns={[
               { key: "name", header: "نام" },
-              { key: "model", header: "مدل", render: (a) => a.model || "—" },
-              { key: "provider", header: "ارائه‌دهنده", render: (a) => a.provider || "—" },
-              { key: "tool_count", header: "تعداد ابزار" },
+              { key: "tool_count", header: "تعداد قابلیت" },
               { key: "active", header: "فعال", render: (a) => <Badge tone={a.active ? "success" : "neutral"}>{a.active ? "بله" : "خیر"}</Badge> },
             ]}
             rows={data.assistants}
           />
         )}
-        {data.vision_api_base && <p className="muted">آدرس مدل ویژن: {data.vision_api_base}</p>}
+        {data.vision_configured && <p className="muted">تحلیل تصویر برای این سازمان پیکربندی شده است.</p>}
       </Card>
       <Card title="رجیستری ابزارها و سطح ریسک">
         <Table

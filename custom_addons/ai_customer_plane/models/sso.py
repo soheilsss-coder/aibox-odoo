@@ -18,6 +18,11 @@ class AiSsoProvider(models.Model):
     claim_user_id = fields.Char(default="sub")
     claim_email = fields.Char(default="email")
     claim_groups = fields.Char(default="groups")
+    claim_group_mapping_json = fields.Text(
+        default="{}",
+        help="JSON mapping of IdP group values to product role XML IDs. "
+             "Only explicitly mapped product roles are synchronized.",
+    )
     active = fields.Boolean(default=False)
     enforce_for_company = fields.Boolean(default=False)
     auto_provision = fields.Boolean(default=False, help="Never create a user from an IdP claim unless explicitly enabled.")

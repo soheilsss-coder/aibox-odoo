@@ -33,6 +33,8 @@ class AiUnifiedOperation(models.Model):
         ('documents_create', 'Create Document'),
         ('helpdesk_ticket_create', 'Create Helpdesk Ticket'),
         ('pos_order_create', 'Create POS Order'),
+        ('pos_restaurant_table_status', 'Read Restaurant Table Status'),
+        ('pos_restaurant_order_note_update', 'Update Restaurant Order Note'),
     ], required=True)
     active = fields.Boolean(default=True)
     description = fields.Text()
@@ -159,7 +161,7 @@ class AiUnifiedAdapterService(models.AbstractModel):
 
     def _handle_hr_attendance_checkin(self, args, user):
         Attendance = self._model('hr.attendance')
-        employee = self.env['hr.employee'].sudo().search([('user_id','=',user.id)], limit=1)
+        employee = self.env['hr.employee'].search([('user_id','=',user.id)], limit=1)
         if not employee:
             raise UserError('no employee is linked to the current user')
         vals = {'employee_id': employee.id}
@@ -171,7 +173,7 @@ class AiUnifiedAdapterService(models.AbstractModel):
 
     def _handle_hr_expense_create(self, args, user):
         Expense = self._model('hr.expense')
-        employee = self.env['hr.employee'].sudo().search([('user_id','=',user.id)], limit=1)
+        employee = self.env['hr.employee'].search([('user_id','=',user.id)], limit=1)
         if not employee:
             raise UserError('no employee is linked to the current user')
         vals = {'name': args.get('name') or 'AI expense', 'employee_id': employee.id}
@@ -233,6 +235,40 @@ class AiUnifiedAdapterService(models.AbstractModel):
         rec = Order.create(vals)
         self._emit_business_event('pos.order.created', {'record_id': rec.id}, user)
         return {'record_id': rec.id, 'model': 'pos.order', 'status': 'created'}
+
+    def _handle_pos_restaurant_table_status(self, args, user):
+        """Read restaurant tables only through the user's native ACL scope."""
+        Table = self._model('restaurant.table')
+        domain = []
+        if args.get('floor_id') and 'floor_id' in Table._fields:
+            domain.append(('floor_id', '=', int(args['floor_id'])))
+        try:
+            limit = min(max(int(args.get('limit', 100)), 1), 100)
+        except (TypeError, ValueError):
+            limit = 100
+        rows = Table.search(domain, limit=limit)
+        result = []
+        for table in rows:
+            result.append({
+                'record_id': table.id,
+                'name': getattr(table, 'name', False) or getattr(table, 'table_number', False) or str(table.id),
+                'floor_id': table.floor_id.id if 'floor_id' in table._fields and table.floor_id else False,
+                'seats': getattr(table, 'seats', False) if 'seats' in table._fields else False,
+            })
+        return {'model': 'restaurant.table', 'tables': result, 'status': 'ok'}
+
+    def _handle_pos_restaurant_order_note_update(self, args, user):
+        Order = self._model('pos.order')
+        if 'note' not in Order._fields:
+            raise UserError('restaurant order notes are not available in this installation')
+        order = Order.browse(int(args.get('order_id', 0))).exists()
+        if not order:
+            raise UserError('restaurant order not found')
+        if 'session_id' in order._fields and order.session_id and order.session_id.state == 'closed':
+            raise UserError('a closed restaurant order cannot be changed')
+        order.write({'note': str(args.get('note') or '')[:2000]})
+        self._emit_business_event('pos.restaurant.order_note.updated', {'record_id': order.id}, user)
+        return {'record_id': order.id, 'model': 'pos.order', 'status': 'updated'}
 
     def _handle_account_move_post(self, args, user):
         Move = self._model('account.move')
