@@ -36,11 +36,11 @@ class AiAuthorizationEngine(models.AbstractModel):
         permanent_groups = user.groups_id
         grant_model = self.env["ai.gateway.access.grant"].sudo() if "ai.gateway.access.grant" in self.env else None
         assignment_model = self.env["ai.customer.role.assignment"].sudo() if "ai.customer.role.assignment" in self.env else None
-        assigned_groups = assignment_model.groups_for_user(user) if assignment_model else self.env["res.groups"].browse()
+        assigned_groups = assignment_model.groups_for_user(user) if assignment_model is not None else self.env["res.groups"].browse()
         effective_groups = permanent_groups | assigned_groups
-        if grant_model:
+        if grant_model is not None:
             effective_groups |= grant_model.effective_groups(user)
-        grant_allows = grant_model.grant_allows(user, capability, record=record) if grant_model else False
+        grant_allows = grant_model.grant_allows(user, capability, record=record) if grant_model is not None else False
         delegation_allows = False
         if "ai.customer.delegation" in self.env:
             delegation_allows = bool(self.env["ai.customer.delegation"].sudo().effective_for(

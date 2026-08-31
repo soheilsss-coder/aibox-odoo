@@ -1,7 +1,7 @@
 [Unit]
 Description=AI Company Assistant application server
-After=network-online.target postgresql.service redis-server.service
-Wants=network-online.target
+After=network-online.target postgresql.service redis-server.service ai-vllm-chat.service
+Wants=network-online.target ai-vllm-chat.service
 
 [Service]
 Type=simple

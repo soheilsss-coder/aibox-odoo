@@ -78,8 +78,8 @@ class AiChannelLink(models.Model):
         # Generate as the MENTIONING user (their tool privileges / thread
         # ownership), but post the reply with the assistant's own identity.
         try:
-            from odoo.addons.ai_gateway.controllers.gateway import _run_chat_env  # noqa: PLC0415
-            result = _run_chat_env(self.env(user=user.id), msg.body or "")
+            from odoo.addons.ai_gateway.controllers.gateway import _run_chat_bounded  # noqa: PLC0415
+            result = _run_chat_bounded(self.env(user=user.id), msg.body or "")
         except Exception as exc:  # noqa: BLE001
             _logger.warning("channel reply generation failed: %s", exc)
             return False

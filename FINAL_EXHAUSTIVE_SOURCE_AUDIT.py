@@ -199,7 +199,7 @@ if v52_root.exists():
 else:
     checks['PRESERVATION-v52']={"pass":True,"evidence":"v52 source preserved by build procedure"}
 
-out={"release":"v57-source-complete","errors":errors,"checks":checks,"runtime_certification":"REQUIRED_ON_REAL_STACK","runtime_note":"No source audit may fabricate Odoo/PostgreSQL/Redis/vLLM/IdP/Telegram/Buzz/DGX E2E PASS."}
+out={"release":"v58-source-verified","errors":errors,"checks":checks,"runtime_certification":"REQUIRED_ON_REAL_STACK","runtime_note":"No source audit may fabricate Odoo/PostgreSQL/Redis/vLLM/IdP/Telegram/Buzz/DGX E2E PASS."}
 (ROOT/'FINAL_EXHAUSTIVE_SOURCE_AUDIT.json').write_text(json.dumps(out,ensure_ascii=False,indent=2))
 print(json.dumps({"release":out["release"],"errors":len(errors),"checks":len(checks),"runtime_certification":out["runtime_certification"]},ensure_ascii=False))
 if errors:

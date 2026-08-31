@@ -169,7 +169,8 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         user = env.user
-        employee = _model(env, "hr.employee").search([("user_id", "=", user.id)], limit=1) if _model(env, "hr.employee") else None
+        employee_model = _model(env, "hr.employee")
+        employee = employee_model.search([("user_id", "=", user.id)], limit=1) if employee_model is not None else None
         capabilities = env["ai.control.capability.resolver"].effective_capabilities(user=user) if "ai.control.capability.resolver" in env else []
         return _json_response({
             "user": {"id": user.id, "name": user.name, "login": user.login},
@@ -185,8 +186,9 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         dept_model = _model(env, "hr.department")
-        if not dept_model: return _json_response({"departments": []})
-        employee = _model(env, "hr.employee").search([("user_id", "=", env.user.id)], limit=1)
+        if dept_model is None: return _json_response({"departments": []})
+        employee_model = _model(env, "hr.employee")
+        employee = employee_model.search([("user_id", "=", env.user.id)], limit=1) if employee_model is not None else None
         privileged = env.user.has_group("base.group_system")
         depts = dept_model.search([]) if privileged else (employee.department_id | employee.child_ids.mapped("department_id"))
         return _json_response({"departments": [{"id": d.id, "name": d.name, "manager_id": d.manager_id.id if d.manager_id else None, "member_count": len(d.member_ids)} for d in depts]})
@@ -198,7 +200,7 @@ class AiExperienceApi(http.Controller):
         if err: return err
         assistants = _model(env, "llm.assistant")
         data = [{"id": "role-default", "name": _assigned_agent(env, env.user), "description": "Agent اختصاصی نقش شما؛ محدود به Capabilityهای مؤثر همان کاربر.", "tools": 0, "assigned_to_user": True}]
-        if assistants:
+        if assistants is not None:
             for a in assistants.search([], order="name"):
                 data.append({"id": a.id, "name": a.name, "description": getattr(a, "description", "") or "", "tools": len(a.tool_ids) if hasattr(a, "tool_ids") else 0})
         return _json_response({"agents": data})
@@ -209,30 +211,70 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         model = _model(env, "project.task")
-        if not model: return _json_response({"tasks": []})
+        if model is None: return _json_response({"tasks": []})
         if request.httprequest.method == "POST":
-            payload = json.loads(request.httprequest.data or b"{}")
+            try:
+                payload = json.loads(request.httprequest.data or b"{}")
+            except (TypeError, ValueError):
+                return _json_response({"error": "invalid JSON body"}, status=400)
+            if not isinstance(payload, dict):
+                return _json_response({"error": "JSON body must be an object"}, status=400)
             vals = {"name": payload.get("name"), "description": payload.get("description", "")}
             if not vals["name"]: return _json_response({"error": "name is required"}, status=400)
-            task = model.create(vals)
-            _audit(env, env.user.id, "experience_api", "task.create", {"task_id": task.id}, True)
-            return _json_response({"id": task.id, "name": task.name}, status=201)
+            try:
+                result = env["ai.gateway.execution.gate"].execute(
+                    "project.task.create", args={"name": str(vals["name"])[:200], "description": str(vals["description"])[:4000]}
+                )
+            except Exception:  # noqa: BLE001
+                _logger.exception("task creation failed")
+                return _json_response({"error": "task could not be created"}, status=409)
+            task = model.browse(result.get("record_id")).exists()
+            _audit(env, env.user.id, "experience_api", "task.create", {"task_id": task.id if task else None}, True)
+            return _json_response({"id": task.id if task else result.get("record_id"), "name": task.name if task else vals["name"]}, status=201)
         tasks = model.search([("create_uid", "=", env.user.id)], order="create_date desc", limit=100)
         return _json_response({"tasks": [{"id": t.id, "name": t.name, "description": t.description or "", "state": getattr(t.stage_id, "name", "") if hasattr(t, "stage_id") else ""} for t in tasks]})
 
-    @http.route("/api/approvals", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
-    def approvals(self, **kwargs):
+    @http.route("/api/calendar", type="http", auth="none", csrf=False, methods=["GET", "POST", "OPTIONS"])
+    def calendar(self, **kwargs):
         if request.httprequest.method == "OPTIONS": return _cors_preflight_response()
         env, err = _require_auth()
         if err: return err
-        model = _model(env, "ai.gateway.approval")
-        if not model: return _json_response({"approvals": []})
-        recs = model.search([], order="create_date desc", limit=100)
-        fields_map = {f: True for f in ("name", "state", "status", "risk_level", "requester_id", "expires_at") if f in model._fields}
-        out=[]
-        for r in recs:
-            out.append({"id": r.id, "name": getattr(r, "name", f"Approval #{r.id}"), "state": getattr(r, "state", getattr(r, "status", "")), "risk": getattr(r, "risk_level", 0), "requester": getattr(getattr(r, "requester_id", False), "name", "")})
-        return _json_response({"approvals": out})
+        model = _model(env, "calendar.event")
+        if model is None: return _json_response({"events": []})
+        if request.httprequest.method == "POST":
+            try:
+                payload = json.loads(request.httprequest.data or b"{}")
+            except (TypeError, ValueError):
+                return _json_response({"error": "invalid JSON body"}, status=400)
+            if not isinstance(payload, dict) or not payload.get("name") or not payload.get("start"):
+                return _json_response({"error": "name and start are required"}, status=400)
+            try:
+                result = env["ai.gateway.execution.gate"].execute(
+                    "calendar.event.create", args={
+                        "name": str(payload["name"])[:200],
+                        "start": str(payload["start"]),
+                        "stop": str(payload.get("stop") or payload["start"]),
+                        "allday": bool(payload.get("allday")),
+                        "description": str(payload.get("description") or "")[:4000],
+                        "location": str(payload.get("location") or "")[:500],
+                    },
+                )
+                _audit(env, env.user.id, "experience_api", "calendar.create", {"record_id": result.get("record_id")}, True)
+                return _json_response(result, status=201)
+            except Exception:  # noqa: BLE001
+                _logger.exception("calendar event creation failed")
+                return _json_response({"error": "calendar event could not be created"}, status=409)
+        start = kwargs.get("start")
+        end = kwargs.get("end")
+        domain = ["|", ("partner_ids", "in", [env.user.partner_id.id]), ("user_id", "=", env.user.partner_id.id)]
+        if start: domain.append(("stop", ">=", start))
+        if end: domain.append(("start", "<=", end))
+        events = model.search(domain, order="start asc", limit=250)
+        return _json_response({"events": [{
+            "id": event.id, "name": event.name, "start": str(event.start) if event.start else None,
+            "stop": str(event.stop) if event.stop else None, "allday": bool(event.allday),
+            "location": event.location or "", "description": event.description or "",
+        } for event in events]})
 
     @http.route("/api/notifications", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def notifications(self, **kwargs):
@@ -241,7 +283,7 @@ class AiExperienceApi(http.Controller):
         if err: return err
         model = _model(env, "mail.notification")
         out=[]
-        if model:
+        if model is not None:
             recs = model.search([("res_partner_id", "=", env.user.partner_id.id)], order="id desc", limit=100)
             for r in recs:
                 msg = r.mail_message_id
@@ -255,7 +297,7 @@ class AiExperienceApi(http.Controller):
         if err: return err
         model = _model(env, "ai.model.profile")
         out=[]
-        if model:
+        if model is not None:
             labels = {
                 "chat": "دستیار گفتگو", "reasoning": "دستیار تحلیل",
                 "vision": "تحلیل تصویر", "embedding": "جستجوی دانش",
@@ -321,9 +363,10 @@ class AiExperienceApi(http.Controller):
                     return _json_response({"error": "XLSX reader is not installed"}, status=501)
             elif lower.endswith((".png", ".jpg", ".jpeg", ".webp")):
                 import requests
-                base = env["ir.config_parameter"].sudo().get_param("company_ai_demo.vision_api_base", "http://127.0.0.1:8001/v1")
+                profile = env["ai.model.router"].route(purpose="vision")
+                base = profile.endpoint or env["ir.config_parameter"].sudo().get_param("company_ai_demo.vision_api_base", "http://127.0.0.1:8001/v1")
                 mime = "image/png" if lower.endswith(".png") else "image/jpeg"
-                resp = requests.post(f"{base}/chat/completions", json={"model":env["ai.model.router"].route(purpose="vision").model_id,"messages":[{"role":"user","content":[{"type":"text","text":question},{"type":"image_url","image_url":{"url":f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],"max_tokens":1500}, timeout=90)
+                resp = requests.post(f"{base.rstrip('/')}/chat/completions", json={"model":profile.model_id,"messages":[{"role":"user","content":[{"type":"text","text":question},{"type":"image_url","image_url":{"url":f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],"max_tokens":1500}, timeout=90)
                 resp.raise_for_status(); answer=resp.json()["choices"][0]["message"]["content"]
                 return _json_response({"filename": filename, "kind": "vision", "analysis": scrub_public_text(answer)})
             else:

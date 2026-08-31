@@ -24,6 +24,17 @@ archive; none of them are optional shortcuts for each other.
    export ODOO_LLM_REPO="<pinned odoo-llm repository>"
    export ODOO_LLM_COMMIT_SHA="<immutable odoo-llm commit>"
    export VLLM_VERSION="<validated GB10-compatible vLLM release>"
+   export PYTHON_RUNTIME_VERSION="3.11"
+   export MODEL_REVISION_QWEN="<revision>" MODEL_REVISION_GLIMMER="<revision>"
+   export MODEL_REVISION_VISION="<revision>" MODEL_REVISION_EMBEDDING="<revision>"
+   export AI_GATEWAY_ENV="production"
+   export AI_GATEWAY_ALLOWED_ORIGIN="https://YOUR-FRONTEND-DOMAIN"
+   export AI_GATEWAY_REDIS_URL="redis://127.0.0.1:6379/0"
+   export AI_VLLM_CHAT_MODEL_PATH="/opt/models/<chat-model-revision>"
+   export AI_VLLM_EMBEDDING_MODEL_PATH="/opt/models/<embedding-model-revision>"
+   export AI_VLLM_VISION_MODEL_PATH="/opt/models/<vision-model-revision>"
+   export AI_RAG_INDEX_VERSION="rag-v1-<embedding-revision>"
+   export NODE_RUNTIME_VERSION="20"
    export PGVECTOR_PACKAGE="postgresql-16-pgvector"
    export ODOO_ADMIN_PASSWORD="<secret supplied by the secret manager>"
    INSTALL_OS_DEPS=1 ./01_setup_base.sh
@@ -35,13 +46,15 @@ archive; none of them are optional shortcuts for each other.
 2. **Set the required environment variables** before touching `deploy.sh`:
    ```bash
    export AI_GATEWAY_ALLOWED_ORIGIN="https://YOUR-FRONTEND-DOMAIN"
+   export AI_GATEWAY_REDIS_URL="redis://127.0.0.1:6379/0"
    export AI_GATEWAY_ENV="production"
    ```
    In production mode (`AI_GATEWAY_ENV=production`), `deploy.sh` will also
    require: `ODOO_COMMIT_SHA`, `ODOO_LLM_COMMIT_SHA`, `VLLM_VERSION`,
    `PYTHON_RUNTIME_VERSION`, `NODE_RUNTIME_VERSION`, `PGVECTOR_PACKAGE`,
    `MODEL_REVISION_QWEN`, `MODEL_REVISION_GLIMMER`, `MODEL_REVISION_VISION`,
-   `MODEL_REVISION_EMBEDDING` - it fails closed (refuses to run) if any of
+   `MODEL_REVISION_EMBEDDING` and `AI_GATEWAY_REDIS_URL` - it fails closed
+   (refuses to run) if any of
    these immutable native-artifact pins are missing,
    rather than silently deploying unpinned versions. See
    `DEPLOYMENT_ARTIFACTS.lock` for where to record the actual values once
@@ -68,15 +81,16 @@ archive; none of them are optional shortcuts for each other.
    > list, so make sure the Odoo artifact you ship contains it, or this
    > install step aborts.
 
-5. **Start the native services** (Odoo and durable event/RAG workers;
-   start the separately configured vLLM model units only after the GB10
-   memory/latency plan has been validated):
+5. **Start the native services** (PostgreSQL, Redis, the three vLLM
+   workload units, Odoo and durable event/RAG workers) only after the GB10
+   memory/latency plan has been validated:
    ```bash
    ./03_start_all.sh
    ```
-   `03_start_all.sh` enables PostgreSQL/Redis and the checked-in systemd
-   units. vLLM is installed by step 1 but model serving is intentionally a
-   runtime capacity decision, not a hard-coded model/weight download.
+   `03_start_all.sh` enables and health-checks PostgreSQL, Redis, the
+   checked-in vLLM units, Odoo and workers. The model weights stay outside
+   the workspace; model paths and serving budgets are supplied by the
+   deployment environment.
 
 6. **Run the deterministic acceptance suite** (ORM-level permission/
    security scenarios, no live traffic needed):
@@ -88,12 +102,25 @@ archive; none of them are optional shortcuts for each other.
 7. **Run full runtime certification** on the real target environment -
    this is the stage that actually exercises Odoo + PostgreSQL + Redis +
    pgvector + vLLM + Buzz + Telegram + SSO/SCIM + every installed ERP
-   module together, and is what the release documents (`FINAL_RELEASE_V57.md`,
-   `FINAL_RELEASE_STATUS.md`) mean by "runtime certification required":
+   module together, and is what the release documents (`FINAL_RELEASE_STATUS.md`,
+   `PRODUCT_UPGRADE_ROADMAP_V58.md`) mean by "runtime certification required":
    ```bash
-   python3 48_auto_integration_certification.py
+   /opt/odoo/src/odoo/odoo-bin shell -c /etc/odoo/odoo.conf -d company_ai < 62_v58_module_certification.py
+   /opt/odoo/src/odoo/odoo-bin shell -c /etc/odoo/odoo.conf -d company_ai < 48_auto_integration_certification.py
    ```
-   plus the full checklist in `PRODUCTION_E2E_RUNBOOK.md` (auth matrix,
+   Then run `60_v58_llm_benchmark.py` once per scenario (`chat`, `tool`,
+   `rag`, `approval`, `vision`, `embedding`) against the matching native
+   serving endpoint. Fill its
+   `system_evidence` fields from the same run (GPU, queue, PostgreSQL and
+   Redis), set measured thresholds, and run `61_v58_capacity_gate.py`.
+   `61` intentionally fails when thresholds or evidence are absent; no
+   concurrency/capacity number is inferred from source tests. After that gate
+   passes, an administrator must promote the measured profile through
+   `ai.model.profile.action_promote_from_benchmark`, supplying the same
+   report plus explicit security/tool-calling/vision scores; promotion starts
+   in `unknown` health state and routing remains closed until the health cron
+   observes the native endpoint.
+   Plus the full checklist in `PRODUCTION_E2E_RUNBOOK.md` (auth matrix,
    workflow scenarios, file/RAG ACL scenarios, Telegram/Buzz scenarios,
    ERP module certification per installed app, and model benchmark/
    promotion gate). Production promotion requires every check there to be

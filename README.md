@@ -1,59 +1,42 @@
 
-## Current release: v57 — Production Stabilization (release candidate)
+## Current release: v58 — Enterprise AI/ERP product candidate
 
-Canonical version marker lives in `RELEASE_CANDIDATE_VERSION.txt`
-(`v57`); see `FINAL_RELEASE_STATUS.md` for the current release state.
-# Odoo AI System — Final Complete Package
+Canonical version marker lives in `RELEASE_CANDIDATE_VERSION.txt` (`v58`).
+See `FINAL_RELEASE_STATUS.md` and `PRODUCT_UPGRADE_ROADMAP_V58.md` for the
+current status, acceptance criteria and the explicit runtime evidence boundary.
+# Enterprise AI/ERP Assistant — v58
 
-Everything built across this whole project: Odoo 18 Community
-(bare-metal, no Docker) + local vLLM + odoo-llm AI framework + a
-custom module with role-based demo users, full-format file reading
-(OCR included), internet search, accurate date awareness, an HR
-decree/leave workflow the AI can execute end-to-end, and an
-`ai_gateway` module exposing exactly 3 generic endpoints
-(`/api/bootstrap`, `/api/rpc` (permanently disabled; use named capabilities), `/api/chat`) for a decoupled React/
-Emergent/Lovable frontend.
+This checkout is a native, API-backed product for company operations. It
+combines the installed ERP applications with a role-aware assistant, durable
+workflow/event processing, ACL-safe documents and RAG, a capability/risk/
+approval gate, audit and observability, and a React product experience. The
+browser exposes product language only; infrastructure identifiers stay behind
+the service boundary.
 
-This version has every fix discovered through extensive real-world
-testing baked directly into the code - not left as manual steps.
+## Product contract
 
-## A note on scope (read this if you're wondering about "enterprise architecture")
+- **Native deployment:** no Docker. `01_setup_base.sh` installs pinned source,
+  Python dependencies and vLLM; systemd runs separate chat, embedding and
+  vision serving units plus the application, event and RAG workers.
+- **One secure operation path:** chat, task, calendar, leave, document, sales,
+  purchase, inventory, accounting, manufacturing, CRM, HR, POS and Restaurant
+  operations use named capabilities and reviewed adapters. Risky writes stop
+  for durable human approval; model output cannot grant access.
+- **Tenant and scope isolation:** current company, department, team, user,
+  delegation and temporary grants are enforced by server-side authorization,
+  ORM ACL/record rules and pre-retrieval RAG filtering. Approval and index
+  snapshots include the company dimension.
+- **Product UX:** login uses an HttpOnly session cookie; Calendar, Documents,
+  Approvals, Tasks, Notifications, Admin and Integrations are API-backed with
+  loading/error/empty states. Chat uses SSE delivery and the same guarded
+  operation path as other entry points.
+- **Verification:** source/contract/security tests and the frontend build run
+  in the release script. Native runtime install/upgrade, module certification,
+  DGX latency and capacity evidence remain mandatory before production
+  promotion.
 
-A much larger enterprise-architecture proposal was considered for this
-project (multi-tenant SSO/SCIM, OpenFGA fine-grained authorization,
-Temporal workflows, separate microservices for identity/workflow/
-memory/documents, etc.). That was deliberately NOT implemented here.
-That level of architecture is for products serving many large
-organizations simultaneously - this project sells one device to one
-company at a time, and that complexity would multiply build time and
-risk without solving a problem you actually have yet. Instead, four
-concrete, scoped improvements were made this round:
-
-1. **Security hardening**: random DB password generated per install
-   (no more hardcoded `change_me`), CORS origin configurable via
-   `AI_GATEWAY_ALLOWED_ORIGIN` env var (defaults open for local dev,
-   lock it down before selling), API key no longer accepted via URL
-   query string (header/Bearer only - query strings leak into logs),
-   basic per-key rate limiting, and the destructive `DROP DATABASE`
-   step moved out of the main install script into a separate
-   confirmation-gated `reset_dev.sh`.
-2. **Self-service leave requests**: a new `create_leave_request` tool
-   lets any employee request time off for themselves; it goes through
-   Odoo's own existing approval/notification flow to their manager -
-   no new notification system needed. Kept separate from
-   `generate_hr_decree`, which is for a manager/HR acting on someone
-   else's behalf.
-3. **Ask instead of guess, but only for writes**: the assistant will
-   now ask one short clarifying question when required information
-   (like a date) is genuinely missing for a write operation (leave,
-   task, decree) - but still never asks for confirmation/permission on
-   read operations, and never asks more than once.
-4. **Vision tool**: a new `analyze_image` tool + optional second vLLM
-   instance (`/opt/start_vllm_vision.sh`, Qwen2.5-VL, its own port so
-   it doesn't fight the main model for GPU memory) lets the assistant
-   reason about the actual content of an image (e.g. "how much rebar
-   does this blueprint need"), not just extract text from it like
-   `read_attached_file` does.
+This is a source release candidate, not a fabricated production certification:
+no capacity number or runtime PASS is claimed without the real target stack.
 
 ## Install (fresh server / fresh instance)
 
@@ -61,6 +44,21 @@ concrete, scoped improvements were made this round:
 unzip odoo-ai-rebuild-final.zip
 cd rebuild_final
 chmod +x 01_setup_base.sh 02_install_modules.sh 03_start_all.sh reset_dev.sh
+# Pin these values to the approved release and keep model weights outside this checkout.
+export AI_GATEWAY_ENV=production
+export ODOO_LLM_REPO="https://github.com/<approved-org>/<pinned-odoo-llm-repo>.git"
+export ODOO_COMMIT_SHA="<40-char-odoo-commit>"
+export ODOO_LLM_COMMIT_SHA="<40-char-odoo-llm-commit>"
+export VLLM_VERSION="<approved-vllm-version>"
+export PYTHON_RUNTIME_VERSION="3.11"
+export MODEL_REVISION_QWEN="<revision>" MODEL_REVISION_GLIMMER="<revision>"
+export MODEL_REVISION_VISION="<revision>" MODEL_REVISION_EMBEDDING="<revision>"
+export AI_VLLM_CHAT_MODEL_PATH="/opt/models/<chat-revision>"
+export AI_VLLM_EMBEDDING_MODEL_PATH="/opt/models/<embedding-revision>"
+export AI_VLLM_VISION_MODEL_PATH="/opt/models/<vision-revision>"
+export AI_GATEWAY_ALLOWED_ORIGIN="https://assistant.example.com"
+export AI_GATEWAY_REDIS_URL="redis://:password@127.0.0.1:6379/0"
+export AI_RAG_INDEX_VERSION="rag-v1-<embedding-revision>"
 ./01_setup_base.sh
 cp -r custom_addons/company_ai_demo \
        custom_addons/ai_gateway \
@@ -99,9 +97,11 @@ you ever need to connect to the database directly.
 ```bash
 ./03_start_all.sh
 ```
-This starts Postgres and prints the exact 3 commands to run in 3
-separate terminals (vLLM, Odoo, tunnel) - each needs to stay in the
-foreground so you can see when it's actually ready, not just launched.
+This starts the native systemd units for the application, chat/embedding/
+vision serving, the durable event worker and the RAG worker. The script
+performs health gates for PostgreSQL, Redis and every required unit; it does
+not claim readiness if any service is down. Put the public reverse proxy or
+TLS termination in front of the application separately.
 
 ⚠️ **GOLDEN RULE**: never `kill -9` the vLLM process. On this class of
 hardware (unified CPU/GPU memory, e.g. NVIDIA GB10/DGX Spark) that can
@@ -115,19 +115,17 @@ vLLM with a single `Ctrl+C` and wait for clean shutdown.
 Demo users are disabled for production by default. Generate credentials through the secure provisioning/session flow only.
 
 ## AI Gateway (for your React/Lovable/Emergent frontend)
-See the API contract (exact JSON shapes for bootstrap/rpc/chat) - it's
-unchanged from before, still 3 endpoints, still one API key per user.
-Test directly before wiring up any frontend:
-```bash
-curl -H "X-API-Key: <a key>" https://<tunnel-url>/api/bootstrap
-```
-Don't have a key handy? Trade a real login/password for one (v24):
-```bash
-Browser/API login returns a short-lived HttpOnly `ai_session` cookie. API keys are reserved for machine-to-machine use and are never returned by browser login.
-```
-CORS is fail-closed and API credentials are accepted only through the
-X-API-Key header or Authorization: Bearer header. Query-string credentials
-are permanently disabled.
+The frontend uses the product API routes for login/session, workspace,
+Tasks, Calendar, Leaves, Documents/RAG, Approvals, Notifications, Admin,
+Integrations and SSE Chat. The generic `/api/rpc` surface is permanently
+closed; business writes go through named capabilities, Odoo ACL/record rules,
+risk policy and (when required) human approval.
+
+Browser login returns only a short-lived HttpOnly `ai_session` cookie. API
+keys are reserved for machine-to-machine use and are accepted only through
+`X-API-Key` or `Authorization: Bearer`; query-string credentials are disabled.
+In production CORS requires the concrete HTTPS origin configured by
+`AI_GATEWAY_ALLOWED_ORIGIN`.
 
 ## Client onboarding from Excel (roadmap #36/#37)
 `onboarding/onboard_from_excel.py` - see inline docstring for usage.

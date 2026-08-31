@@ -26,21 +26,26 @@ export const getMyCapabilities = () => request("/api/me/capabilities");
 export const getWorkspace = () => request("/api/workspace");
 export const getDepartments = () => request("/api/departments");
 export const getAgents = () => request("/api/agents");
+export const getCalendar = (start = "", end = "") => { const p = new URLSearchParams(); if (start) p.set("start", start); if (end) p.set("end", end); const q = p.toString(); return request(`/api/calendar${q ? `?${q}` : ""}`); };
+export const createCalendarEvent = (payload) => request("/api/calendar", { method: "POST", body: payload });
 export const getTasks = () => request("/api/tasks");
 export const createTask = (payload) => request("/api/tasks", { method: "POST", body: payload });
 export const getApprovals = () => request("/api/approvals");
+export const approveApproval = (id) => request(`/api/approvals/${id}/approve`, { method: "POST" });
+export const rejectApproval = (id, note = "") => request(`/api/approvals/${id}/reject`, { method: "POST", body: { note } });
 export const getNotifications = () => request("/api/notifications");
 export const getModels = () => request("/api/models");
 export const getIntegrations = () => request("/api/integrations");
 export const sendChatMessage = (message, threadId) => request("/api/chat", { method: "POST", body: { message, thread_id: threadId } });
 
 export function streamChat(payload, handlers) {
-  const { onThinking, onDelta, onDone, onError } = handlers || {};
+  const { onThinking, onDelta, onDone, onError, signal } = handlers || {};
   return fetch("/api/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     credentials: "include",
+    signal,
   })
     .then(async (resp) => {
       if (!resp.ok) {

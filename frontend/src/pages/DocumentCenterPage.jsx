@@ -98,7 +98,10 @@ export default function DocumentCenterPage({ user }) {
           setOptions(data);
           setUploadForm((f) => ({ ...f, department_id: data.own_department_id || "" }));
         })
-        .catch(() => setOptions({ departments: [], groups: [], own_department_id: null }));
+        .catch((err) => {
+          setError(err instanceof ApiError ? err.message : "خطا در بارگذاری گزینه‌های دسترسی");
+          setOptions({ departments: [], groups: [], own_department_id: null });
+        });
     }
   }
 

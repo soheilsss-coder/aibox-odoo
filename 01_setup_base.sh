@@ -22,13 +22,23 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 : "${AI_SYSTEMD_DIR:=/etc/systemd/system}"
 : "${AI_RUNTIME_WORKERS:=/opt/odoo-custom-addons/ai-runtime-workers}"
 : "${ODOO_SERVICE:=ai-odoo.service}"
+: "${AI_VLLM_CHAT_MODEL_PATH:=}"
+: "${AI_VLLM_EMBEDDING_MODEL_PATH:=}"
+: "${AI_VLLM_VISION_MODEL_PATH:=}"
+: "${AI_RAG_INDEX_VERSION:=rag-v1}"
+: "${AI_GATEWAY_ALLOWED_ORIGIN:=}"
+: "${AI_GATEWAY_REDIS_URL:=}"
+: "${AI_VLLM_MAX_MODEL_LEN:=32768}"
+: "${AI_VLLM_MAX_NUM_SEQS:=32}"
+: "${AI_VLLM_MAX_NUM_BATCHED_TOKENS:=8192}"
+: "${AI_VLLM_GPU_MEMORY_UTILIZATION:=0.90}"
 : "${PGVECTOR_PACKAGE:=postgresql-16-pgvector}"
 : "${VLLM_VERSION:?Set an immutable VLLM_VERSION for native installation}"
 : "${ODOO_COMMIT_SHA:?Set the immutable ODOO_COMMIT_SHA before native installation}"
 : "${ODOO_LLM_COMMIT_SHA:?Set the immutable ODOO_LLM_COMMIT_SHA before native installation}"
 
 if [[ "${AI_GATEWAY_ENV:-development}" == "production" ]]; then
-  for v in PYTHON_RUNTIME_VERSION MODEL_REVISION_QWEN MODEL_REVISION_GLIMMER MODEL_REVISION_VISION MODEL_REVISION_EMBEDDING; do
+  for v in PYTHON_RUNTIME_VERSION MODEL_REVISION_QWEN MODEL_REVISION_GLIMMER MODEL_REVISION_VISION MODEL_REVISION_EMBEDDING AI_VLLM_CHAT_MODEL_PATH AI_VLLM_EMBEDDING_MODEL_PATH AI_VLLM_VISION_MODEL_PATH AI_GATEWAY_ALLOWED_ORIGIN AI_GATEWAY_REDIS_URL; do
     [[ -n "${!v:-}" ]] || { echo "Missing immutable production variable: $v" >&2; exit 1; }
   done
 fi
@@ -122,17 +132,55 @@ EOF
 fi
 
 # Systemd receives only non-secret location settings from this environment file.
-as_root install -d -m 0755 -o "$ODOO_USER" -g "$ODOO_GROUP" "$AI_RUNTIME_WORKERS" /etc/ai-box
+for model_path in "$AI_VLLM_CHAT_MODEL_PATH" "$AI_VLLM_EMBEDDING_MODEL_PATH" "$AI_VLLM_VISION_MODEL_PATH"; do
+  [[ "$model_path" != *$'\n'* ]] || { echo "Model path contains a newline" >&2; exit 1; }
+done
+[[ "${AI_VLLM_SPECULATIVE_CONFIG:-}" != *$'\n'* ]] || { echo "Speculative config contains a newline" >&2; exit 1; }
+[[ "$AI_GATEWAY_ALLOWED_ORIGIN" != *$'\n'* && "$AI_GATEWAY_REDIS_URL" != *$'\n'* && "$AI_RAG_INDEX_VERSION" != *$'\n'* ]] || { echo "Runtime configuration contains a newline" >&2; exit 1; }
+as_root install -d -m 0755 -o "$ODOO_USER" -g "$ODOO_GROUP" "$AI_RUNTIME_WORKERS" /etc/ai-box /var/cache/ai-box
 as_root sh -c "cat > /etc/ai-box/runtime.env" <<EOF
 ODOO_BIN=${ODOO_SOURCE}/odoo-bin
 ODOO_CONF=${ODOO_CONF}
 ODOO_DB=${ODOO_DB}
+AI_GATEWAY_ENV=${AI_GATEWAY_ENV:-development}
+AI_GATEWAY_ALLOWED_ORIGIN=${AI_GATEWAY_ALLOWED_ORIGIN}
+AI_GATEWAY_REDIS_URL=${AI_GATEWAY_REDIS_URL}
+AI_RAG_INDEX_VERSION=${AI_RAG_INDEX_VERSION}
+AI_CHAT_GLOBAL_CONCURRENCY=${AI_CHAT_GLOBAL_CONCURRENCY:-2}
+AI_CHAT_LEASE_SECONDS=${AI_CHAT_LEASE_SECONDS:-240}
+AI_CHAT_GLOBAL_WAIT_SECONDS=${AI_CHAT_GLOBAL_WAIT_SECONDS:-0.75}
+AI_CHAT_QUEUE_CONCURRENCY=${AI_CHAT_QUEUE_CONCURRENCY:-2}
+AI_CHAT_QUEUE_MAX_WAITERS=${AI_CHAT_QUEUE_MAX_WAITERS:-10}
+AI_CHAT_QUEUE_TIMEOUT=${AI_CHAT_QUEUE_TIMEOUT:-180}
 EOF
 as_root chmod 0600 /etc/ai-box/runtime.env; as_root chown root:root /etc/ai-box/runtime.env
+write_vllm_env() {
+  local file="$1" model_path="$2" port="$3" served_model="$4" runner="$5" max_len="$6" max_seqs="$7" max_batch="$8"
+  cat <<EOF | as_root tee "$file" >/dev/null
+AI_VLLM_BIN=${VENV}/bin/vllm
+AI_VLLM_MODEL_PATH=${model_path}
+AI_VLLM_HOST=127.0.0.1
+AI_VLLM_PORT=${port}
+AI_VLLM_SERVED_MODEL=${served_model}
+AI_VLLM_RUNNER=${runner}
+AI_VLLM_MAX_MODEL_LEN=${max_len}
+AI_VLLM_MAX_NUM_SEQS=${max_seqs}
+AI_VLLM_MAX_NUM_BATCHED_TOKENS=${max_batch}
+AI_VLLM_GPU_MEMORY_UTILIZATION=${AI_VLLM_GPU_MEMORY_UTILIZATION}
+AI_VLLM_ENABLE_PREFIX_CACHING=1
+AI_VLLM_ENABLE_CHUNKED_PREFILL=1
+AI_VLLM_TRUST_REMOTE_CODE=${AI_VLLM_TRUST_REMOTE_CODE:-0}
+AI_VLLM_SPECULATIVE_CONFIG=${AI_VLLM_SPECULATIVE_CONFIG:-}
+EOF
+  as_root chmod 0600 "$file"; as_root chown root:root "$file"
+}
+write_vllm_env /etc/ai-box/vllm-chat.env "$AI_VLLM_CHAT_MODEL_PATH" 8000 local-model generate "$AI_VLLM_MAX_MODEL_LEN" "$AI_VLLM_MAX_NUM_SEQS" "$AI_VLLM_MAX_NUM_BATCHED_TOKENS"
+write_vllm_env /etc/ai-box/vllm-embedding.env "$AI_VLLM_EMBEDDING_MODEL_PATH" 8002 embedding-model pooling 8192 64 4096
+write_vllm_env /etc/ai-box/vllm-vision.env "$AI_VLLM_VISION_MODEL_PATH" 8001 vision-model generate "$AI_VLLM_MAX_MODEL_LEN" "$AI_VLLM_MAX_NUM_SEQS" "$AI_VLLM_MAX_NUM_BATCHED_TOKENS"
 as_root cp -f "$ROOT/runtime_workers/event_bus_worker.py" "$ROOT/runtime_workers/rag_worker.py" "$AI_RUNTIME_WORKERS/"
-as_root cp -f "$ROOT/runtime_workers/run_event_worker.sh" "$ROOT/runtime_workers/run_rag_worker.sh" "$AI_RUNTIME_WORKERS/"
+as_root cp -f "$ROOT/runtime_workers/run_event_worker.sh" "$ROOT/runtime_workers/run_rag_worker.sh" "$ROOT/runtime_workers/run_vllm_server.sh" "$AI_RUNTIME_WORKERS/"
 as_root chmod 0755 "$AI_RUNTIME_WORKERS"/*.sh
-for unit in ai-odoo.service ai-event-worker.service ai-rag-worker.service; do
+for unit in ai-odoo.service ai-event-worker.service ai-rag-worker.service ai-vllm-chat.service ai-vllm-embedding.service ai-vllm-vision.service; do
   src="$ROOT/systemd/$unit"
   [[ -f "$src" ]] || { echo "Missing systemd unit: $src" >&2; exit 1; }
   as_root sed -e "s#^User=.*#User=${ODOO_USER}#" \

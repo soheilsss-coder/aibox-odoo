@@ -95,8 +95,8 @@ class AiScheduleRule(models.Model):
             return False
         owner_env = self.env(user=rule.user_id.id)
         # Same env-based chat core the /api/chat and Telegram paths use.
-        from odoo.addons.ai_gateway.controllers.gateway import _run_chat_env  # noqa: PLC0415,E402
-        result = _run_chat_env(owner_env, rule.prompt_text)
+        from odoo.addons.ai_gateway.controllers.gateway import _run_chat_bounded  # noqa: PLC0415,E402
+        result = _run_chat_bounded(owner_env, rule.prompt_text)
         ok = "error" not in result
         rule.sudo().write({
             "last_run_datetime": fields.Datetime.now(),

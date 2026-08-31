@@ -353,6 +353,68 @@ class AiSemanticApiController(http.Controller):
             "leave_type": leave.holiday_status_id.name or "",
         }
 
+    @http.route("/api/approvals", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
+    def approvals(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_auth()
+        if err:
+            return err
+        if "ai.gateway.approval" not in env:
+            return _json_response({"approvals": []})
+        model = env["ai.gateway.approval"]
+        records = model.search([], order="requested_at desc, id desc", limit=100)
+        risk_model = env["ai.gateway.tool.risk"].sudo() if "ai.gateway.tool.risk" in env else None
+        result = []
+        for approval in records:
+            risk = risk_model.search([("tool_name", "=", approval.tool_name)], limit=1) if risk_model is not None and approval.tool_name else None
+            result.append({
+                "id": approval.id,
+                "name": approval.name,
+                "state": approval.state,
+                "requested_by": approval.requested_by_id.name,
+                "approver_group": approval.approver_group_id.name,
+                "risk_level": risk.risk_level if risk else None,
+                "expires_at": str(approval.expires_at) if approval.expires_at else None,
+                "can_decide": approval.state == "pending" and approval.requested_by_id != env.user and approval.approver_group_id in env.user.groups_id,
+            })
+        return _json_response({"approvals": result})
+
+    @http.route("/api/approvals/<int:approval_id>/approve", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])
+    def approve(self, approval_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_auth()
+        if err:
+            return err
+        approval = env["ai.gateway.approval"].browse(approval_id).exists() if "ai.gateway.approval" in env else None
+        if not approval:
+            return _json_response({"error": "approval not found or access denied"}, status=404)
+        try:
+            approval.action_approve()
+        except Exception:  # noqa: BLE001 - do not expose internal target details
+            return _json_response({"error": "approval could not be completed"}, status=409)
+        return _json_response({"status": "approved", "approval_id": approval.id})
+
+    @http.route("/api/approvals/<int:approval_id>/reject", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])
+    def reject(self, approval_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_auth()
+        if err:
+            return err
+        body, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        approval = env["ai.gateway.approval"].browse(approval_id).exists() if "ai.gateway.approval" in env else None
+        if not approval:
+            return _json_response({"error": "approval not found or access denied"}, status=404)
+        try:
+            approval.action_reject(str(body.get("note") or "")[:1000])
+        except Exception:  # noqa: BLE001
+            return _json_response({"error": "approval could not be rejected"}, status=409)
+        return _json_response({"status": "rejected", "approval_id": approval.id})
+
     # ------------------------------------------------------------
     # Documents - wraps company.document + ai.document.chunk
     # (roadmap #27). Same access rule as the AI tools use, so a
@@ -595,18 +657,23 @@ class AiSemanticApiController(http.Controller):
                {"document_id": document_id, "name": name}, success=True)
         return _json_response({"status": "deleted"})
 
-    @http.route("/api/documents/search", type="json", auth="none", csrf=False, methods=["POST", "OPTIONS"])
+    @http.route("/api/documents/search", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])
     def documents_search(self, **params):
         if request.httprequest.method == "OPTIONS":
             return _cors_preflight_response()
         env, err = _require_auth()
         if err:
-            return {"error": "invalid or missing API key"}
-
-        query = params.get("query", "")
-        top_k = params.get("top_k", 5)
+            return err
+        try:
+            body = json.loads(request.httprequest.data or b"{}")
+        except (TypeError, ValueError):
+            return _json_response({"error": "invalid JSON body"}, status=400)
+        if not isinstance(body, dict):
+            return _json_response({"error": "JSON body must be an object"}, status=400)
+        query = body.get("query", "")
+        top_k = body.get("top_k", 5)
         if not query:
-            return {"error": "'query' is required"}
+            return _json_response({"error": "'query' is required"}, status=400)
 
         try:
             # Same underlying method the AI tool uses
@@ -618,11 +685,11 @@ class AiSemanticApiController(http.Controller):
             results = env["ai.document.chunk"].search_similar(query, top_k=int(top_k))
             _audit(env, env.user.id, "semantic_api", "documents.search",
                    {"query": query}, success=True)
-            return {"results": results}
+            return _json_response({"results": results})
         except UserError as exc:
             _audit(env, env.user.id, "semantic_api", "documents.search",
                    {"query": query}, success=False, error_message=str(exc))
-            return {"error": "semantic search failed"}
+            return _json_response({"error": "semantic search failed"}, status=503)
 
     @staticmethod
     def _serialize_document(env, doc):
@@ -800,7 +867,9 @@ class AiSemanticApiController(http.Controller):
         env, err = _require_privileged()
         if err:
             return err
-        docs = env["company.document"].sudo().search([], order="create_date desc")
+        docs = env["company.document"].sudo().search([
+            ("company_id", "=", env.company.id),
+        ], order="create_date desc")
         return _json_response({"documents": [self._serialize_document(env, d) for d in docs]})
 
     @http.route("/api/admin/agents", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])

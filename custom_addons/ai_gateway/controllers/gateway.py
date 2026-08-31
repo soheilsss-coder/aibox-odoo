@@ -8,8 +8,9 @@ from odoo.http import request
 from odoo.exceptions import AccessError, UserError
 from odoo.sql_db import db_connect
 from .rate_limit import check as _shared_rate_limit, blocked as _shared_rate_blocked
-from .chat_queue import get_chat_pool
+from .chat_queue import get_chat_pool, get_global_chat_gate
 from .output_firewall import scrub_public_text
+from odoo.addons.ai_gateway.models.inference_config import classify_request
 from werkzeug.wrappers import Response
 
 
@@ -197,6 +198,48 @@ def _is_privileged(env, user):
     return False
 
 
+def _select_assistant(env, message, has_attachment=False):
+    """Select a certified assistant for the workload without exposing routing data.
+
+    The third-party thread API binds generation to an ``llm.assistant`` record,
+    so routing is implemented by choosing the assistant/model record before a
+    thread is created. If no certified profile is available, production
+    fails closed; only development/legacy mode may use the configured
+    compatibility assistant. No unreviewed model is auto-created or
+    silently promoted.
+    """
+    budget = classify_request(message, has_attachment=has_attachment)
+    Assistant = env["llm.assistant"]
+    base_domain = [("name", "=", "Company Assistant"), ("active", "=", True)]
+    if "ai.model.router" in env:
+        try:
+            profile = env["ai.model.router"].route(
+                purpose=budget.purpose,
+                requires_vision=budget.requires_vision,
+                latency_budget_ms=budget.latency_budget_ms,
+                requires_tools=budget.requires_tools,
+            )
+            candidate = Assistant.search(
+                base_domain + [("model_id.name", "=", profile.model_id)], limit=1
+            )
+            if candidate:
+                return candidate, budget
+            if os.environ.get("AI_GATEWAY_ENV", "development") == "production":
+                return Assistant.browse(), budget
+        except Exception:
+            # Production must not silently downgrade to an unbenchmarked
+            # assistant. Development/legacy databases retain an explicit
+            # compatibility path so upgrades remain usable before promotion.
+            if os.environ.get("AI_GATEWAY_ENV", "development") == "production":
+                return Assistant.browse(), budget
+    assistant = Assistant.search(base_domain, limit=1)
+    if not assistant:
+        # Upgrade compatibility for databases created before the assistant
+        # activation data fix. Do not create or select an arbitrary assistant.
+        assistant = Assistant.search([("name", "=", "Company Assistant")], limit=1)
+    return assistant, budget
+
+
 def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     """Business logic for one assistant turn, executed wholly as the
     environment's user (env.uid).
@@ -214,11 +257,11 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     """
     t0 = time.time()
     user_id = env.uid
-    assistant = env["llm.assistant"].search(
-        [("name", "=", "Company Assistant")], limit=1
+    assistant, budget = _select_assistant(
+        env, message, has_attachment=bool(attachment_ids)
     )
     if not assistant:
-        return {"error": "Company Assistant not found - check AI module install"}
+        return {"error": "assistant is not configured"}
 
     # v19 (roadmap #50) - CLOSED GAP: this used to accept ANY
     # thread_id the client sent and just check .exists(), with no
@@ -251,7 +294,12 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
         allowed_tools = assistant.tool_ids
         if "ai.gateway.tool.risk" in env:
             allowed_ids = env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user)
-            allowed_tools = assistant.tool_ids.filtered(lambda t: t.id in allowed_ids)
+            # The assistant seed intentionally carries no blanket tool list.
+            # Resolve only tools present in the explicit risk registry, then
+            # apply capability authorization for this user. This also makes
+            # newly installed reviewed tools available without mutating the
+            # assistant record or reintroducing an unreviewed default.
+            allowed_tools = env["llm.tool"].browse(allowed_ids)
         thread = env["llm.thread"].create({
             "assistant_id": assistant.id,
             "tool_ids": [(6, 0, allowed_tools.ids)],
@@ -261,7 +309,9 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     # Generic framework CRUD tools are never exposed through chat.
     if "ai.gateway.tool.risk" in env:
         allowed_ids = env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user)
-        thread.write({"tool_ids": [(6, 0, [i for i in thread.tool_ids.ids if i in allowed_ids])]})
+        allowed_tools = thread.tool_ids.filtered(lambda t: t.id in allowed_ids)
+        allowed_tools |= env["llm.tool"].browse(allowed_ids)
+        thread.write({"tool_ids": [(6, 0, allowed_tools.ids)]})
 
     # Attachments are persisted on a mail.message belonging to this exact
     # user-owned thread. The file-reader/vision tools discover attachments
@@ -287,7 +337,7 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     try:
         list(thread.generate(user_message_body=message or "لطفاً فایل ضمیمه را بررسی کن."))
     except Exception as exc:  # noqa: BLE001
-        _audit(env, user_id, "chat", "chat", {"message": message},
+        _audit(env, user_id, "chat", "chat", {"message": message, "purpose": budget.purpose},
                success=False, error_message=str(exc),
                duration_ms=int((time.time() - t0) * 1000),
                token_count=_estimate_tokens(message))
@@ -298,7 +348,7 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
         order="create_date desc",
         limit=1,
     )
-    _audit(env, user_id, "chat", "chat", {"message": message}, success=True,
+    _audit(env, user_id, "chat", "chat", {"message": message, "purpose": budget.purpose}, success=True,
            duration_ms=int((time.time() - t0) * 1000),
            token_count=_estimate_tokens(message, last_message.body))
     reply_html = last_message.body or ""
@@ -311,11 +361,13 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
 
 
 def _run_chat(user, message, thread_id=None, attachment_ids=None):
-    """Wrapper for the synchronous (request-env) path - kept so the
-    Telegram bridge keeps calling exactly the same signature as before.
-    Queued execution uses _run_chat_detached below instead."""
-    env = request.env(user=user.id)
-    return _run_chat_env(env, message, thread_id, attachment_ids)
+    """Compatibility wrapper for integrations that call the shared chat core.
+
+    Use the same detached cursor and global capacity lease as HTTP chat so
+    Telegram cannot bypass concurrency protection by entering the old direct
+    helper.
+    """
+    return _run_chat_detached(request.env.cr.dbname, user.id, message, thread_id, attachment_ids)
 
 
 def _run_chat_detached(dbname, user_id, message, thread_id=None, attachment_ids=None):
@@ -324,17 +376,42 @@ def _run_chat_detached(dbname, user_id, message, thread_id=None, attachment_ids=
     request thread's transaction (which belongs to a different,
     possibly idle query). Used only when the chat pool queues the job;
     the idle fast path keeps running inline with the request env."""
-    cr = db_connect(dbname).cursor()
+    lease = get_global_chat_gate().acquire()
+    if lease is False:
+        return {"error": "assistant capacity is currently full, try again shortly"}
+    cr = None
     try:
+        cr = db_connect(dbname).cursor()
         with api.Environment(cr, user_id, {}) as env:
             result = _run_chat_env(env, message, thread_id, attachment_ids)
+        cr.commit()
         return result
     except Exception:  # noqa: BLE001
         try:
-            cr.rollback()
+            if cr is not None:
+                cr.rollback()
         except Exception:  # noqa: BLE001
             pass
         return {"error": "generation failed, check server logs for details"}
+    finally:
+        try:
+            if cr is not None:
+                cr.close()
+        finally:
+            get_global_chat_gate().release(lease)
+
+
+def _run_chat_bounded(env, message, thread_id=None, attachment_ids=None):
+    """Run non-HTTP callers through the same cross-process capacity lease."""
+    lease = get_global_chat_gate().acquire()
+    if lease is False:
+        return {"error": "assistant capacity is currently full, try again shortly"}
+    try:
+        return _run_chat_env(env, message, thread_id, attachment_ids)
+    except Exception:  # noqa: BLE001 - callers receive the public-safe error
+        return {"error": "generation failed, check server logs for details"}
+    finally:
+        get_global_chat_gate().release(lease)
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +546,13 @@ class AiGatewayController(http.Controller):
         if "ai.gateway.audit.log" not in env:
             return _json_response({"error": "ai_business_tools is not installed"}, status=501)
 
-        return _json_response(env["ai.gateway.audit.log"].sudo().observability_snapshot())
+        snapshot = env["ai.gateway.audit.log"].sudo().observability_snapshot()
+        snapshot["chat_queue"] = get_chat_pool().snapshot()
+        snapshot["global_concurrency_lease"] = {
+            "enabled": get_global_chat_gate().enabled,
+            "capacity": get_global_chat_gate().capacity,
+        }
+        return _json_response(snapshot)
 
     @http.route("/api/reports/tokens", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def token_report(self, **kwargs):
@@ -551,6 +634,9 @@ class AiGatewayController(http.Controller):
         # fast with a busy error when the queue is full) instead of
         # every parallel request hitting the single GPU at once.
         dbname = request.env.cr.dbname
+        # Always use the detached cursor path, including the idle fast path.
+        # That makes the Redis lease cover every request across all Odoo
+        # worker processes instead of only requests that entered the queue.
         ok, result = get_chat_pool().submit(
             lambda: _run_chat_detached(dbname, user.id, message, thread_id, attachment_ids)
         )

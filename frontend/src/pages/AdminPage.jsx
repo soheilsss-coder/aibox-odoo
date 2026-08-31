@@ -104,8 +104,8 @@ function GrantsTab() {
   function openModal() {
     setFormError("");
     setOpen(true);
-    if (!users) adminListUsers().then((d) => setUsers(d.users)).catch(() => setUsers([]));
-    if (!roles) adminListRoles().then((d) => setRoles(d.roles)).catch(() => setRoles([]));
+    if (!users) adminListUsers().then((d) => setUsers(d.users)).catch((err) => setFormError(err instanceof ApiError ? err.message : "خطا در بارگذاری کاربران"));
+    if (!roles) adminListRoles().then((d) => setRoles(d.roles)).catch((err) => setFormError(err instanceof ApiError ? err.message : "خطا در بارگذاری نقش‌ها"));
   }
 
   async function handleCreate(e) {

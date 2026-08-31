@@ -12,6 +12,7 @@ export default function ChatPage({ user }) {
   const [file, setFile] = useState(null);
   const [recording, setRecording] = useState(false);
   const fileRef = useRef(null);
+  const abortRef = useRef(null);
 
   const closeAssistantBubble = () => {
     setThinking(false);
@@ -26,6 +27,7 @@ export default function ChatPage({ user }) {
     setError("");
     setMessages((m) => [...m, { role: "user", text: text.trim() || "[فایل]" }]);
     setBusy(true);
+    abortRef.current = new AbortController();
     try {
       let effective = text.trim();
       if (file) {
@@ -48,6 +50,7 @@ export default function ChatPage({ user }) {
       await streamChat(
         { message: effective, thread_id: threadId },
         {
+          signal: abortRef.current.signal,
           onThinking: () => setThinking(true),
           onDelta: ({ text }) => setMessages((m) => {
             const next = [...m];
@@ -69,8 +72,9 @@ export default function ChatPage({ user }) {
     } catch (err) {
       setThinking(false);
       setMessages((m) => m.filter((msg) => msg !== null && !(msg.role === "assistant" && msg.text === "")));
-      setError(err instanceof ApiError ? err.message : "ارسال پیام ناموفق بود");
+      if (err?.name !== "AbortError") setError(err instanceof ApiError ? err.message : "ارسال پیام ناموفق بود");
     } finally {
+      abortRef.current = null;
       setBusy(false);
     }
   }
@@ -143,6 +147,7 @@ export default function ChatPage({ user }) {
             <Button type="button" variant="ghost" onClick={() => fileRef.current?.click()}>فایل</Button>
             <Button type="button" variant="ghost" onClick={voice}>{recording ? "در حال شنیدن..." : "صدا"}</Button>
             <div style={{ flex: 1 }} />
+            {busy && <Button type="button" variant="danger" onClick={() => abortRef.current?.abort()}>توقف</Button>}
             <Button type="submit" disabled={busy} loading={busy}>ارسال</Button>
           </div>
         </form>

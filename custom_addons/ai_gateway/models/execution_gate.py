@@ -55,9 +55,10 @@ class AiGatewayExecutionGate(models.AbstractModel):
             )
 
     @api.model
-    def _approval_key(self, tool_name, args, user_id):
+    def _approval_key(self, tool_name, args, user_id, company_id=None):
         raw = json.dumps(
-            {"tool": tool_name, "args": args or {}, "user": user_id},
+            {"tool": tool_name, "args": args or {}, "user": user_id,
+             "company": company_id or self.env.company.id},
             sort_keys=True, default=str, ensure_ascii=False
         )
         return hashlib.sha256(raw.encode()).hexdigest()
@@ -143,7 +144,12 @@ class AiGatewayExecutionGate(models.AbstractModel):
             valid_state = approval.state == "approved" or (approval.state == "executing" and self.env.context.get("approval_action"))
             if not approval.exists() or not valid_state or approval.executed_at or approval.decided_by_id.id != self.env.user.id:
                 raise AccessError("approval token is invalid, expired or already executed")
-            if approval.tool_name != tool_name or approval.requested_by_id.id != self.env.user.id:
+            if approval.company_id != self.env.company:
+                raise AccessError("approval token belongs to another company")
+            # The approver executes the already-approved action. Requiring
+            # requested_by_id here would make every legitimate approval fail
+            # because self-approval is explicitly forbidden.
+            if approval.tool_name != tool_name or approval.decided_by_id.id != self.env.user.id:
                 raise AccessError("approval token does not match this tool invocation")
             try:
                 approved_args = json.loads(approval.tool_args or "{}")
@@ -163,8 +169,11 @@ class AiGatewayExecutionGate(models.AbstractModel):
             if not create_approval or "ai.gateway.approval" not in self.env:
                 raise AccessError("approval_required: this AI action requires human approval")
             Approval = self.env["ai.gateway.approval"].sudo()
-            key = self._approval_key(tool_name, args, self.env.user.id)
-            existing = Approval.search([("approval_key", "=", key), ("state", "=", "pending")], limit=1)
+            key = self._approval_key(tool_name, args, self.env.user.id, self.env.company.id)
+            existing = Approval.search([
+                ("approval_key", "=", key), ("company_id", "=", self.env.company.id),
+                ("state", "=", "pending"),
+            ], limit=1)
             if existing:
                 approval = existing
             else:

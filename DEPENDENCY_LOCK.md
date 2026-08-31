@@ -16,6 +16,9 @@ Set and review these exact environment variables before running
 - `ODOO_COMMIT_SHA` — immutable Odoo source commit
 - `ODOO_LLM_REPO` and `ODOO_LLM_COMMIT_SHA` — immutable AI addon source
 - `VLLM_VERSION` — validated, immutable vLLM Python package version
+- `AI_VLLM_CHAT_MODEL_PATH`, `AI_VLLM_EMBEDDING_MODEL_PATH` and
+  `AI_VLLM_VISION_MODEL_PATH` — model weights stored outside this workspace
+- `AI_RAG_INDEX_VERSION` — explicit embedding/chunk revision for safe rebuilds
 - `PYTHON_RUNTIME_VERSION` and `NODE_RUNTIME_VERSION`
 - `PGVECTOR_PACKAGE` — native PostgreSQL pgvector package name
 - `MODEL_REVISION_QWEN`

@@ -92,6 +92,11 @@
         <field name="tool_name">create_task</field>
         <field name="risk_level">1</field>
     </record>
+    <record id="risk_get_task_status" model="ai.gateway.tool.risk">
+        <field name="tool_name">get_task_status</field>
+        <field name="risk_level">0</field>
+        <field name="description">Read-only task status through native ACL and record rules; used by deadline workflows.</field>
+    </record>
     <record id="risk_save_memory" model="ai.gateway.tool.risk">
         <field name="tool_name">save_memory</field>
         <field name="risk_level">1</field>

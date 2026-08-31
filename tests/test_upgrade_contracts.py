@@ -107,6 +107,8 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("operation_modules", source)
         self.assertIn("operation_coverage", source)
         self.assertIn("uninstalled_operation_modules", source)
+        self.assertIn("if adapters is not None", source)
+        self.assertIn("if subscriptions is not None", source)
 
     def test_scim_has_exception_import_and_standard_contract_markers(self):
         source = (ADDONS / "ai_customer_plane/models/scim.py").read_text()
@@ -143,6 +145,19 @@ class SourceContracts(unittest.TestCase):
         gate = (ADDONS / "ai_gateway/models/execution_gate.py").read_text()
         self.assertIn("if registry.resolve(tool_name):", gate)
         self.assertIn("registered operation with", gate)
+
+    def test_authorization_uses_optional_models_when_they_are_installed(self):
+        authorization = (ADDONS / "ai_control_plane/models/authorization.py").read_text()
+        rag = (ADDONS / "ai_rag/models/document_chunk.py").read_text()
+        self.assertIn("grant_model is not None", authorization)
+        self.assertIn("assignment_model is not None", authorization)
+        self.assertIn("grant_model is not None", rag)
+
+    def test_experience_model_presence_checks_do_not_treat_empty_recordsets_as_missing(self):
+        experience = (ADDONS / "ai_experience/controllers/experience_api.py").read_text()
+        self.assertNotIn("if not model:", experience)
+        self.assertNotIn("if assistants:", experience)
+        self.assertIn("if model is not None:", experience)
 
     def test_customer_surfaces_do_not_return_infrastructure_identifiers(self):
         experience = (ADDONS / "ai_experience/controllers/experience_api.py").read_text()
@@ -193,7 +208,7 @@ class SourceContracts(unittest.TestCase):
 
     def test_release_manifest_matches_current_entries(self):
         manifest = json.loads((ROOT / "SHA256MANIFEST.json").read_text())
-        self.assertEqual(len(manifest), 392)
+        self.assertEqual(len(manifest), 407)
         missing = [path for path in manifest if not (ROOT / path).is_file()]
         self.assertEqual(missing, [])
         mismatched = [
@@ -206,8 +221,72 @@ class SourceContracts(unittest.TestCase):
             "02_install_modules.sh", "03_start_all.sh",
             "custom_addons/ai_gateway/controllers/file_policy.py",
             "custom_addons/ai_gateway/migrations/18.0.1.1.0/pre-migrate.py",
+            "custom_addons/ai_business_tools/migrations/18.0.1.6.0/pre-migrate.py",
+            "custom_addons/ai_business_tools/migrations/18.0.1.6.0/post-migrate.py",
+            "custom_addons/ai_integration/migrations/18.0.2.1.0/post-migrate.py",
+            "custom_addons/ai_integration/models/reviewed_operation_tools.py",
         ):
             self.assertIn(path, manifest)
+
+    def test_approval_expiration_is_durable_and_audited(self):
+        approval = (ADDONS / "ai_business_tools/models/approval.py").read_text()
+        cron = (ADDONS / "ai_business_tools/data/cron_data.xml").read_text()
+        history = (ADDONS / "ai_business_tools/models/approval_history.py").read_text()
+        self.assertIn('("expired", "Expired")', approval)
+        self.assertIn("def cron_expire_pending", approval)
+        self.assertIn('"approval.expired"', approval)
+        self.assertIn('event": "expired"', approval)
+        self.assertIn('id="cron_expire_ai_approvals"', cron)
+        self.assertIn('model.cron_expire_pending()', cron)
+        self.assertIn('("expired", "Expired")', history)
+
+    def test_reviewed_operation_dispatch_is_bounded(self):
+        source = (ADDONS / "ai_integration/models/reviewed_operation_tools.py").read_text()
+        registry = (ADDONS / "ai_integration/models/unified_registry.py").read_text()
+        self.assertIn("arguments_json", source)
+        self.assertIn("json.loads", source)
+        self.assertIn("ai.integration.unified.registry", source)
+        self.assertIn("module_read_summary", registry)
+        self.assertIn("_MODULE_READ_MODELS", registry)
+        self.assertNotIn("args.get('model')", registry)
+
+    def test_approved_execution_uses_approver_identity(self):
+        gate = (ADDONS / "ai_gateway/models/execution_gate.py").read_text()
+        self.assertIn("approval.decided_by_id.id != self.env.user.id", gate)
+        self.assertNotIn("approval.requested_by_id.id != self.env.user.id", gate)
+
+    def test_model_promotion_is_benchmark_and_evidence_gated(self):
+        registry = (ADDONS / "ai_integration/models/model_registry.py").read_text()
+        benchmark = (ROOT / "60_v58_llm_benchmark.py").read_text()
+        self.assertIn("action_promote_from_benchmark", registry)
+        self.assertIn("system administrator", registry)
+        self.assertIn("db_redis_metrics", registry)
+        self.assertIn('"vision"', benchmark)
+        self.assertIn('"embedding"', benchmark)
+        self.assertIn("image_url", benchmark)
+
+    def test_workflow_deadline_recheck_and_hybrid_rag_contract(self):
+        workflow = ET.parse(ADDONS / "ai_workflow/data/default_workflows.xml")
+        record = workflow.find(".//record[@id='workflow_task_deadline_escalation']")
+        definition = json.loads(record.findtext("field[@name='definition_json']"))
+        self.assertEqual(definition["schema_version"], 1)
+        self.assertEqual([step["action"] for step in definition["steps"]],
+                         ["branch", "wait_until", "tool", "branch", "notify", "escalate", "noop"])
+        self.assertEqual(definition["steps"][2]["tool"], "get_task_status")
+        self.assertEqual(definition["steps"][3]["then"], 6)
+        self.assertEqual(definition["steps"][3]["else"], 4)
+        rag = (ADDONS / "ai_rag/models/document_chunk.py").read_text()
+        self.assertIn("ts_rank_cd", rag)
+        self.assertIn("retrieval_mode", rag)
+        self.assertIn("allowed_doc_ids", rag)
+        self.assertIn("status", rag)
+        self.assertIn("active_snapshot", rag)
+        rag_index = (ADDONS / "ai_rag/models/rag_index.py").read_text()
+        self.assertIn("class AiRagIndexSnapshot", rag_index)
+        self.assertIn("content_checksum", rag_index)
+        benchmark = (ROOT / "60_v58_llm_benchmark.py").read_text()
+        self.assertIn("ttft_ms", benchmark)
+        self.assertIn("p95", benchmark)
 
     def test_all_python_sources_compile(self):
         for path in ADDONS.rglob("*.py"):

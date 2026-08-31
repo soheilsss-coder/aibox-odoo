@@ -1,22 +1,57 @@
-# v57 Final Release Status
+# v58 Final Release Status
 
-**RELEASE_CANDIDATE_VERSION.txt: v57 — this document now agrees.**
-(Previously this file said "v56 Final Release Status" while
-`RELEASE_CANDIDATE_VERSION.txt` already said `v57` - that inconsistency is
-what this update fixes. See `FINAL_RELEASE_V57.md` for the full v57 report
-and `V57_HARDENING_NOTES.md` for the itemized source diff since v56.)
+**Release candidate:** `v58` (`RELEASE_CANDIDATE_VERSION.txt`)
 
-**SOURCE RELEASE: PASS — 94/94 exhaustive checks, 21/21 production-source
-gates, 13/13 upgrade contract tests, plus the v57 direct hardening audit
-(`59_v57_hardening_audit.py`): PASS.**
+## Source verification
 
-**RELEASE INTEGRITY: PASS — `SHA256MANIFEST.json` regenerated and
-reverified against the current source tree (392/392 entries, zero mismatch;
-this includes the native install scripts, upload policy, migration hook and
-current tests).**
+The source release currently passes:
 
-**RUNTIME_CERTIFICATION_REQUIRED: YES.**
+- `16/16` upgrade contract tests.
+- `25_static_audit.py`, `28_release_audit.py`, `29_production_e2e.py`.
+- `50_v47_static_security_tests.py` and `59_v57_hardening_audit.py` (`21/21`).
+- `FINAL_PRODUCTION_GATE.py` (`94` checks) and
+  `FINAL_EXHAUSTIVE_SOURCE_AUDIT.py`.
+- Queue self-test (`10/10`) and inference-policy self-test.
+- Native frontend dependency install, Vite build in a temporary directory,
+  and high-severity dependency audit.
+- SHA256 release manifest (`407` listed entries, zero hash mismatch).
 
-No runtime PASS is claimed in this archive because the real Odoo/PostgreSQL/Redis/pgvector/vLLM/IdP/Buzz/Telegram/hardware stack is not running inside the archive build environment.
+## v58 product changes
 
-Production promotion is fail-closed and requires `48_auto_integration_certification.py` plus the model benchmark/promotion gate on the real target environment. See `INSTALL_READY.md` for the exact, literal command sequence to reach that stage - it was also corrected this pass to spell out every step instead of implying `deploy.sh` alone is a full deployment.
+- Native systemd lifecycle for chat, embedding and vision vLLM services;
+  model weights and build/cache artifacts stay outside the repository.
+- Configurable, benchmark-gated model routing with an explicit registry
+  promotion transition, health state, bounded local queue and Redis-backed
+  cross-worker inference leases.
+- Durable approval API consolidated to one canonical route family, with
+  company-scoped approval records, integrity re-sealing on upgrade and
+  re-authorization at decision/execution time.
+- Company-scoped documents, RAG chunks and index snapshots; hybrid retrieval
+  filters authorization before SQL ranking and filters the active index
+  revision.
+- Real API-backed Calendar, Tasks, Documents, Approvals, Notifications,
+  Integrations and Chat surfaces with visible loading/error/empty states.
+- Live installed-module certification harness for reviewed adapters,
+  capabilities, risk contracts, handlers and promotion status.
+
+## Runtime boundary
+
+`RUNTIME_CERTIFICATION_REQUIRED: YES`.
+
+This checkout has no running target Odoo/PostgreSQL/Redis/pgvector/vLLM/IdP,
+DGX or external-integration stack. Therefore this report does **not** claim
+production-ready status, zero defects in an untested deployment, or a user
+capacity number. Production promotion requires, on the real native target:
+
+1. `62_v58_module_certification.py` and `48_auto_integration_certification.py`
+   in an Odoo shell, with every installed business module passing.
+2. `60_v58_llm_benchmark.py` for representative chat, tool, RAG, approval,
+   vision and embedding scenarios, enriched with same-run GPU, queue,
+   PostgreSQL and Redis evidence.
+3. `61_v58_capacity_gate.py` with measured latency/error thresholds and an
+   explicitly recorded workload/configuration.
+4. The end-to-end security, failure-recovery and upgrade probes in
+   `PRODUCTION_E2E_RUNBOOK.md`.
+
+Until those steps pass, the correct release state is **source-verified,
+runtime-blocked**.

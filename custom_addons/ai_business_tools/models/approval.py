@@ -16,6 +16,10 @@ class AiGatewayApproval(models.Model):
     _order = "create_date desc"
 
     name = fields.Char(required=True, help="Short description of the requested action")
+    company_id = fields.Many2one(
+        "res.company", required=True, index=True,
+        default=lambda self: self.env.company,
+    )
     requested_by_id = fields.Many2one("res.users", required=True, default=lambda self: self.env.user)
     approver_group_id = fields.Many2one(
         "res.groups", required=True,
@@ -24,7 +28,7 @@ class AiGatewayApproval(models.Model):
     action_model = fields.Char(help="Technical model this approval will act on, e.g. hr.decree")
     action_res_id = fields.Integer(help="Record id this approval is about")
     state = fields.Selection(
-        [("pending", "Pending"), ("executing", "Executing"), ("approved", "Approved"), ("rejected", "Rejected")],
+        [("pending", "Pending"), ("executing", "Executing"), ("approved", "Approved"), ("rejected", "Rejected"), ("expired", "Expired")],
         default="pending", index=True,
     )
     decided_by_id = fields.Many2one("res.users")
@@ -47,8 +51,10 @@ class AiGatewayApproval(models.Model):
     def create(self, vals_list):
         import hashlib, json
         for vals in vals_list:
+            vals.setdefault("company_id", self.env.company.id)
+            vals.setdefault("requested_by_id", self.env.user.id)
             vals.setdefault("expires_at", fields.Datetime.add(fields.Datetime.now(), hours=48))
-            snapshot = {k: vals.get(k) for k in ("name", "requested_by_id", "approver_group_id", "action_model", "action_res_id")}
+            snapshot = {k: vals.get(k) for k in ("name", "company_id", "requested_by_id", "approver_group_id", "action_model", "action_res_id")}
             payload = {**snapshot, "tool_name": vals.get("tool_name"), "tool_args": vals.get("tool_args"), "capability_name": vals.get("capability_name")}
             vals.setdefault("policy_snapshot", json.dumps(payload, sort_keys=True, default=str))
             vals.setdefault("approval_hash", hashlib.sha256(json.dumps(snapshot, sort_keys=True, default=str).encode()).hexdigest())
@@ -108,7 +114,7 @@ class AiGatewayApproval(models.Model):
     def _verify_integrity(self):
         import hashlib, json
         for rec in self:
-            snapshot = {"name": rec.name, "requested_by_id": rec.requested_by_id.id, "approver_group_id": rec.approver_group_id.id, "action_model": rec.action_model, "action_res_id": rec.action_res_id}
+            snapshot = {"name": rec.name, "company_id": rec.company_id.id, "requested_by_id": rec.requested_by_id.id, "approver_group_id": rec.approver_group_id.id, "action_model": rec.action_model, "action_res_id": rec.action_res_id}
             expected = hashlib.sha256(json.dumps(snapshot, sort_keys=True, default=str).encode()).hexdigest()
             if rec.approval_hash and rec.approval_hash != expected:
                 raise UserError("integrity_error: محتوای اصلی تاییدیه تغییر کرده است.")
@@ -119,8 +125,35 @@ class AiGatewayApproval(models.Model):
                     raise UserError("integrity_error: tool/arguments approval payload changed.")
         return True
 
+    @api.model
+    def cron_expire_pending(self):
+        """Close expired requests so the product never shows a stale action."""
+        now = fields.Datetime.now()
+        for rec in self.sudo().search([
+            ("state", "=", "pending"), ("expires_at", "!=", False),
+            ("expires_at", "<=", now),
+        ]):
+            rec.with_context(approval_action=True).write({
+                "state": "expired", "decision_note": "expired",
+            })
+            if "ai.gateway.approval.history" in self.env:
+                self.env["ai.gateway.approval.history"].sudo().create({
+                    "approval_id": rec.id, "event": "expired", "actor_id": self.env.user.id,
+                    "state_before": "pending", "state_after": "expired", "note": "expired",
+                })
+            if "ai.control.event" in self.env:
+                self.env["ai.control.event"].sudo().publish(
+                    "approval.expired", aggregate=rec,
+                    payload={"approval_id": rec.id, "action": rec.action_model},
+                )
+        return True
+
     def action_reject(self, note=""):
         for rec in self:
+            if rec.state != "pending":
+                raise UserError("این تاییدیه دیگر در انتظار تصمیم نیست.")
+            if rec.expires_at and rec.expires_at < fields.Datetime.now():
+                raise UserError("این تاییدیه منقضی شده است.")
             if rec.approver_group_id not in self.env.user.groups_id:
                 raise UserError("شما عضو گروه لازم برای رد این درخواست نیستید.")
             old_state = rec.state
@@ -173,7 +206,7 @@ class AiGatewayApproval(models.Model):
             if decree.exists() and hasattr(decree, "action_mark_approved"):
                 decree.action_mark_approved()
     def write(self, vals):
-        protected = {"requested_by_id", "approver_group_id", "action_model", "action_res_id", "name", "policy_snapshot", "approval_hash", "expires_at", "requested_at", "state", "decided_by_id", "approval_key", "tool_name", "tool_args", "capability_name", "executed_at", "execution_result", "approval_payload_hash", "integrity_version"}
+        protected = {"company_id", "requested_by_id", "approver_group_id", "action_model", "action_res_id", "name", "policy_snapshot", "approval_hash", "expires_at", "requested_at", "state", "decided_by_id", "approval_key", "tool_name", "tool_args", "capability_name", "executed_at", "execution_result", "approval_payload_hash", "integrity_version"}
         if not self.env.context.get("approval_action") and protected.intersection(vals):
             raise UserError("اطلاعات اصلی تاییدیه قابل ویرایش نیست؛ فقط approve/reject/cancel از مسیر مجاز انجام شود.")
         return super().write(vals)

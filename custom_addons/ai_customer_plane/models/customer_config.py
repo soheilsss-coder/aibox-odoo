@@ -147,7 +147,7 @@ class AiDeploymentWizard(models.TransientModel):
             "ai.integration.adapter", "ai.integration.operation", "ai.integration.subscription",
             "ai.gateway.execution.gate", "ai.gateway.approval", "ai.gateway.access.grant",
             "ai.customer.role.assignment", "ai.customer.role.policy", "ai.workflow",
-            "ai.document.index.job", "ai.model.profile", "ai.gateway.session",
+            "ai.document.index.job", "ai.rag.index.snapshot", "ai.model.profile", "ai.gateway.session",
             "ai.customer.sso.provider", "ai.customer.scim.token",
         ]
         checks = {
@@ -170,15 +170,15 @@ class AiDeploymentWizard(models.TransientModel):
         checks["unregistered_installed_modules"] = missing_registry
         checks["all_installed_modules_registered"] = not missing_registry
 
-        adapters = self.env["ai.integration.adapter"].sudo() if "ai.integration.adapter" in self.env else False
-        all_operations = self.env["ai.integration.operation"].sudo() if "ai.integration.operation" in self.env else False
-        active_operations = all_operations.search([("active", "=", True)]) if all_operations else False
-        operation_modules_all = set(active_operations.mapped("module_name")) if active_operations else set()
+        adapters = self.env["ai.integration.adapter"].sudo() if "ai.integration.adapter" in self.env else None
+        all_operations = self.env["ai.integration.operation"].sudo() if "ai.integration.operation" in self.env else None
+        active_operations = all_operations.search([("active", "=", True)]) if all_operations is not None else None
+        operation_modules_all = set(active_operations.mapped("module_name")) if active_operations is not None else set()
         # Optional operation records are loaded by the integration module even
         # when their native Odoo domain is not installed. They must be
         # reportable, but cannot make an unrelated tenant unready.
         operation_modules = operation_modules_all.intersection(installed_names)
-        operations = active_operations.filtered(lambda op: op.module_name in operation_modules) if active_operations else False
+        operations = active_operations.filtered(lambda op: op.module_name in operation_modules) if active_operations is not None else None
         checks["operation_modules"] = sorted(operation_modules)
         checks["uninstalled_operation_modules"] = sorted(operation_modules_all - installed_names)
         checks["operation_modules_installed"] = {
@@ -191,10 +191,10 @@ class AiDeploymentWizard(models.TransientModel):
                 ("module_name", "=", module), ("active", "=", True), ("state", "=", "ready")
             ]))
             for module in sorted(operation_modules)
-        } if adapters else {}
+        } if adapters is not None else {}
         checks["all_required_adapters"] = all(checks["required_adapters"].values())
         checks["operation_contracts"] = {}
-        if operations and "ai.integration.unified.registry" in self.env:
+        if operations is not None and "ai.integration.unified.registry" in self.env:
             registry = self.env["ai.integration.unified.registry"].sudo()
             for operation in operations:
                 try:
@@ -212,8 +212,8 @@ class AiDeploymentWizard(models.TransientModel):
         checks["all_operation_contracts"] = all(
             checks["operation_contracts"].values())
 
-        subscriptions = self.env["ai.integration.subscription"].sudo() if "ai.integration.subscription" in self.env else False
-        active_targets = set(subscriptions.search([("active", "=", True)]).mapped("target")) if subscriptions else set()
+        subscriptions = self.env["ai.integration.subscription"].sudo() if "ai.integration.subscription" in self.env else None
+        active_targets = set(subscriptions.search([("active", "=", True)]).mapped("target")) if subscriptions is not None else set()
         required_targets = {"audit", "ai", "notification"}
         optional_target_modules = {
             "workflow": "ai_workflow", "calendar": "calendar", "buzz": "ai_collaboration",
@@ -227,7 +227,7 @@ class AiDeploymentWizard(models.TransientModel):
         checks["capability_count"] = self.env["ai.control.capability"].sudo().search_count(
             [("active", "=", True)]) if "ai.control.capability" in self.env else 0
         checks["integration_operations"] = operations.search_count(
-            [("active", "=", True)]) if operations else 0
+            [("active", "=", True)]) if operations is not None else 0
         # A tenant may legitimately have no optional business domain enabled;
         # that is not a failed deployment. If an installed domain is mapped to
         # an operation, however, its reviewed operation set must be present.

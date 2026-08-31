@@ -1,6 +1,10 @@
 import json
+import logging
+
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class AiUnifiedOperation(models.Model):
@@ -35,6 +39,7 @@ class AiUnifiedOperation(models.Model):
         ('pos_order_create', 'Create POS Order'),
         ('pos_restaurant_table_status', 'Read Restaurant Table Status'),
         ('pos_restaurant_order_note_update', 'Update Restaurant Order Note'),
+        ('module_read_summary', 'Read Reviewed Module Summary'),
     ], required=True)
     active = fields.Boolean(default=True)
     description = fields.Text()
@@ -52,7 +57,8 @@ class AiUnifiedAdapterService(models.AbstractModel):
     @api.model
     def _model(self, name):
         if name not in self.env:
-            raise UserError('required ERP module/model is not installed: %s' % name)
+            _logger.warning("reviewed operation unavailable because its optional model is not installed: %s", name)
+            raise UserError('reviewed operation is unavailable')
         # Defense in depth: reviewed adapters must still run under the real
         # user's Odoo ACL/record-rule context. The central gateway decides
         # AI authorization first; Odoo remains the second enforcement layer.
@@ -70,7 +76,8 @@ class AiUnifiedAdapterService(models.AbstractModel):
             self.env['ai.gateway.execution.gate'].authorize(
                 operation.tool_name, args=args, context_label='adapter:%s' % operation.handler_key,
             )
-        handler = getattr(self, '_handle_%s' % operation.handler_key, None)
+        handler = getattr(self.with_context(ai_adapter_operation=operation.tool_name),
+                           '_handle_%s' % operation.handler_key, None)
         if not handler:
             raise UserError('unimplemented reviewed adapter handler: %s' % operation.handler_key)
         return handler(args, user)
@@ -269,6 +276,49 @@ class AiUnifiedAdapterService(models.AbstractModel):
         order.write({'note': str(args.get('note') or '')[:2000]})
         self._emit_business_event('pos.restaurant.order_note.updated', {'record_id': order.id}, user)
         return {'record_id': order.id, 'model': 'pos.order', 'status': 'updated'}
+
+    _MODULE_READ_MODELS = {
+        'event': 'event.event',
+        'lunch': 'lunch.order',
+        'maintenance': 'maintenance.request',
+        'quality': 'quality.alert',
+        'repair': 'repair.order',
+        'sale_management': 'sale.order',
+        'sale_renting': 'sale.order',
+        'sale_subscription': 'sale.order',
+        'website': 'website.page',
+        'mass_mailing': 'mailing.mailing',
+    }
+
+    def _handle_module_read_summary(self, args, user):
+        """Read a reviewed module's safe display fields under native ACLs.
+
+        The module-to-model map is source-reviewed and immutable; callers
+        cannot supply an arbitrary model or field list. Missing optional
+        dependencies fail closed rather than becoming generic discovery.
+        """
+        operation = self.env.context.get('ai_adapter_operation', '')
+        module_name = operation.removesuffix('.read_summary')
+        model_name = self._MODULE_READ_MODELS.get(module_name)
+        if not model_name:
+            raise UserError('reviewed module operation is unavailable')
+        Model = self._model(model_name)
+        try:
+            limit = min(max(int(args.get('limit', 20)), 1), 100)
+        except (TypeError, ValueError):
+            limit = 20
+        try:
+            records = Model.search([], order='id desc', limit=limit)
+        except AccessError as exc:
+            raise UserError('access_denied: this operation is not available for your role') from exc
+        rows = []
+        for record in records:
+            rows.append({
+                'record_id': record.id,
+                'name': getattr(record, 'name', False) or getattr(record, 'display_name', str(record.id)),
+                'state': getattr(record, 'state', False) or getattr(record, 'stage_id', False) and record.stage_id.name or False,
+            })
+        return {'status': 'ok', 'items': rows}
 
     def _handle_account_move_post(self, args, user):
         Move = self._model('account.move')

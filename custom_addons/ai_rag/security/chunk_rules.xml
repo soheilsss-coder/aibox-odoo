@@ -17,14 +17,18 @@
         <field name="model_id" ref="model_ai_document_chunk"/>
         <field name="groups" eval="[(4, ref('base.group_user'))]"/>
         <field name="domain_force">[
-            '|', '|', '|',
+            '|', '|', '|', '|', '|',
             ('document_id.access_level', '=', 'company'),
             '&amp;', ('document_id.access_level', '=', 'group'),
                      ('document_id.group_id', 'in', user.groups_id.ids),
+            '&amp;', ('document_id.access_level', '=', 'team'),
+                     ('document_id.member_ids', 'in', [user.id]),
             '&amp;', ('document_id.access_level', '=', 'department'),
                      ('document_id.department_id', '=', user.employee_id.department_id.id),
             '&amp;', ('document_id.access_level', '=', 'personal'),
-                     ('document_id.owner_id', '=', user.id)
+                     ('document_id.owner_id', '=', user.id),
+            '&amp;', ('document_id.access_level', 'in', ['restricted', 'confidential']),
+                     ('document_id.allowed_user_ids', 'in', [user.id])
         ]</field>
     </record>
 
@@ -32,7 +36,7 @@
         <field name="name">Document Chunk: admin full access</field>
         <field name="model_id" ref="model_ai_document_chunk"/>
         <field name="groups" eval="[(4, ref('base.group_system'))]"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[('document_id.company_id', 'in', company_ids)]</field>
     </record>
 
 </odoo>

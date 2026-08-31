@@ -35,5 +35,13 @@ class AiDocumentIndexJob(models.Model):
                 job.write({"state": "done", "finished_at": fields.Datetime.now(), "error": False})
             except Exception as exc:
                 _logger.exception("RAG index job %s failed", job.id)
+                if "ai.rag.index.snapshot" in self.env:
+                    self.env["ai.rag.index.snapshot"].sudo().search(
+                        [
+                            ("version", "=", __import__("os").environ.get("AI_RAG_INDEX_VERSION", "rag-v1")),
+                            ("company_id", "=", self.env.company.id),
+                        ],
+                        limit=1,
+                    ).write({"status": "failed", "note": str(exc)[:2000]})
                 job.write({"state": "failed" if job.attempts >= 3 else "pending", "error": str(exc), "finished_at": fields.Datetime.now()})
         return len(jobs)
