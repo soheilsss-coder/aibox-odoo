@@ -1,4 +1,5 @@
 from . import hr_decree
+from . import document_extractor
 from . import file_reader
 from . import allow_uploads
 from . import web_search

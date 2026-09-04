@@ -1,58 +1,17 @@
 import logging
-import re
-import tempfile
 import os
-import mimetypes
+import tempfile
 
 from odoo import models
 from odoo.addons.llm_tool.decorators import llm_tool
 
+from .document_extractor import extract_file
+
 _logger = logging.getLogger(__name__)
 
-_ocr_engine = None
 MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
 MAX_EXTRACTED_CHARS = 2_000_000
 EMBEDDING_BATCH_SIZE = 64
-
-
-def get_ocr():
-    global _ocr_engine
-    if _ocr_engine is None:
-        from rapidocr_onnxruntime import RapidOCR
-        _ocr_engine = RapidOCR()
-    return _ocr_engine
-
-
-def ocr_image_file(image_path):
-    try:
-        engine = get_ocr()
-        result, _ = engine(image_path)
-        if not result:
-            return ""
-        return "\n".join([line[1] for line in result])
-    except Exception as exc:  # noqa: BLE001
-        _logger.warning("RapidOCR failed on %s: %s", image_path, exc)
-        return ""
-
-
-def ocr_scanned_pdf(pdf_path):
-    try:
-        import fitz  # PyMuPDF
-
-        doc = fitz.open(pdf_path)
-        texts = []
-        for page in doc:
-            pix = page.get_pixmap(dpi=200)
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_img:
-                pix.save(tmp_img.name)
-                page_text = ocr_image_file(tmp_img.name)
-                os.unlink(tmp_img.name)
-            if page_text:
-                texts.append(page_text)
-        return "\n\n".join(texts)
-    except Exception as exc:  # noqa: BLE001
-        _logger.warning("Scanned-PDF OCR failed on %s: %s", pdf_path, exc)
-        return ""
 
 
 def chunk_text(text, chunk_size=1000, overlap=150):
@@ -113,46 +72,43 @@ class LLMToolFileReader(models.Model):
 
         attachment = attachments[0]
         name = attachment.name or "file"
+        validate_upload = None
+        try:
+            from odoo.addons.ai_gateway.controllers.file_policy import (
+                MAX_CHAT_UPLOAD_BYTES,
+                validate_upload as shared_validate_upload,
+            )
+            validate_upload = shared_validate_upload
+            upload_limit = MAX_CHAT_UPLOAD_BYTES
+        except ImportError:
+            upload_limit = MAX_ATTACHMENT_BYTES
         declared_size = getattr(attachment, "file_size", 0) or 0
-        if declared_size > MAX_ATTACHMENT_BYTES:
+        if declared_size > upload_limit:
             return {"error": "attached file exceeds the safe processing limit"}
         raw = attachment.raw
-        if len(raw or b"") > MAX_ATTACHMENT_BYTES:
+        if len(raw or b"") > upload_limit:
             return {"error": "attached file exceeds the safe processing limit"}
-        mimetype = attachment.mimetype or mimetypes.guess_type(name)[0] or ""
+        try:
+            validate_upload(name, raw, max_bytes=upload_limit)
+        except (ImportError, TypeError, ValueError):
+            return {"error": "unsupported or unsafe attachment"}
 
         text = ""
+        tmp_path = None
         try:
             suffix = os.path.splitext(name)[1] or ".bin"
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                 tmp.write(raw)
                 tmp_path = tmp.name
-
-            try:
-                if mimetype.startswith("image/"):
-                    text = ocr_image_file(tmp_path)
-
-                elif suffix.lower() == ".pdf":
-                    from unstructured.partition.auto import partition
-                    elements = partition(filename=tmp_path)
-                    text = "\n".join(str(el) for el in elements)
-                    if len(text.strip()) < 30:
-                        _logger.info("PDF looks scanned, falling back to OCR: %s", name)
-                        text = ocr_scanned_pdf(tmp_path)
-
-                else:
-                    from unstructured.partition.auto import partition
-                    elements = partition(filename=tmp_path)
-                    text = "\n".join(str(el) for el in elements)
-
-            finally:
-                os.unlink(tmp_path)
-
+            result = extract_file(tmp_path, filename=name, max_chars=MAX_EXTRACTED_CHARS)
+            text = result.text
         except Exception as exc:  # noqa: BLE001
             _logger.exception("File extraction failed for %s", name)
             return {"error": f"Could not read file {name}"}
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
 
-        text = re.sub(r"\n{3,}", "\n\n", text).strip()
         if len(text) > MAX_EXTRACTED_CHARS:
             return {"error": "extracted file text exceeds the safe processing limit"}
         if not text:

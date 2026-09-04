@@ -60,11 +60,23 @@ class AiDocumentIndexJob(models.Model):
         for job in jobs:
             job.write({"state": "running", "started_at": now, "attempts": job.attempts + 1})
             try:
-                if job.document_id.exists():
-                    job.document_id._rag_reindex()
+                # A failed parser/embedding call must not poison the whole
+                # worker transaction. The savepoint rolls back partial chunk
+                # writes; the explicit status writes below happen after the
+                # rollback and therefore remain durable for the UI/operator.
+                with self.env.cr.savepoint():
+                    if job.document_id.exists():
+                        job.document_id._rag_reindex()
                 job.write({"state": "done", "finished_at": fields.Datetime.now(), "error": False})
             except Exception as exc:
                 _logger.exception("RAG index job %s failed", job.id)
+                document = job.document_id.exists()
+                if document:
+                    document.write({
+                        "rag_ingestion_state": "failed",
+                        "rag_ingestion_error": str(exc)[:2000],
+                        "rag_ingestion_finished_at": fields.Datetime.now(),
+                    })
                 if "ai.rag.index.snapshot" in self.env:
                     self.env["ai.rag.index.snapshot"].sudo().search(
                         [

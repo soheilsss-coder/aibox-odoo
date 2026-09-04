@@ -4,6 +4,7 @@ import os
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
+from .chunking import normalize_search_text
 from .embedding_client import embed_texts, to_pgvector_literal
 
 _logger = logging.getLogger(__name__)
@@ -15,6 +16,10 @@ _logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 1024
 RAG_INDEX_VERSION = os.getenv("AI_RAG_INDEX_VERSION", "rag-v1")
 RAG_MAX_QUERY_CHARS = 8_000
+try:
+    RAG_MAX_AUTHORIZED_DOCUMENTS = max(1_000, int(os.getenv("AI_RAG_MAX_AUTHORIZED_DOCUMENTS", "50000")))
+except (TypeError, ValueError):
+    RAG_MAX_AUTHORIZED_DOCUMENTS = 50_000
 
 
 def _env_float(name, default):
@@ -60,6 +65,9 @@ class AiDocumentChunk(models.Model):
     )
     sequence = fields.Integer(default=0)
     content = fields.Text(required=True)
+    normalized_content = fields.Text(
+        help="Unicode-normalized lexical representation; original content remains citation source.",
+    )
     content_hash = fields.Char(
         index=True,
         help="md5 of content - lets reindex skip re-embedding chunks "
@@ -72,6 +80,15 @@ class AiDocumentChunk(models.Model):
         index=True,
         help="Immutable index/embedding revision used for safe rebuilds.",
     )
+    source_page = fields.Integer(index=True, help="1-based source page when the parser provides it.")
+    source_section = fields.Char(index=True, help="Source heading/section when available.")
+    source_type = fields.Char(help="Parser block type, for example Table or paragraph.")
+    source_coordinates = fields.Char(help="Serialized source bounding box when available.")
+    source_table = fields.Char(help="Source table identifier or name when available.")
+    source_sheet = fields.Char(help="Source spreadsheet sheet when available.")
+    source_slide = fields.Integer(help="1-based presentation slide when available.")
+    parser_name = fields.Char(index=True)
+    parser_version = fields.Char()
 
     def init(self):
         """pgvector column + HNSW index aren't expressible as a
@@ -81,6 +98,7 @@ class AiDocumentChunk(models.Model):
         existence-checked), matching how Odoo actually calls init()
         (once per -i/-u, not guaranteed to run only once ever)."""
         self.env.cr.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        self.env.cr.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
 
         self.env.cr.execute(
             "SELECT column_name FROM information_schema.columns "
@@ -114,7 +132,11 @@ class AiDocumentChunk(models.Model):
         self.env.cr.execute(
             "CREATE INDEX IF NOT EXISTS ai_document_chunk_content_fts_idx "
             "ON ai_document_chunk USING gin "
-            "(to_tsvector('simple', coalesce(content, '')))"
+            "(to_tsvector('simple', coalesce(normalized_content, content, '')))"
+        )
+        self.env.cr.execute(
+            "CREATE INDEX IF NOT EXISTS ai_document_chunk_content_trgm_idx "
+            "ON ai_document_chunk USING gin (normalized_content gin_trgm_ops)"
         )
 
     def write_embedding(self, vector):
@@ -146,8 +168,10 @@ class AiDocumentChunk(models.Model):
         Document = self.env["company.document"]
         visible_domain = []
         if "ai.control.relation" in self.env and not self.env.user.has_group("base.group_system"):
-            # Resolve FGA and grant facts in two bounded queries, then let the
-            # normal ORM search apply the native company/access-level record
+        # Resolve FGA and grant facts in two bounded queries, then let the
+        # normal ORM search apply the native company/access-level record
+        # rule. Central grant_allows remains additive; it never replaces
+        # this pre-retrieval ACL boundary.
             # rule. The former implementation loaded every visible document
             # and called relation/grant checks once per row (N+1), which made
             # RAG latency grow with the corpus and could exhaust memory under
@@ -214,7 +238,14 @@ class AiDocumentChunk(models.Model):
                     ).mapped("resource_id")
                     if document_ids:
                         visible_domain = ["|", *visible_domain, ("id", "in", document_ids)]
-        visible_docs = Document.search(visible_domain)
+        visible_docs = Document.search(
+            visible_domain,
+            limit=RAG_MAX_AUTHORIZED_DOCUMENTS + 1,
+        )
+        if len(visible_docs) > RAG_MAX_AUTHORIZED_DOCUMENTS:
+            raise UserError(
+                "authorized document scope is too large for this retrieval path; refine the company or folder scope"
+            )
         allowed_doc_ids = visible_docs.ids
         if not allowed_doc_ids:
             return []
@@ -234,6 +265,7 @@ class AiDocumentChunk(models.Model):
         safe_query = scrub_value(str(query_text or "")).strip()[:RAG_MAX_QUERY_CHARS]
         if not safe_query:
             return []
+        safe_lexical_query = normalize_search_text(safe_query)
 
         # Retrieve a wider candidate set, apply a minimum relevance check,
         # then return only the requested number. This prevents a low-score
@@ -261,8 +293,13 @@ class AiDocumentChunk(models.Model):
                 """
                 SELECT c.id AS chunk_id, c.document_id AS document_id,
                        c.content AS content, c.sequence AS sequence,
+                       c.source_page AS source_page, c.source_section AS source_section,
+                       c.source_type AS source_type,
+                       c.source_table AS source_table, c.source_sheet AS source_sheet,
+                       c.source_slide AS source_slide,
                        1 - (c.embedding <=> %s::vector) AS vector_score,
-                       0.0 AS lexical_score
+                       0.0 AS lexical_score,
+                       0.0 AS trigram_score
                 FROM ai_document_chunk c
                 WHERE c.document_id = ANY(%s)
                   AND c.index_version = %s
@@ -277,20 +314,25 @@ class AiDocumentChunk(models.Model):
                 """
                 SELECT c.id AS chunk_id, c.document_id AS document_id,
                        c.content AS content, c.sequence AS sequence,
+                       c.source_page AS source_page, c.source_section AS source_section,
+                       c.source_type AS source_type,
+                       c.source_table AS source_table, c.source_sheet AS source_sheet,
+                       c.source_slide AS source_slide,
                        0.0 AS vector_score,
                        ts_rank_cd(
-                         to_tsvector('simple', coalesce(c.content, '')),
+                         to_tsvector('simple', coalesce(c.normalized_content, c.content, '')),
                          plainto_tsquery('simple', %s)
-                       ) AS lexical_score
+                       ) AS lexical_score,
+                       0.0 AS trigram_score
                 FROM ai_document_chunk c
                 WHERE c.document_id = ANY(%s)
                   AND c.index_version = %s
-                  AND to_tsvector('simple', coalesce(c.content, '')) @@
+                  AND to_tsvector('simple', coalesce(c.normalized_content, c.content, '')) @@
                       plainto_tsquery('simple', %s)
                 ORDER BY lexical_score DESC
                 LIMIT %s
                 """,
-                (safe_query, allowed_doc_ids, RAG_INDEX_VERSION, safe_query, candidate_limit),
+                (safe_lexical_query, allowed_doc_ids, RAG_INDEX_VERSION, safe_lexical_query, candidate_limit),
             )
             rows = vector_rows
             for lexical_row in self.env.cr.dictfetchall():
@@ -305,34 +347,94 @@ class AiDocumentChunk(models.Model):
                 """
                 SELECT c.id AS chunk_id, c.document_id AS document_id,
                        c.content AS content, c.sequence AS sequence,
+                       c.source_page AS source_page, c.source_section AS source_section,
+                       c.source_type AS source_type,
+                       c.source_table AS source_table, c.source_sheet AS source_sheet,
+                       c.source_slide AS source_slide,
                        0.0 AS vector_score,
                        ts_rank_cd(
-                         to_tsvector('simple', coalesce(c.content, '')),
+                         to_tsvector('simple', coalesce(c.normalized_content, c.content, '')),
                          plainto_tsquery('simple', %s)
-                       ) AS lexical_score
+                       ) AS lexical_score,
+                       0.0 AS trigram_score
                 FROM ai_document_chunk c
                 WHERE c.document_id = ANY(%s)
                   AND c.index_version = %s
-                  AND to_tsvector('simple', coalesce(c.content, '')) @@
+                  AND to_tsvector('simple', coalesce(c.normalized_content, c.content, '')) @@
                       plainto_tsquery('simple', %s)
                 ORDER BY lexical_score DESC
                 LIMIT %s
                 """,
-                (safe_query, allowed_doc_ids, RAG_INDEX_VERSION, safe_query, candidate_limit),
+                (safe_lexical_query, allowed_doc_ids, RAG_INDEX_VERSION, safe_lexical_query, candidate_limit),
             )
 
         if not query_literal:
             rows = self.env.cr.dictfetchall()
+
+        # Trigram search is a bounded third candidate path for short Persian
+        # identifiers and typo-tolerant substring matches. The `%` operator
+        # uses the pg_trgm GIN index; the threshold is local to this query and
+        # never broadens the already ACL-filtered document id set.
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("SET LOCAL pg_trgm.similarity_threshold = 0.10")
+                self.env.cr.execute(
+                    """
+                    SELECT c.id AS chunk_id, c.document_id AS document_id,
+                           c.content AS content, c.sequence AS sequence,
+                           c.source_page AS source_page, c.source_section AS source_section,
+                           c.source_type AS source_type,
+                       c.source_table AS source_table, c.source_sheet AS source_sheet,
+                       c.source_slide AS source_slide,
+                           0.0 AS vector_score,
+                           0.0 AS lexical_score,
+                           similarity(c.normalized_content, %s) AS trigram_score
+                    FROM ai_document_chunk c
+                    WHERE c.document_id = ANY(%s)
+                      AND c.index_version = %s
+                      AND c.normalized_content %% %s
+                    ORDER BY c.normalized_content <-> %s
+                    LIMIT %s
+                    """,
+                    (
+                        safe_lexical_query, allowed_doc_ids, RAG_INDEX_VERSION,
+                        safe_lexical_query, safe_lexical_query, candidate_limit,
+                    ),
+                )
+                trigram_rows = self.env.cr.dictfetchall()
+                if query_literal:
+                    rows_by_id = {row["chunk_id"]: row for row in rows}
+                    for trigram_row in trigram_rows:
+                        current = rows_by_id.get(trigram_row["chunk_id"])
+                        if current:
+                            current["trigram_score"] = trigram_row["trigram_score"]
+                        else:
+                            rows_by_id[trigram_row["chunk_id"]] = trigram_row
+                    rows = list(rows_by_id.values())
+                else:
+                    rows_by_id = {row["chunk_id"]: row for row in rows}
+                    for trigram_row in trigram_rows:
+                        current = rows_by_id.get(trigram_row["chunk_id"])
+                        if current:
+                            current["trigram_score"] = trigram_row["trigram_score"]
+                        else:
+                            rows_by_id[trigram_row["chunk_id"]] = trigram_row
+                    rows = list(rows_by_id.values())
+        except Exception:  # pg_trgm may be unavailable on a minimal database.
+            _logger.info("pg_trgm candidate search unavailable", exc_info=True)
+
         if not rows:
             return []
         for row in rows:
             vector_score = float(row["vector_score"] or 0.0)
             lexical_score = float(row["lexical_score"] or 0.0)
-            row["hybrid_score"] = 0.80 * vector_score + 0.20 * lexical_score
+            trigram_score = float(row.get("trigram_score") or 0.0)
+            row["hybrid_score"] = 0.70 * vector_score + 0.20 * lexical_score + 0.10 * trigram_score
         if retrieval_mode == "hybrid":
             rows = [row for row in rows if (
                 float(row["vector_score"] or 0.0) >= RAG_MIN_VECTOR_SCORE
                 or float(row["lexical_score"] or 0.0) >= RAG_MIN_LEXICAL_SCORE
+                or float(row.get("trigram_score") or 0.0) >= 0.10
             )]
         rows.sort(key=lambda row: row["hybrid_score"], reverse=True)
         rows = rows[:top_k]
@@ -350,8 +452,17 @@ class AiDocumentChunk(models.Model):
                 # excerpt, not local record ids, ORM names, or index metadata.
                 "document_name": doc_names.get(row["document_id"], ""),
                 "excerpt": scrub_value(row["content"] or ""),
+                "citation": {
+                    "page": row.get("source_page"),
+                    "section": row.get("source_section") or "",
+                    "type": row.get("source_type") or "",
+                    "table": row.get("source_table") or "",
+                    "sheet": row.get("source_sheet") or "",
+                    "slide": row.get("source_slide"),
+                },
                 "similarity": round(float(row["vector_score"] or 0.0), 4),
                 "lexical_score": round(float(row["lexical_score"] or 0.0), 4),
+                "trigram_score": round(float(row.get("trigram_score") or 0.0), 4),
                 "relevance_score": round(float(row["hybrid_score"] or 0.0), 4),
                 "retrieval_mode": retrieval_mode,
             }

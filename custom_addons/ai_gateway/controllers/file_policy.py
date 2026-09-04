@@ -1,28 +1,54 @@
-"""Shared, dependency-free upload validation for all ingress paths."""
+"""Shared, dependency-free upload validation for every file ingress path.
+
+The policy validates the bytes before Odoo stores an attachment.  It is not an
+antivirus scanner and it intentionally does not unpack arbitrary archives.
+Heavy parsers are selected later by the bounded document extractor.
+"""
 from __future__ import annotations
 
 import io
+import json
 import os
 import zipfile
 from pathlib import PurePosixPath
 
 
-MAX_UPLOAD_BYTES = int(os.environ.get("AI_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
-MAX_UNPACKED_BYTES = int(os.environ.get("AI_MAX_UNPACKED_BYTES", str(100 * 1024 * 1024)))
+def _env_int(name, default):
+    try:
+        return max(1, int(os.environ.get(name, str(default))))
+    except (TypeError, ValueError):
+        return default
 
-_ALLOWED_EXTENSIONS = {
-    ".txt": "text/plain", ".md": "text/markdown", ".csv": "text/csv", ".json": "application/json",
-    ".pdf": "application/pdf", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+MAX_UPLOAD_BYTES = _env_int("AI_MAX_UPLOAD_BYTES", 25 * 1024 * 1024)
+MAX_CHAT_UPLOAD_BYTES = _env_int("AI_MAX_CHAT_UPLOAD_BYTES", 50 * 1024 * 1024)
+MAX_UNPACKED_BYTES = _env_int("AI_MAX_UNPACKED_BYTES", 100 * 1024 * 1024)
+
+# Tier A: formats with a deterministic local extraction path.  Legacy Office,
+# archives, macro-enabled Office, audio/video and executables stay out until a
+# separate worker and a real customer corpus certify them.
+ALLOWED_EXTENSIONS = frozenset({
+    ".txt", ".md", ".csv", ".json", ".html", ".htm",
+    ".pdf", ".docx", ".xlsx", ".pptx",
+    ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff",
+})
+
+_ALLOWED_MIME_TYPES = {
+    ".txt": "text/plain", ".md": "text/markdown", ".csv": "text/csv",
+    ".json": "application/json", ".html": "text/html", ".htm": "text/html",
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".xls": "application/vnd.ms-excel", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".webp": "image/webp", ".bmp": "image/bmp", ".tif": "image/tiff", ".tiff": "image/tiff",
 }
 
 
 def _zip_is_safe(raw, required_names=()):
     try:
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-            names = set(info.filename.replace("\\", "/") for info in archive.infolist())
+            names = {info.filename.replace("\\", "/") for info in archive.infolist()}
             if any(required not in names for required in required_names):
                 return False, "office document content is invalid"
             total = 0
@@ -31,7 +57,6 @@ def _zip_is_safe(raw, required_names=()):
                 name = PurePosixPath(normalized_name)
                 if "\x00" in normalized_name or name.is_absolute() or ".." in name.parts:
                     return False, "archive contains an unsafe path"
-                # Unix mode 0o120000 denotes a symlink entry.
                 if (info.external_attr >> 16) & 0o170000 == 0o120000:
                     return False, "archive symlinks are not allowed"
                 total += max(info.file_size, 0)
@@ -42,20 +67,37 @@ def _zip_is_safe(raw, required_names=()):
     return True, None
 
 
-def validate_upload(filename, raw, max_bytes=None):
-    """Validate extension, size and basic content signatures.
+def _validate_text(raw, extension):
+    if b"\x00" in raw[:8192]:
+        raise ValueError("text file contains binary content")
+    try:
+        decoded = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("text file must be UTF-8") from exc
+    if extension == ".json":
+        try:
+            json.loads(decoded)
+        except json.JSONDecodeError as exc:
+            raise ValueError("JSON document is invalid") from exc
+    return decoded
 
-    This does not claim to be malware scanning. A production deployment should
-    connect the quarantine state to an AV/content scanning service before a
-    file becomes searchable or downloadable.
+
+def validate_upload(filename, raw, max_bytes=None):
+    """Validate extension, size, signatures and lightweight document shape.
+
+    This function is deliberately shared by API upload, attachment ingress and
+    protected download.  It does not parse or malware-scan the complete file.
     """
     filename = os.path.basename(str(filename or "file"))
+    if "\x00" in filename or any(ord(char) < 32 for char in filename):
+        raise ValueError("filename contains unsafe control characters")
     ext = os.path.splitext(filename.lower())[1]
-    if ext not in _ALLOWED_EXTENSIONS:
+    if ext not in ALLOWED_EXTENSIONS:
         raise ValueError("unsupported file type")
     if not isinstance(raw, (bytes, bytearray)) or not raw:
         raise ValueError("file is empty")
-    if len(raw) > (max_bytes or MAX_UPLOAD_BYTES):
+    limit = MAX_UPLOAD_BYTES if max_bytes is None else max(1, int(max_bytes))
+    if len(raw) > limit:
         raise ValueError("file exceeds the upload size limit")
     raw = bytes(raw)
     signatures = {
@@ -64,6 +106,9 @@ def validate_upload(filename, raw, max_bytes=None):
         ".jpg": raw.startswith(b"\xff\xd8\xff"),
         ".jpeg": raw.startswith(b"\xff\xd8\xff"),
         ".webp": raw[:4] == b"RIFF" and raw[8:12] == b"WEBP",
+        ".bmp": raw.startswith(b"BM"),
+        ".tif": raw[:4] in {b"II*\x00", b"MM\x00*"},
+        ".tiff": raw[:4] in {b"II*\x00", b"MM\x00*"},
     }
     if ext in signatures and not signatures[ext]:
         raise ValueError("file content does not match its extension")
@@ -78,13 +123,11 @@ def validate_upload(filename, raw, max_bytes=None):
         safe, reason = _zip_is_safe(raw, required_names=required)
         if not safe:
             raise ValueError(reason)
-    if ext == ".xls" and raw[:8] != b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
-        raise ValueError("legacy spreadsheet content is invalid")
-    if ext in {".txt", ".md", ".csv", ".json"}:
-        if b"\x00" in raw[:8192]:
-            raise ValueError("text file contains binary content")
-        try:
-            raw.decode("utf-8")
-        except UnicodeDecodeError:
-            raise ValueError("text file must be UTF-8")
-    return {"filename": filename, "extension": ext, "mimetype": _ALLOWED_EXTENSIONS[ext], "size": len(raw)}
+    if ext in {".txt", ".md", ".csv", ".json", ".html", ".htm"}:
+        _validate_text(raw, ext)
+    return {
+        "filename": filename,
+        "extension": ext,
+        "mimetype": _ALLOWED_MIME_TYPES[ext],
+        "size": len(raw),
+    }

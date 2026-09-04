@@ -759,6 +759,17 @@ class AiSemanticApiController(http.Controller):
             "is_mine": doc.owner_id.id == env.user.id if doc.owner_id else False,
             "create_date": str(doc.create_date) if doc.create_date else None,
             "chunk_count": doc.chunk_count if "chunk_count" in doc._fields else None,
+            "ingestion_status": (
+                doc.rag_ingestion_state
+                if "rag_ingestion_state" in doc._fields and doc.file
+                else ("no_file" if not doc.file else "pending")
+            ),
+            "ingestion_pages": doc.rag_ingestion_page_count if "rag_ingestion_page_count" in doc._fields else 0,
+            "ingestion_error": (
+                "document could not be indexed"
+                if "rag_ingestion_state" in doc._fields and doc.rag_ingestion_state == "failed"
+                else ""
+            ),
         }
 
     # ------------------------------------------------------------------

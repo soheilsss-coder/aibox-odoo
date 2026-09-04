@@ -49,7 +49,10 @@ if [[ "${INSTALL_OS_DEPS:-0}" == "1" ]]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y \
     git build-essential libpq-dev libxml2-dev libxslt1-dev libldap2-dev \
     libsasl2-dev libjpeg-dev libffi-dev libssl-dev postgresql postgresql-client \
-    "$PGVECTOR_PACKAGE" redis-server redis-tools
+    "$PGVECTOR_PACKAGE" redis-server redis-tools \
+    libmagic-dev libgl1 libglib2.0-0 poppler-utils tesseract-ocr tesseract-ocr-eng \
+    tesseract-ocr-ara tesseract-ocr-fas libreoffice-core libreoffice-writer \
+    libreoffice-calc libreoffice-impress pandoc fonts-noto-core fonts-noto-extra
 fi
 
 command -v "$PYTHON_BIN" >/dev/null || { echo "Python executable not found: $PYTHON_BIN" >&2; exit 1; }

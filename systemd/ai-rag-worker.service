@@ -1,6 +1,7 @@
 [Unit]
 Description=AI durable RAG indexing worker
-After=postgresql.service redis-server.service
+After=postgresql.service redis-server.service ai-odoo.service
+PartOf=ai-odoo.service
 [Service]
 Type=simple
 User=odoo
@@ -9,6 +10,8 @@ EnvironmentFile=-/etc/ai-box/runtime.env
 ExecStart=/opt/odoo-custom-addons/ai-runtime-workers/run_rag_worker.sh
 Restart=always
 RestartSec=3
+TimeoutStopSec=30
+KillSignal=SIGTERM
 NoNewPrivileges=true
 PrivateTmp=true
 [Install]

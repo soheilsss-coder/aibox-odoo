@@ -8,13 +8,15 @@
 # baseline; re-validate during runtime certification on the real box.
 
 # -- step [7/9] custom-tool dependencies (01_setup_base.sh) ---------------
-python-docx==1.1.2
+python-docx==1.2.0
 python-pptx==1.0.2
 reportlab==4.2.2
+chardet==5.2.0
 xlsxwriter==3.2.2
-unstructured==0.16.3
-ddgs==8.1.0
-requests==2.32.3
+unstructured[docx,xlsx,pptx]==0.27.5
+docling-slim[format-pdf,format-office,format-web,extract-core,feat-ocr-rapidocr-onnx]==2.125.0
+ddgs==9.16.0
+requests==2.32.5
 numpy==2.1.3
 jdatetime==5.2.0
 rapidocr-onnxruntime==1.4.4
@@ -30,11 +32,11 @@ Authlib==1.3.2
 python3-saml==1.16.0
 faster-whisper==1.2.1
 
-# --- resolved extras pulled by `unstructured[all-docs]` at install time
-# (the parse range ai_document_intelligence needs: pdf2image, pypdf,
-# pillow, python-pptx, tabulate, xlsx2html, pandas, ...). These are
-# the Odoo-venv consumers of step [3/9]'s app artifacts and must be
-# pinned together with the release during certification.
+# Unstructured is deliberately limited to office fallbacks here. Its
+# `all-docs`/`pdf` extras pull a heavyweight torch/transformers inference
+# stack; PDF and image extraction are covered locally by Docling, PyMuPDF
+# and RapidOCR, so that stack would add memory and cold-start cost without
+# improving this appliance's certified path.
 #
 # --- vLLM, odoo-llm, Odoo's own requirements.txt and pgvector are
 # infrastructure artifacts and MUST be supplied by the deployment

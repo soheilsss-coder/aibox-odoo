@@ -1,4 +1,7 @@
 import logging
+
+# Canonical persistence contract: odoo-orm-canonical. Memory is stored and
+# filtered through the Odoo ORM model, never a parallel external memory store.
 from odoo import api, models
 from odoo.addons.llm_tool.decorators import llm_tool
 

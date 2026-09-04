@@ -30,6 +30,26 @@ const ACCESS_TONE = {
   personal: "success",
 };
 
+const INGESTION_LABEL = {
+  no_file: "بدون فایل",
+  pending: "در صف پردازش",
+  extracting: "در حال استخراج",
+  embedding: "در حال ایندکس معنایی",
+  indexed: "قابل جستجو",
+  empty: "بدون متن قابل استخراج",
+  failed: "پردازش ناموفق",
+};
+
+const INGESTION_TONE = {
+  no_file: "neutral",
+  pending: "warning",
+  extracting: "warning",
+  embedding: "warning",
+  indexed: "success",
+  empty: "neutral",
+  failed: "danger",
+};
+
 const TABS = [
   { key: "", label: "همه" },
   { key: "company", label: "کل سازمان" },
@@ -186,10 +206,16 @@ export default function DocumentCenterPage({ user }) {
               <div>
                 <strong>{d.name}</strong>{" "}
                 <Badge tone={ACCESS_TONE[d.access_level]}>{ACCESS_LABEL[d.access_level]}</Badge>
+                {d.file_name && (
+                  <Badge tone={INGESTION_TONE[d.ingestion_status] || "neutral"}>
+                    {INGESTION_LABEL[d.ingestion_status] || "وضعیت نامشخص"}
+                  </Badge>
+                )}
                 {d.department && <span className="muted"> — {d.department}</span>}
                 {d.group && <span className="muted"> — {d.group}</span>}
               </div>
               {d.description && <div className="muted">{d.description}</div>}
+              {d.ingestion_error && <div className="muted">{d.ingestion_error}</div>}
               <div className="muted" style={{ fontSize: 12 }}>
                 {d.owner ? `مالک: ${d.owner}` : ""} {d.file_name ? `— ${d.file_name}` : ""}
               </div>
