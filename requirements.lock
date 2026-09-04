@@ -13,7 +13,6 @@ python-pptx==1.0.2
 reportlab==4.2.2
 xlsxwriter==3.2.2
 unstructured==0.16.3
-sentence-transformers==3.3.1
 ddgs==8.1.0
 requests==2.32.3
 numpy==2.1.3
@@ -33,8 +32,7 @@ faster-whisper==1.2.1
 
 # --- resolved extras pulled by `unstructured[all-docs]` at install time
 # (the parse range ai_document_intelligence needs: pdf2image, pypdf,
-# pillow, python-pptx, tabulate, xlsx2html, pandas, ...) and by
-# sentence-transformers (torch, transformers, scikit-learn). These are
+# pillow, python-pptx, tabulate, xlsx2html, pandas, ...). These are
 # the Odoo-venv consumers of step [3/9]'s app artifacts and must be
 # pinned together with the release during certification.
 #

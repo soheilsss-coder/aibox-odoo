@@ -245,6 +245,33 @@ class AiAgentModuleBinding(models.Model):
         return result
 
     @api.model
+    def refresh_if_stale(self, max_age_seconds=15):
+        """Avoid a full binding write on every chat turn.
+
+        The post-install hook and one-minute cron are the normal refresh paths.
+        This bounded check only closes a short install-to-cron window and
+        recovers a worker after a restart; the hot chat path stays read-mostly.
+        """
+        try:
+            max_age_seconds = max(1, min(int(max_age_seconds), 300))
+        except (TypeError, ValueError):
+            max_age_seconds = 15
+        bindings = self.sudo().search([
+            ("company_id", "=", self.env.company.id),
+        ], limit=200)
+        cutoff = fields.Datetime.subtract(fields.Datetime.now(), seconds=max_age_seconds)
+        installed_names = self._installed_names()
+        bound_names = set(bindings.filtered(lambda binding: binding.active).mapped("module_name"))
+        missing_install_bindings = installed_names - bound_names
+        if (
+            not bindings
+            or missing_install_bindings
+            or any(not binding.last_sync or binding.last_sync < cutoff for binding in bindings)
+        ):
+            return self.sync_installed_module_bindings()
+        return True
+
+    @api.model
     def tool_ids_for_agent(self, assistant):
         bindings = self.sudo().search([
             ("agent_id", "=", assistant.id),
@@ -257,7 +284,11 @@ class AiAgentModuleBinding(models.Model):
 
     @api.model
     def binding_for_module(self, module_name, assistant=None):
-        domain = [("module_name", "=", module_name), ("active", "=", True)]
+        domain = [
+            ("module_name", "=", module_name),
+            ("company_id", "=", self.env.company.id),
+            ("active", "=", True),
+        ]
         if assistant:
             domain.append(("agent_id", "=", assistant.id))
         return self.sudo().search(domain, limit=1)

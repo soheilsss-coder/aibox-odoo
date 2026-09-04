@@ -152,7 +152,7 @@ Notification / workflow / memory / RAG / Telegram / Buzz workers
 
 | شناسه | یافته | شاهد/اثر |
 |---|---|---|
-| P2-01 | chat queue process-local است | `ai_gateway/models/chat_queue.py:16-21` تصریح می‌کند هماهنگی cross-process وجود ندارد؛ پیش‌فرض concurrency برابر ۲، waiter برابر ۱۰ و timeout برابر ۱۸۰ ثانیه است. | پشت چند worker روی یک GPU، سقف واقعی global نیست؛ runtime load test و sizing لازم است. |
+| P2-01 | صف داخلی chat در هر process جداست | `ai_gateway/models/chat_queue.py` صف process-local دارد و برای هماهنگی cross-process از Redis lease استفاده می‌کند؛ پیش‌فرض application concurrency برابر ۸، waiter برابر ۱۲۸ و timeout برابر ۲۴۰ ثانیه است. | burst صدتایی در صف application پذیرفته می‌شود، اما ظرفیت واقعی، tail latency و sizing روی GPU باید با load test native تأیید شود. |
 | P2-02 | SSE، token streaming واقعی نیست | `ai_gateway/controllers/gateway.py:556-614` ابتدا generation blocking انجام می‌شود و سپس متن نهایی word-sized chunk می‌شود. | تجربهٔ progressive وجود دارد، ولی latency واقعی قبل از اولین token پنهان نمی‌شود و backpressure/provider streaming حل نشده است. |
 | P2-03 | bootstrap احتمال N+1 دارد | `gateway.py:384-407` برای هر menu فرزندها را جداگانه search می‌کند. | در database بزرگ startup latency و query count بالا می‌رود؛ باید endpoint contract و cache/pagination داشته باشد. |
 | P2-04 | SCIM list مقیاس‌پذیر نیست | `scim_api.py:47-51` `search_count` و سپس search با limit ثابت ۱۰۰ دارد، بدون startIndex/count و filter واقعی. | sync سازمان‌های بزرگ ناقص یا پرهزینه می‌شود. |
@@ -332,3 +332,13 @@ Notification / workflow / memory / RAG / Telegram / Buzz workers
 - بخش‌های قدیمی این گزارش baseline تاریخی هستند؛ تست‌های باقی‌مانده در الحاقیه و `UPGRADE_PLAN_AND_EXECUTION_LOG_FA.md` منبع اجرای بعدی‌اند.
 
 **نتیجهٔ نهایی:** مسیر سورس و native installer اکنون قابل ادامه و قابل audit است، اما checkout هنوز production-certified نیست. ابتدا باید install/upgrade واقعی، migration، security matrix، RAG leakage، IdP integration، queue/Redis test و DGX benchmark اجرا و evidence آن‌ها ثبت شود.
+
+---
+
+## الحاقیه — hardening RAG، memory و ظرفیت (2026-09-04)
+
+در این مرحله مسیر retrieval از sort ترکیبی مستقیم به دو candidate scan مستقل تغییر کرد: candidateهای semantic با ترتیب HNSW و candidateهای lexical با GIN/full-text؛ پس از آن merge، threshold و hybrid rank در لایهٔ application انجام می‌شود. ACL/FGA و snapshot gate قبل از هر دو scan باقی مانده‌اند.
+
+embedding cache در مسیر اصلی query فعال است و فقط digest endpoint/model/revision را با vector فشردهٔ float32 نگه می‌دارد. memory encrypted نیز HMAC token digest و migration backfill دارد تا search عادی مجبور به decrypt کردن کل جدول نباشد. file reader محدودیت اندازه و failure صریح دارد و RAG بدون excerpt کافی پاسخ را `insufficient_context` اعلام می‌کند.
+
+اعتبارسنجی قابل تکرار این turn: 28 تست source-contract، compileall، XML parse و queue self-test با `PASS=14 FAIL=0` موفق شدند. این‌ها static/pure-runtime evidence هستند و جای install/upgrade واقعی Odoo یا benchmark روی PostgreSQL/Redis/vLLM/DGX را نمی‌گیرند؛ release همچنان `RUNTIME_CERTIFICATION_REQUIRED` است.

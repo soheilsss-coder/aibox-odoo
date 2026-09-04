@@ -1,14 +1,10 @@
 import re
 
-# Deliberately NOT the naive fixed-offset char slicer already used in
-# company_ai_demo/models/file_reader.py's chunk_text() (which just cuts
-# every 800 chars regardless of word/sentence boundaries - fine for a
-# one-off "rank 4 excerpts from THIS attachment" use case, not accurate
-# enough to be the actual persistent search index for the whole
-# document library). This one respects paragraph boundaries first and
-# only falls back to a hard cut for a single paragraph that is itself
-# bigger than one chunk (e.g. a wall-of-text scanned document with no
-# real paragraph breaks).
+# This shared chunker respects paragraph boundaries first and only falls
+# back to a hard cut for a single paragraph that is itself bigger than one
+# chunk (e.g. a wall-of-text scanned document with no real paragraph breaks).
+# The ad-hoc attachment reader delegates here when ai_rag is installed so
+# persistent indexing and one-off relevance selection use the same boundaries.
 
 _DEFAULT_CHUNK_SIZE = 1000
 _DEFAULT_OVERLAP = 150
@@ -53,6 +49,11 @@ def chunk_text(text, chunk_size=_DEFAULT_CHUNK_SIZE, overlap=_DEFAULT_OVERLAP):
     boundary is still findable from either side), and only break a
     single oversized paragraph internally (sentence-aware, see
     _split_long_paragraph)."""
+    try:
+        chunk_size = max(128, int(chunk_size))
+        overlap = max(0, min(int(overlap), chunk_size // 2))
+    except (TypeError, ValueError):
+        chunk_size, overlap = _DEFAULT_CHUNK_SIZE, _DEFAULT_OVERLAP
     paragraphs = _split_paragraphs(text)
     if not paragraphs:
         return []

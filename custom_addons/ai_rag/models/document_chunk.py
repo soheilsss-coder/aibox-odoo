@@ -14,6 +14,18 @@ _logger = logging.getLogger(__name__)
 # in one pgvector column.
 EMBEDDING_DIM = 1024
 RAG_INDEX_VERSION = os.getenv("AI_RAG_INDEX_VERSION", "rag-v1")
+RAG_MAX_QUERY_CHARS = 8_000
+
+
+def _env_float(name, default):
+    try:
+        return float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+RAG_MIN_VECTOR_SCORE = _env_float("AI_RAG_MIN_VECTOR_SCORE", 0.18)
+RAG_MIN_LEXICAL_SCORE = _env_float("AI_RAG_MIN_LEXICAL_SCORE", 0.01)
 
 
 class AiDocumentChunk(models.Model):
@@ -131,32 +143,78 @@ class AiDocumentChunk(models.Model):
         except (TypeError, ValueError):
             top_k = 5
 
-        visible_docs = self.env["company.document"].search([])
-        if "ai.control.relation" in self.env:
-            relation = self.env["ai.control.relation"]
+        Document = self.env["company.document"]
+        visible_domain = []
+        if "ai.control.relation" in self.env and not self.env.user.has_group("base.group_system"):
+            # Resolve FGA and grant facts in two bounded queries, then let the
+            # normal ORM search apply the native company/access-level record
+            # rule. The former implementation loaded every visible document
+            # and called relation/grant checks once per row (N+1), which made
+            # RAG latency grow with the corpus and could exhaust memory under
+            # concurrent chat traffic.
+            now = fields.Datetime.now()
+            relation_rows = self.env["ai.control.relation"].sudo().search([
+                ("subject_user_id", "=", self.env.user.id),
+                ("resource_model", "in", ["company.document", "project.project", "documents.folder"]),
+                ("company_id", "in", [self.env.company.id, False]),
+                ("active", "=", True),
+                ("starts_at", "<=", now),
+                "|", ("expires_at", "=", False), ("expires_at", ">=", now),
+            ], limit=5000)
+            direct_ids = relation_rows.filtered(
+                lambda rel: rel.resource_model == "company.document"
+            ).mapped("resource_id")
+            project_ids = relation_rows.filtered(
+                lambda rel: rel.resource_model == "project.project"
+            ).mapped("resource_id")
+            folder_ids = relation_rows.filtered(
+                lambda rel: rel.resource_model == "documents.folder"
+            ).mapped("resource_id")
+            # Four additive visibility cases: unscoped documents, direct FGA
+            # document relations, project relations, and folder relations.
+            visible_domain = [
+                "|", "&", ("project_id", "=", False), ("folder_id", "=", False),
+                "|", ("id", "in", direct_ids or [0]),
+                "|", ("project_id", "in", project_ids or [0]),
+                ("folder_id", "in", folder_ids or [0]),
+            ]
             grant_model = (
                 self.env["ai.gateway.access.grant"].sudo()
-                if "ai.gateway.access.grant" in self.env
-                else None
+                if "ai.gateway.access.grant" in self.env else None
             )
-            filtered = []
-            for doc in visible_docs:
-                if not (doc.project_id or doc.folder_id):
-                    filtered.append(doc)
-                    continue
-                allowed = any(
-                    relation.allows(self.env.user, rel, doc)
-                    for rel in ("owner", "manager", "member", "viewer", "editor", "delegate")
+            if grant_model is not None:
+                grants = grant_model._active_grants_for(
+                    self.env.user, capability="document.read"
                 )
-                if grant_model is not None and grant_model.grant_allows(
-                    self.env.user, "document.read", record=doc
-                ):
-                    allowed = True
-                if allowed or self.env.user.has_group("base.group_system"):
-                    filtered.append(doc)
-            visible_docs = self.env["company.document"].browse(
-                [doc.id for doc in filtered]
-            )
+                grant_ids = grants.filtered(
+                    lambda grant: (
+                        not grant.resource_id
+                        or (
+                            grant.resource_model == "company.document"
+                            and (
+                                grant.grant_type != "delegated"
+                                or (
+                                    grant.delegated_from_id
+                                    and (
+                                        not grant.group_id
+                                        or grant.group_id in grant.delegated_from_id.groups_id
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+                if any(not grant.resource_id for grant in grant_ids):
+                    # A global grant is additive to the native record rule,
+                    # not a bypass of it; no extra domain is necessary.
+                    grant_ids = grant_ids.browse()
+                else:
+                    document_ids = grant_ids.filtered(
+                        lambda grant: grant.resource_model == "company.document"
+                    ).mapped("resource_id")
+                    if document_ids:
+                        visible_domain = ["|", *visible_domain, ("id", "in", document_ids)]
+        visible_docs = Document.search(visible_domain)
         allowed_doc_ids = visible_docs.ids
         if not allowed_doc_ids:
             return []
@@ -173,10 +231,15 @@ class AiDocumentChunk(models.Model):
 
         from odoo.addons.ai_business_tools.models.context_firewall import scrub_value
 
-        safe_query = scrub_value(str(query_text or "")).strip()
+        safe_query = scrub_value(str(query_text or "")).strip()[:RAG_MAX_QUERY_CHARS]
         if not safe_query:
             return []
 
+        # Retrieve a wider candidate set, apply a minimum relevance check,
+        # then return only the requested number. This prevents a low-score
+        # nearest neighbour from being presented as a factual answer while
+        # preserving lexical hits for exact identifiers and policy codes.
+        candidate_limit = min(max(top_k * 4, top_k), 100)
         retrieval_mode = "hybrid"
         query_literal = None
         try:
@@ -189,11 +252,32 @@ class AiDocumentChunk(models.Model):
             retrieval_mode = "lexical_fallback"
 
         if query_literal:
+            # Keep the vector and lexical candidate scans independently
+            # index-friendly. Sorting the entire ACL-filtered corpus by a
+            # combined expression prevents PostgreSQL from using the HNSW
+            # ordering efficiently; the small Python merge is deterministic
+            # and gives exact identifiers a second chance.
             self.env.cr.execute(
                 """
                 SELECT c.id AS chunk_id, c.document_id AS document_id,
                        c.content AS content, c.sequence AS sequence,
                        1 - (c.embedding <=> %s::vector) AS vector_score,
+                       0.0 AS lexical_score
+                FROM ai_document_chunk c
+                WHERE c.document_id = ANY(%s)
+                  AND c.index_version = %s
+                  AND c.embedding IS NOT NULL
+                ORDER BY c.embedding <=> %s::vector
+                LIMIT %s
+                """,
+                (query_literal, allowed_doc_ids, RAG_INDEX_VERSION, query_literal, candidate_limit),
+            )
+            vector_rows = {row["chunk_id"]: row for row in self.env.cr.dictfetchall()}
+            self.env.cr.execute(
+                """
+                SELECT c.id AS chunk_id, c.document_id AS document_id,
+                       c.content AS content, c.sequence AS sequence,
+                       0.0 AS vector_score,
                        ts_rank_cd(
                          to_tsvector('simple', coalesce(c.content, '')),
                          plainto_tsquery('simple', %s)
@@ -201,26 +285,21 @@ class AiDocumentChunk(models.Model):
                 FROM ai_document_chunk c
                 WHERE c.document_id = ANY(%s)
                   AND c.index_version = %s
-                  AND c.embedding IS NOT NULL
-                ORDER BY (
-                    0.80 * (1 - (c.embedding <=> %s::vector)) +
-                    0.20 * ts_rank_cd(
-                      to_tsvector('simple', coalesce(c.content, '')),
+                  AND to_tsvector('simple', coalesce(c.content, '')) @@
                       plainto_tsquery('simple', %s)
-                    )
-                ) DESC
+                ORDER BY lexical_score DESC
                 LIMIT %s
                 """,
-                (
-                    query_literal,
-                    safe_query,
-                    allowed_doc_ids,
-                    RAG_INDEX_VERSION,
-                    query_literal,
-                    safe_query,
-                    top_k,
-                ),
+                (safe_query, allowed_doc_ids, RAG_INDEX_VERSION, safe_query, candidate_limit),
             )
+            rows = vector_rows
+            for lexical_row in self.env.cr.dictfetchall():
+                current = rows.get(lexical_row["chunk_id"])
+                if current:
+                    current["lexical_score"] = lexical_row["lexical_score"]
+                else:
+                    rows[lexical_row["chunk_id"]] = lexical_row
+            rows = list(rows.values())
         else:
             self.env.cr.execute(
                 """
@@ -239,10 +318,24 @@ class AiDocumentChunk(models.Model):
                 ORDER BY lexical_score DESC
                 LIMIT %s
                 """,
-                (safe_query, allowed_doc_ids, RAG_INDEX_VERSION, safe_query, top_k),
+                (safe_query, allowed_doc_ids, RAG_INDEX_VERSION, safe_query, candidate_limit),
             )
 
-        rows = self.env.cr.dictfetchall()
+        if not query_literal:
+            rows = self.env.cr.dictfetchall()
+        if not rows:
+            return []
+        for row in rows:
+            vector_score = float(row["vector_score"] or 0.0)
+            lexical_score = float(row["lexical_score"] or 0.0)
+            row["hybrid_score"] = 0.80 * vector_score + 0.20 * lexical_score
+        if retrieval_mode == "hybrid":
+            rows = [row for row in rows if (
+                float(row["vector_score"] or 0.0) >= RAG_MIN_VECTOR_SCORE
+                or float(row["lexical_score"] or 0.0) >= RAG_MIN_LEXICAL_SCORE
+            )]
+        rows.sort(key=lambda row: row["hybrid_score"], reverse=True)
+        rows = rows[:top_k]
         if not rows:
             return []
 
@@ -259,6 +352,8 @@ class AiDocumentChunk(models.Model):
                 "excerpt": scrub_value(row["content"] or ""),
                 "similarity": round(float(row["vector_score"] or 0.0), 4),
                 "lexical_score": round(float(row["lexical_score"] or 0.0), 4),
+                "relevance_score": round(float(row["hybrid_score"] or 0.0), 4),
+                "retrieval_mode": retrieval_mode,
             }
             for row in rows
         ]

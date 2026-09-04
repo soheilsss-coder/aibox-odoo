@@ -178,7 +178,7 @@ class AiDeploymentWizard(models.TransientModel):
         bindings = self.env["ai.integration.agent.module"].sudo() if "ai.integration.agent.module" in self.env else None
         if bindings is not None:
             try:
-                bindings.sync_installed_module_bindings()
+                bindings.refresh_if_stale()
             except Exception:  # noqa: BLE001
                 checks["agent_binding_error"] = True
         checks["installed_module_agent_connections"] = {}

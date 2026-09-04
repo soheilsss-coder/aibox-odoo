@@ -81,7 +81,7 @@ def _personal_agent_state(env, user):
     if not assistant:
         return result
     try:
-        binding_model.sudo().sync_installed_module_bindings()
+        binding_model.sudo().refresh_if_stale()
         bindings = binding_model.sudo().search([
             ("agent_id", "=", assistant.id),
             ("company_id", "=", env.company.id),

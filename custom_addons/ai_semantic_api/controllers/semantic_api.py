@@ -988,7 +988,7 @@ class AiSemanticApiController(http.Controller):
 
         if "ai.integration.agent.module" in env:
             try:
-                env["ai.integration.agent.module"].sudo().sync_installed_module_bindings()
+                env["ai.integration.agent.module"].sudo().refresh_if_stale()
             except Exception:  # noqa: BLE001
                 _logger.exception("Could not refresh module-agent connections for admin view")
 

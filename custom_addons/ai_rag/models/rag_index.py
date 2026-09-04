@@ -6,12 +6,14 @@ import os
 import tempfile
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 from .chunking import chunk_text
 from .embedding_client import embed_texts
 
 _logger = logging.getLogger(__name__)
 RAG_INDEX_VERSION = os.getenv("AI_RAG_INDEX_VERSION", "rag-v1")
+EMBEDDING_BATCH_SIZE = 64
 
 
 class AiRagIndexSnapshot(models.Model):
@@ -71,11 +73,14 @@ class CompanyDocumentRag(models.Model):
             return ""
 
         from odoo.addons.company_ai_demo.models.file_reader import (
+            MAX_ATTACHMENT_BYTES,
+            MAX_EXTRACTED_CHARS,
             ocr_image_file,
             ocr_scanned_pdf,
         )
-
         raw = base64.b64decode(self.file)
+        if len(raw) > MAX_ATTACHMENT_BYTES:
+            raise UserError("document exceeds the safe indexing size limit")
         name = self.file_name or self.name or "file"
         suffix = os.path.splitext(name)[1] or ".bin"
         mimetype = mimetypes.guess_type(name)[0] or ""
@@ -96,13 +101,15 @@ class CompanyDocumentRag(models.Model):
                 text = "\n".join(str(el) for el in elements)
                 if suffix.lower() == ".pdf" and len(text.strip()) < 30:
                     text = ocr_scanned_pdf(tmp_path)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             _logger.exception("RAG text extraction failed for document %s", self.id)
-            text = ""
+            raise UserError("document extraction is temporarily unavailable") from exc
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
+        if len(text) > MAX_EXTRACTED_CHARS:
+            raise UserError("extracted document text exceeds the safe indexing limit")
         return text
 
     def _rag_update_snapshot(self, status_note=None):
@@ -175,6 +182,9 @@ class CompanyDocumentRag(models.Model):
         from odoo.addons.ai_business_tools.models.context_firewall import scrub_value
 
         raw_text = ((self.description or "") + "\n\n" + self._rag_extract_text()).strip()
+        from odoo.addons.company_ai_demo.models.file_reader import MAX_EXTRACTED_CHARS
+        if len(raw_text) > MAX_EXTRACTED_CHARS:
+            raise UserError("combined document text exceeds the safe indexing limit")
         text = scrub_value(raw_text) if raw_text else ""
 
         existing = Chunk.search([("document_id", "=", self.id)])
@@ -198,7 +208,12 @@ class CompanyDocumentRag(models.Model):
                 to_embed_texts.append(pieces[i])
                 to_embed_positions.append(i)
 
-        vectors = embed_texts(to_embed_texts, env=self.env) if to_embed_texts else []
+        vectors = []
+        for start in range(0, len(to_embed_texts), EMBEDDING_BATCH_SIZE):
+            vectors.extend(embed_texts(
+                to_embed_texts[start:start + EMBEDDING_BATCH_SIZE],
+                env=self.env,
+            ))
         vector_by_position = dict(zip(to_embed_positions, vectors))
 
         keep_hashes = set()

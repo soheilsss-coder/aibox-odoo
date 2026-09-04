@@ -82,6 +82,8 @@ class AiModelProfile(models.Model):
             max_e2e = float(limits["max_p95_e2e_ms"])
             max_error = float(limits["max_error_rate"])
             min_completed = int(limits["min_completed"])
+            min_concurrency = int(limits.get("min_concurrency", 100))
+            measured_concurrency = int(report.get("concurrency", 0))
             security_score = float(limits["security_score"])
             tool_calling_score = float(limits.get("tool_calling_score", 0.0))
             vision_score = float(limits.get("vision_score", 0.0))
@@ -104,6 +106,7 @@ class AiModelProfile(models.Model):
         if (
             not all(evidence.get(key) for key in ("gpu_metrics", "queue_metrics", "db_redis_metrics"))
             or max_ttft <= 0 or max_e2e <= 0 or max_error < 0 or min_completed < 1
+            or min_concurrency < 100 or measured_concurrency < min_concurrency
             or ttft < 0 or e2e < 0 or error_rate < 0 or error_rate > 1
             or ttft > max_ttft or e2e > max_e2e or error_rate > max_error
             or completed < min_completed or not scores_ok or not dimensions_ok

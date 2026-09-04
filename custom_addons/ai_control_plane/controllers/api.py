@@ -191,7 +191,7 @@ class AiControlPlaneController(http.Controller):
             return _json_response({"error": "access denied"}, status=403)
         if "ai.integration.agent.module" in env:
             try:
-                env["ai.integration.agent.module"].sudo().sync_installed_module_bindings()
+                env["ai.integration.agent.module"].sudo().refresh_if_stale()
             except Exception:  # noqa: BLE001
                 _logger.exception("Could not refresh module-agent connections for catalog")
         modules = env["ir.module.module"].sudo().search([
@@ -322,7 +322,7 @@ class AiControlPlaneController(http.Controller):
             return err
         if "ai.integration.agent.module" in env:
             try:
-                env["ai.integration.agent.module"].sudo().sync_installed_module_bindings()
+                env["ai.integration.agent.module"].sudo().refresh_if_stale()
             except Exception:  # noqa: BLE001
                 _logger.exception("Could not refresh module-agent connections for navigation")
         installed = env["ir.module.module"].sudo().search([

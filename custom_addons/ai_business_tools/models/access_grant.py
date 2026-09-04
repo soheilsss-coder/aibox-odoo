@@ -81,7 +81,7 @@ class AiGatewayAccessGrant(models.Model):
                 raise ValidationError("Only product-defined role groups may receive temporary/delegated access.")
 
     @api.model
-    def _active_grants_for(self, user, capability=None, record=None):
+    def _active_grants_for(self, user, capability=None, record=None, limit=1000):
         today = fields.Date.context_today(self)
         domain = [
             ("to_user_id", "=", user.id), ("company_id", "=", self.env.company.id),
@@ -90,7 +90,11 @@ class AiGatewayAccessGrant(models.Model):
         ]
         if capability:
             domain += ["|", ("capability_name", "=", capability), ("capability_name", "=", False)]
-        grants = self.sudo().search(domain)
+        try:
+            limit = max(1, min(int(limit), 5000))
+        except (TypeError, ValueError):
+            limit = 1000
+        grants = self.sudo().search(domain, limit=limit)
         if not record:
             return grants
         return grants.filtered(lambda g: not g.resource_id or (

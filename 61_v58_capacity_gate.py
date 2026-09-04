@@ -20,13 +20,28 @@ def number(value, label):
     return float(value)
 
 
+def env_float(name, default):
+    try:
+        return float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def env_int(name, default):
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return int(default)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", type=Path)
-    parser.add_argument("--max-p95-ttft-ms", type=float, default=float(os.getenv("AI_MAX_P95_TTFT_MS", "0")))
-    parser.add_argument("--max-p95-e2e-ms", type=float, default=float(os.getenv("AI_MAX_P95_E2E_MS", "0")))
-    parser.add_argument("--max-error-rate", type=float, default=float(os.getenv("AI_MAX_ERROR_RATE", "0")))
-    parser.add_argument("--min-completed", type=int, default=int(os.getenv("AI_MIN_COMPLETED", "1")))
+    parser.add_argument("--max-p95-ttft-ms", type=float, default=env_float("AI_MAX_P95_TTFT_MS", 0))
+    parser.add_argument("--max-p95-e2e-ms", type=float, default=env_float("AI_MAX_P95_E2E_MS", 0))
+    parser.add_argument("--max-error-rate", type=float, default=env_float("AI_MAX_ERROR_RATE", 0))
+    parser.add_argument("--min-completed", type=int, default=env_int("AI_MIN_COMPLETED", 100))
+    parser.add_argument("--min-concurrency", type=int, default=env_int("AI_MIN_CONCURRENCY", 100))
     args = parser.parse_args()
 
     try:
@@ -40,6 +55,15 @@ def main() -> int:
         print("- benchmark report must be a JSON object")
         return 1
     failures = []
+    try:
+        measured_requests = int(report.get("requests", 0))
+        measured_concurrency = int(report.get("concurrency", 0))
+    except (TypeError, ValueError):
+        measured_requests = measured_concurrency = 0
+    if measured_requests < args.min_completed:
+        failures.append(f"benchmark requests {measured_requests} is below the required burst {args.min_completed}")
+    if measured_concurrency < args.min_concurrency:
+        failures.append(f"benchmark concurrency {measured_concurrency} is below the required concurrency {args.min_concurrency}")
     summary = report.get("summary") or {}
     ttft_p95 = number((summary.get("ttft_ms") or {}).get("p95"), "summary.ttft_ms.p95")
     e2e_p95 = number((summary.get("e2e_ms") or {}).get("p95"), "summary.e2e_ms.p95")

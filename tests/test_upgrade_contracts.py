@@ -145,6 +145,28 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("postcommit.add", sync)
         self.assertIn('<field name="interval_type">minutes</field>', cron)
 
+    def test_rag_memory_and_100_request_path_are_bounded(self):
+        chunk = (ADDONS / "ai_rag/models/document_chunk.py").read_text()
+        rag_tool = (ADDONS / "ai_rag/models/rag_tool.py").read_text()
+        embedding = (ADDONS / "ai_rag/models/embedding_client.py").read_text()
+        reader = (ADDONS / "company_ai_demo/models/file_reader.py").read_text()
+        memory = (ADDONS / "company_ai_demo/models/memory_record.py").read_text()
+        memory_tool = (ADDONS / "company_ai_demo/models/agent_memory.py").read_text()
+        memory_rules = (ADDONS / "company_ai_demo/security/memory_rules.xml").read_text()
+        queue = (ADDONS / "ai_gateway/models/chat_queue.py").read_text()
+        benchmark = (ROOT / "60_v58_llm_benchmark.py").read_text()
+        capacity = (ROOT / "61_v58_capacity_gate.py").read_text()
+        for marker in (
+            "candidate_limit", "RAG_MIN_VECTOR_SCORE", "hybrid_score", "retrieval_mode",
+            "ai_document_chunk_embedding_hnsw_idx", "_query_cache_key", "No sufficiently relevant",
+            "same certified embedding service", "limit=10 if not query else 500",
+            "rule_memory_company_hr_manager", "Memory key must contain", "existing",
+            "_POOL_MAX_WAITERS", "100-request burst", "default=100", "AI_MIN_CONCURRENCY",
+        ):
+            self.assertIn(marker, chunk + rag_tool + embedding + reader + memory + memory_tool + memory_rules + queue + benchmark + capacity)
+        self.assertNotIn("SentenceTransformer", reader)
+        self.assertNotIn('"provider": "odoo-orm-canonical"', memory_tool)
+
     def test_personal_workspace_uses_shared_agent_core(self):
         identity = (ADDONS / "ai_gateway/models/agent_identity.py").read_text()
         thread = (ADDONS / "ai_gateway/models/personal_thread.py").read_text()
@@ -378,6 +400,7 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("action_promote_from_benchmark", registry)
         self.assertIn("system administrator", registry)
         self.assertIn("db_redis_metrics", registry)
+        self.assertIn("min_concurrency", registry)
         self.assertIn('"vision"', benchmark)
         self.assertIn('"embedding"', benchmark)
         self.assertIn("image_url", benchmark)

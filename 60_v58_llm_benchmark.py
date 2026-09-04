@@ -232,16 +232,22 @@ def run(args: argparse.Namespace) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--endpoint", default=os.getenv("AI_BENCHMARK_ENDPOINT", "http://127.0.0.1:8000/v1/chat/completions"))
-    parser.add_argument("--model", default=os.getenv("AI_BENCHMARK_MODEL", "chat-model"))
+    parser.add_argument("--endpoint", default=os.getenv("AI_BENCHMARK_ENDPOINT", ""))
+    parser.add_argument("--model", default=os.getenv("AI_BENCHMARK_MODEL", ""))
     parser.add_argument("--scenario", choices=sorted(SCENARIOS), default="chat")
-    parser.add_argument("--requests", type=int, default=20)
-    parser.add_argument("--warmup", type=int, default=2)
-    parser.add_argument("--concurrency", type=int, default=4)
+    parser.add_argument("--requests", type=int, default=100)
+    parser.add_argument("--warmup", type=int, default=5)
+    parser.add_argument("--concurrency", type=int, default=100)
     parser.add_argument("--max-tokens", type=int, default=128)
     parser.add_argument("--timeout", type=float, default=120)
     parser.add_argument("--output", default="/tmp/ai-v58-llm-benchmark.json")
     args = parser.parse_args()
+    if not args.model:
+        args.model = {"embedding": "embedding-model", "vision": "vision-model"}.get(args.scenario, "local-model")
+    if not args.endpoint:
+        port = {"embedding": 8002, "vision": 8001}.get(args.scenario, 8000)
+        path = "/v1/embeddings" if args.scenario == "embedding" else "/v1/chat/completions"
+        args.endpoint = "http://127.0.0.1:%d%s" % (port, path)
     if args.requests < 1 or args.requests > 10000 or args.concurrency < 1 or args.concurrency > args.requests:
         parser.error("requests must be 1..10000 and concurrency must be positive and no greater than requests")
     if args.warmup < 0 or args.warmup > 100 or args.max_tokens < 1 or args.timeout <= 0:

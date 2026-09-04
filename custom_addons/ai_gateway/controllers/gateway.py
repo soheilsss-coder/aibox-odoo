@@ -277,7 +277,7 @@ def _agent_tools(env, assistant):
         # The cron is the normal path. This idempotent refresh closes the
         # small install-to-cron window without asking an administrator to
         # press a second sync button.
-        Binding.sync_installed_module_bindings()
+        Binding.refresh_if_stale()
         return Binding.tool_ids_for_agent(assistant)
     except Exception:  # noqa: BLE001
         # Fail closed: stale assistant tools must not survive a broken module

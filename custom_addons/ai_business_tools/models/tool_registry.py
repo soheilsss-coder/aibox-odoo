@@ -20,7 +20,7 @@ class LLMToolRegistry(models.Model):
         installed_names = set(self.env["ir.module.module"].sudo().search([
             ("state", "=", "installed"),
         ]).mapped("name"))
-        risks = risks.filtered(lambda risk: not risk.module_name or risk.module_name in installed_names)
+        risks = risks.filtered(lambda risk: bool(risk.module_name and risk.module_name in installed_names))
         return {
             "count": len(risks),
             "tools": [
