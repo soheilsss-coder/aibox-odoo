@@ -367,7 +367,7 @@
   "custom_addons/company_ai_demo/security/ir.model.access.csv": "95c8234506bf5a07ac87f8676248d54182cc836d6c827b45319933caed3dfec9",
   "custom_addons/company_ai_demo/security/memory_rules.xml": "7229d8906f8d2ec56098d4b976a4e4cc2ca5463fbe0cb99d3010fb6e663c0242",
   "deploy.sh": "d4a0a210b8f3b18aa919a875faf4d2ee19455e0582007f663736443471e7d3b5",
-  "frontend/README.md": "4fce52255f8306570911015ce913b5acfb661ba950d14c17f21e428b971036dd",
+  "frontend/README.md": "146dda20ddc453f8e0df1c4e5df2c7394580c2c1d999830db8746c1813a33c9d",
   "frontend/index.html": "358fcf375b9bc0b9d49dcd5ae14b5ecaf8cff7817c49c4e7b853e5c17321be7c",
   "frontend/package-lock.json": "850322b5497c79aa8d22886dece309f91918d0da3253f3392feadf0866b138b7",
   "frontend/package.json": "ea00e2e789736a50a1495d1799f82f4d250498c156a6cfea20798b1bd58ca05a",
