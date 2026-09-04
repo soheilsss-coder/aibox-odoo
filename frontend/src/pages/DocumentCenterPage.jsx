@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  listDocuments, searchDocuments, uploadDocument, deleteDocument,
+  listDocuments, searchDocuments, uploadDocument, deleteDocument, reindexDocument,
   getDocumentOptions, ApiError,
 } from "../api/client.js";
 import {
@@ -83,6 +83,7 @@ export default function DocumentCenterPage({ user }) {
     department_id: "", group_id: "", file: null,
   });
   const [uploading, setUploading] = useState(false);
+  const [reindexing, setReindexing] = useState(null);
 
   function refresh() {
     setDocuments(null);
@@ -92,6 +93,21 @@ export default function DocumentCenterPage({ user }) {
   }
 
   useEffect(refresh, [tab]);
+
+  // Ingestion is asynchronous. Keep the badge useful without turning the
+  // page into a busy loop: poll only while this tab contains an active job.
+  useEffect(() => {
+    const active = (documents || []).some((document) =>
+      ["pending", "extracting", "embedding"].includes(document.ingestion_status)
+    );
+    if (!active) return undefined;
+    const timer = setInterval(() => {
+      listDocuments("", tab)
+        .then((data) => setDocuments(data.documents))
+        .catch(() => undefined);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [documents, tab]);
 
   async function handleSemanticSearch(e) {
     e.preventDefault();
@@ -161,6 +177,19 @@ export default function DocumentCenterPage({ user }) {
     }
   }
 
+  async function handleReindex(documentId) {
+    setReindexing(documentId);
+    setError("");
+    try {
+      await reindexDocument(documentId);
+      refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "تلاش مجدد ایندکس ناموفق بود");
+    } finally {
+      setReindexing(null);
+    }
+  }
+
   return (
     <div>
       <div className="ds-card-header" style={{ marginBottom: 12 }}>
@@ -185,12 +214,23 @@ export default function DocumentCenterPage({ user }) {
       {semanticResults && (
         <Card title="نتایج جستجوی معنایی">
           {semanticResults.length === 0 && <EmptyState text="نتیجه‌ای یافت نشد." />}
-          {semanticResults.map((r, i) => (
-            <div key={i} style={{ marginBottom: 12 }}>
-              <div><strong>{r.document_name}</strong> <span className="muted">({r.similarity})</span></div>
-              <div className="muted">{r.excerpt.slice(0, 220)}...</div>
-            </div>
-          ))}
+          {semanticResults.map((r, i) => {
+            const citation = r.citation || {};
+            const anchors = [
+              citation.page ? `صفحه ${citation.page}` : "",
+              citation.section ? `بخش ${citation.section}` : "",
+              citation.sheet ? `برگه ${citation.sheet}` : "",
+              citation.slide ? `اسلاید ${citation.slide}` : "",
+              citation.table ? `جدول ${citation.table}` : "",
+            ].filter(Boolean);
+            return (
+              <div key={i} style={{ marginBottom: 12 }}>
+                <div><strong>{r.document_name}</strong> <span className="muted">({r.relevance_score ?? r.similarity})</span></div>
+                {anchors.length > 0 && <div className="muted" style={{ fontSize: 12 }}>{anchors.join(" — ")}</div>}
+                <div className="muted">{r.excerpt.slice(0, 220)}...</div>
+              </div>
+            );
+          })}
         </Card>
       )}
 
@@ -216,13 +256,24 @@ export default function DocumentCenterPage({ user }) {
               </div>
               {d.description && <div className="muted">{d.description}</div>}
               {d.ingestion_error && <div className="muted">{d.ingestion_error}</div>}
+              {d.ingestion_warnings && <div className="muted">هشدار استخراج: {d.ingestion_warnings}</div>}
+              {d.ingestion_parser && (
+                <div className="muted" style={{ fontSize: 12 }}>
+                  parser: {d.ingestion_parser}{d.ingestion_pages ? ` — ${d.ingestion_pages} صفحه` : ""}
+                </div>
+              )}
               <div className="muted" style={{ fontSize: 12 }}>
                 {d.owner ? `مالک: ${d.owner}` : ""} {d.file_name ? `— ${d.file_name}` : ""}
               </div>
             </div>
-            {(d.is_mine || user?.can_manage_documents) && (
-              <Button variant="danger" size="sm" onClick={() => handleDelete(d.id)}>حذف</Button>
-            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              {d.ingestion_status === "failed" && (d.is_mine || user?.can_manage_documents) && (
+                <Button size="sm" loading={reindexing === d.id} onClick={() => handleReindex(d.id)}>تلاش مجدد</Button>
+              )}
+              {(d.is_mine || user?.can_manage_documents) && (
+                <Button variant="danger" size="sm" onClick={() => handleDelete(d.id)}>حذف</Button>
+              )}
+            </div>
           </div>
         </Card>
       ))}

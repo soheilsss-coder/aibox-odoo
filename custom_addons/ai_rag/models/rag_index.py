@@ -61,6 +61,7 @@ class CompanyDocumentRag(models.Model):
         ("empty", "Empty"), ("failed", "Failed"),
     ], default="pending", index=True, readonly=True)
     rag_ingestion_error = fields.Text(readonly=True)
+    rag_ingestion_warnings = fields.Text(readonly=True)
     rag_ingestion_parser = fields.Char(readonly=True)
     rag_ingestion_parser_version = fields.Char(readonly=True)
     rag_ingestion_page_count = fields.Integer(readonly=True)
@@ -218,6 +219,7 @@ class CompanyDocumentRag(models.Model):
             self.write({
                 "rag_ingestion_parser": parser,
                 "rag_ingestion_parser_version": parser_version,
+                "rag_ingestion_warnings": "\n".join(payload.warnings if payload else []),
                 "rag_ingestion_page_count": page_count,
                 "rag_ingestion_char_count": len(raw_text),
                 "rag_ingestion_checksum": checksum,

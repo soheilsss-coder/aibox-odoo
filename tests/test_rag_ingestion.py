@@ -88,6 +88,19 @@ class RagIngestionContracts(unittest.TestCase):
         self.assertEqual(provenance[0]["slide"], 2)
         self.assertEqual(self.chunking.normalize_search_text("ي ك ۱۲۳\u200cالف"), "ی ک 123 الف")
 
+    def test_retrieval_contract_keeps_acl_and_citation_bounds(self):
+        source = (ROOT / "custom_addons/ai_rag/models/document_chunk.py").read_text()
+        for marker in (
+            "allowed_doc_ids",
+            "source_coordinates",
+            "source_table",
+            "source_sheet",
+            "source_slide",
+            "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+            "normalized_content %% %s",
+        ):
+            self.assertIn(marker, source)
+
     def test_safe_upload_round_trip_is_bounded(self):
         raw = b"hello"
         encoded = base64.b64encode(raw)

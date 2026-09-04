@@ -104,6 +104,7 @@ export const listDocuments = (query = "", accessLevel = "") => { const p = new U
 export const getDocument = (id) => request(`/api/documents/${id}`);
 export const uploadDocument = (payload) => request("/api/documents", { method: "POST", body: payload });
 export const deleteDocument = (id) => request(`/api/documents/${id}`, { method: "DELETE" });
+export const reindexDocument = (id) => request(`/api/documents/${id}/reindex`, { method: "POST" });
 export const getDocumentOptions = () => request("/api/documents/options");
 export const searchDocuments = (query, topK = 5) => request("/api/documents/search", { method: "POST", body: { query, top_k: topK } });
 export const generateArtifact = (payload) => request("/api/artifacts/generate", { method: "POST", body: payload });

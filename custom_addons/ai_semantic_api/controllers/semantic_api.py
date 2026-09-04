@@ -709,6 +709,40 @@ class AiSemanticApiController(http.Controller):
                {"document_id": document_id, "name": name}, success=True)
         return _json_response({"status": "deleted"})
 
+    @http.route("/api/documents/<int:document_id>/reindex", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def document_reindex(self, document_id, **kwargs):
+        """Queue a bounded, durable retry without embedding in the HTTP request."""
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_auth()
+        if err:
+            return err
+        document = env["company.document"].browse(document_id)
+        try:
+            document.check_access("read")
+        except AccessError:
+            return _json_response({"error": "access denied: insufficient permission"}, status=403)
+        if not document.exists():
+            return _json_response({"error": "not found"}, status=404)
+        is_owner = document.owner_id.id == env.user.id
+        if not (is_owner or _is_privileged(env, env.user)):
+            return _json_response({"error": "access denied: only the owner or an admin can retry indexing"}, status=403)
+        if not document.file:
+            return _json_response({"error": "document has no file"}, status=400)
+        if "ai.document.index.job" not in env:
+            return _json_response({"error": "document indexing is unavailable"}, status=503)
+        job = env["ai.document.index.job"].sudo().enqueue(document)
+        _audit(
+            env, env.user.id, "semantic_api", "documents.reindex",
+            {"document_id": document.id, "job_id": job.id}, success=True,
+        )
+        return _json_response({
+            "status": "queued",
+            "job_state": job.state,
+            "document": self._serialize_document(env, document),
+        }, status=202)
+
     @http.route("/api/documents/search", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])
     def documents_search(self, **params):
         if request.httprequest.method == "OPTIONS":
@@ -765,6 +799,8 @@ class AiSemanticApiController(http.Controller):
                 else ("no_file" if not doc.file else "pending")
             ),
             "ingestion_pages": doc.rag_ingestion_page_count if "rag_ingestion_page_count" in doc._fields else 0,
+            "ingestion_parser": doc.rag_ingestion_parser if "rag_ingestion_parser" in doc._fields else "",
+            "ingestion_warnings": doc.rag_ingestion_warnings if "rag_ingestion_warnings" in doc._fields else "",
             "ingestion_error": (
                 "document could not be indexed"
                 if "rag_ingestion_state" in doc._fields and doc.rag_ingestion_state == "failed"
