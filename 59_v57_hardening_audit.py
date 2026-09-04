@@ -30,7 +30,7 @@ require('unregistered_tool' in gate, "unknown tools must remain deny-by-default"
 generic = read("custom_addons/ai_integration/models/generic_read.py")
 require('@llm_tool(read_only_hint=True)' in generic, "generic read must be read-only tool")
 require('require(capability)' not in generic, "generic read must not use a per-model capability without checking registration")
-require('search(parsed_domain, limit=limit)' in generic, "generic read must use ORM search")
+require('Model.search(parsed_domain' in generic, "generic read must use ORM search")
 require('Model.sudo()' not in generic and "Model = self.env[model].sudo()" not in generic, "generic read must never sudo business records")
 require('create(' not in generic and 'write(' not in generic and 'unlink(' not in generic, "generic read adapter must not expose writes")
 require('ast.literal_eval' in generic, "generic read domain parser must not eval arbitrary code")

@@ -4,20 +4,70 @@ from odoo.exceptions import AccessError, UserError
 
 
 class LLMToolGenericRead(models.Model):
-    """Safe generic READ adapter for newly installed Odoo modules.
+    """Conservative read fallback for an automatically discovered module.
 
-    This is intentionally READ-only: no create/write/unlink, no method
-    dispatch, no sudo, and no arbitrary SQL. The model must have a discovered
-    <model>.read capability; the actual query then runs as the authenticated
-    Odoo user so ACLs and record rules remain the second enforcement layer.
+    Discovery is an inventory/control-plane operation, not permission to
+    expose the ERP ORM to an employee or to the model.  This fallback is
+    intentionally limited to system administrators, requires a discovered
+    model capability, permits only a small non-relational display contract,
+    and removes record ids/technical field metadata from the AI result.
+    Source-reviewed business adapters remain the normal user-facing path.
     """
     _inherit = "llm.tool"
 
-    _SENSITIVE_FIELDS = {
-        "password", "password_crypt", "api_key", "secret", "client_secret",
-        "access_token", "refresh_token", "token", "private_key", "ssh_key",
-        "database_password", "webhook_secret",
+    _SAFE_FIELDS = {
+        "display_name", "name", "ref", "code", "state", "active",
+        "date", "date_start", "date_end", "write_date",
     }
+    _SAFE_OPERATORS = {"=", "!=", "ilike", "not ilike", "in", "not in", ">", "<", ">=", "<="}
+    _FORBIDDEN_FIELD_PARTS = {
+        "password", "secret", "token", "key", "salary", "wage", "bank",
+        "iban", "birth", "identification", "passport", "ssn", "national",
+        "phone", "email", "street", "address", "zip", "vat", "tax",
+        "amount", "price", "cost", "debit", "credit", "margin", "body",
+        "description", "note", "comment", "content", "attachment", "file",
+    }
+
+    @classmethod
+    def _field_allowed(cls, name, field):
+        lowered = name.lower()
+        return (
+            name in cls._SAFE_FIELDS
+            and not any(part in lowered for part in cls._FORBIDDEN_FIELD_PARTS)
+            and field.type not in {"binary", "html", "one2many", "many2many", "many2one"}
+        )
+
+    @classmethod
+    def _validated_domain(cls, value, Model):
+        try:
+            import ast
+            parsed = ast.literal_eval(value or "[]")
+        except (ValueError, SyntaxError) as exc:
+            raise UserError("domain must be a Python literal list of safe search clauses") from exc
+        if not isinstance(parsed, list) or len(parsed) > 20:
+            raise UserError("domain must be a list with at most 20 clauses")
+        validated = []
+        logical = {"&", "|", "!"}
+        for clause in parsed:
+            if isinstance(clause, str) and clause in logical:
+                validated.append(clause)
+                continue
+            if not isinstance(clause, (tuple, list)) or len(clause) != 3:
+                raise UserError("domain contains an invalid clause")
+            field_name, operator, operand = clause
+            if not isinstance(field_name, str) or "." in field_name:
+                raise UserError("domain may not traverse relations")
+            field = Model._fields.get(field_name)
+            if not field or not cls._field_allowed(field_name, field):
+                raise UserError("domain field is not in the safe read contract")
+            if operator not in cls._SAFE_OPERATORS:
+                raise UserError("domain operator is not allowed")
+            if isinstance(operand, str) and len(operand) > 200:
+                raise UserError("domain value is too long")
+            if isinstance(operand, (list, tuple)) and len(operand) > 20:
+                raise UserError("domain list is too long")
+            validated.append((field_name, operator, operand))
+        return validated
 
     @llm_tool(read_only_hint=True)
     def generic_read(self, model: str, fields: str = "", domain: str = "[]", limit: int = 20) -> dict:
@@ -27,27 +77,31 @@ class LLMToolGenericRead(models.Model):
         capability = f"{model}.read"
         if "ai.control.authorization" not in self.env:
             raise AccessError("read authorization service is unavailable")
-        # Discovery must have registered this exact model before the AI can
-        # query it. The tool never creates capabilities on demand.
-        if not self.env["ai.control.capability"].sudo().search([("name", "=", capability), ("active", "=", True)], limit=1):
+        if not self.env["ai.control.capability"].sudo().search([
+            ("name", "=", capability), ("active", "=", True),
+        ], limit=1):
             raise AccessError("read capability is not registered for this model")
+        # Generic discovery is a privileged fallback.  Ordinary employees
+        # must use a source-reviewed operation with an explicit role contract.
         self.env["ai.control.authorization"].require("odoo.generic.read")
-
-        try:
-            import ast
-            parsed_domain = ast.literal_eval(domain or "[]")
-        except (ValueError, SyntaxError) as exc:
-            raise UserError("domain must be a Python literal list of Odoo search clauses") from exc
-        if not isinstance(parsed_domain, list) or len(parsed_domain) > 20:
-            raise UserError("domain must be a list with at most 20 clauses")
-        limit = max(1, min(int(limit or 20), 100))
 
         requested = [x.strip() for x in (fields or "").split(",") if x.strip()]
         if not requested:
-            requested = [f for f in Model._fields if f not in self._SENSITIVE_FIELDS and not f.endswith("_password")]
-        requested = [f for f in requested if f in Model._fields and f not in self._SENSITIVE_FIELDS and not f.endswith("_password")]
+            requested = [name for name, field in Model._fields.items() if self._field_allowed(name, field)]
+        requested = [
+            name for name in requested
+            if name in Model._fields and self._field_allowed(name, Model._fields[name])
+        ]
         if not requested:
-            raise UserError("no readable fields were requested")
-        records = Model.search(parsed_domain, limit=limit)
-        rows = records.read(requested)
-        return {"model": model, "count": len(rows), "fields": requested, "records": rows}
+            raise UserError("no safe display fields were requested")
+        parsed_domain = self._validated_domain(domain, Model)
+        try:
+            bounded_limit = max(1, min(int(limit or 20), 100))
+        except (TypeError, ValueError) as exc:
+            raise UserError("limit must be an integer") from exc
+        records = Model.search(parsed_domain, limit=bounded_limit)
+        raw_rows = records.read(requested)
+        # Odoo includes the local id in read payloads even when it is not
+        # requested.  It is intentionally removed from the AI-facing result.
+        rows = [{key: value for key, value in row.items() if key != "id"} for row in raw_rows]
+        return {"count": len(rows), "records": rows}

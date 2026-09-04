@@ -77,7 +77,10 @@ class AiDelegation(models.Model):
     @api.model
     def effective_for(self, user, capability, model=None, res_id=None):
         domain = [
-            ("delegatee_id", "=", user.id), ("capability", "=", capability),
+            ("delegatee_id", "=", user.id),
+            ("delegator_id.company_ids", "in", self.env.company.id),
+            ("delegatee_id.company_ids", "in", self.env.company.id),
+            ("capability", "=", capability),
             ("active", "=", True), ("revoked_at", "=", False),
             ("starts_at", "<=", fields.Datetime.now()),
             ("expires_at", ">=", fields.Datetime.now()),

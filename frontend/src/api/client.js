@@ -1,3 +1,22 @@
+let csrfToken = "";
+
+function readCsrfCookie() {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(/(?:^|; )ai_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function rememberSession(data) {
+  if (data && data.csrf_token) csrfToken = data.csrf_token;
+  return data;
+}
+
+function csrfHeader(method) {
+  return method === "GET" || method === "HEAD" || method === "OPTIONS"
+    ? {}
+    : { "X-CSRF-Token": csrfToken || readCsrfCookie() };
+}
+
 export function getApiKey() { return ""; }
 export function setApiKey(_key) {}
 export function clearApiKey() {}
@@ -13,8 +32,9 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
     headers["Content-Type"] = "application/json";
     fetchBody = JSON.stringify(body);
   }
+  Object.assign(headers, csrfHeader(method));
   const resp = await fetch(path, { method, headers, body: fetchBody, credentials: "include" });
-  const data = await resp.json().catch(() => ({}));
+  const data = rememberSession(await resp.json().catch(() => ({})));
   if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status);
   return data;
 }
@@ -42,7 +62,7 @@ export function streamChat(payload, handlers) {
   const { onThinking, onDelta, onDone, onError, signal } = handlers || {};
   return fetch("/api/chat/stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...csrfHeader("POST") },
     body: JSON.stringify(payload),
     credentials: "include",
     signal,

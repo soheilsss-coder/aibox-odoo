@@ -34,11 +34,12 @@ import os
 from odoo import fields as odoo_fields
 from odoo import http
 from odoo.http import request
-from odoo.exceptions import AccessError, AccessDenied, UserError
+from odoo.exceptions import AccessError, AccessDenied, UserError, ValidationError
 
 from odoo.addons.ai_gateway.controllers.gateway import (
     _authenticate,
     _check_rate_limit,
+    _scoped_user_env,
     _json_response,
     _cors_preflight_response,
     _audit,
@@ -49,6 +50,7 @@ from odoo.addons.ai_gateway.controllers.gateway import (
     _CORS_HEADERS,
 )
 from odoo.addons.ai_gateway.controllers.file_policy import validate_upload, MAX_UPLOAD_BYTES
+from odoo.addons.ai_gateway.controllers.output_firewall import scrub_public_text
 from werkzeug.wrappers import Response
 from urllib.parse import quote as _quote_filename
 
@@ -76,7 +78,7 @@ def _require_auth():
         return None, _json_response({"error": "invalid or missing API key"}, status=401)
     if not _check_rate_limit(api_key):
         return None, _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
-    return request.env(user=user.id), None
+    return _scoped_user_env(user), None
 
 
 def _require_privileged():
@@ -105,6 +107,14 @@ def _read_json_body():
     if not isinstance(body, dict):
         return None, _json_response({"error": "JSON body must be an object"}, status=400)
     return body, None
+
+
+def _public_capabilities(capabilities):
+    """Expose product-level facts, never internal capability/model names."""
+    return [{
+        "operation": capability.operation,
+        "risk_level": capability.risk_level,
+    } for capability in capabilities]
 
 
 class AiSemanticApiController(http.Controller):
@@ -172,26 +182,43 @@ class AiSemanticApiController(http.Controller):
         if "ai.gateway.session" not in env:
             return _json_response({"error": "secure session service is not installed"}, status=503)
         user = env["res.users"].sudo().browse(uid)
-        token, expires = env["ai.gateway.session"].sudo().issue(user)
+        if not user or not user.active:
+            return _json_response({"error": "account is inactive"}, status=401)
+        env = _scoped_user_env(user)
+        token, expires, csrf_token = env["ai.gateway.session"].sudo().issue(user)
         response = _json_response({
             "authenticated": True,
             "user": {"id": user.id, "name": user.name, "login": user.login},
             "expires_at": expires,
+            # This is a non-secret double-submit value.  The session cookie
+            # remains HttpOnly; returning the CSRF value also supports a
+            # separately hosted frontend that cannot read the API cookie.
+            "csrf_token": csrf_token,
         })
-        response.set_cookie("ai_session", token, max_age=8 * 3600, httponly=True, secure=os.environ.get("AI_GATEWAY_COOKIE_SECURE", "1" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "0") == "1", samesite=os.environ.get("AI_GATEWAY_COOKIE_SAMESITE", "None" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "Lax"), path="/")
+        secure = os.environ.get("AI_GATEWAY_COOKIE_SECURE", "1" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "0") == "1"
+        samesite = os.environ.get("AI_GATEWAY_COOKIE_SAMESITE", "None" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "Lax")
+        response.set_cookie("ai_session", token, max_age=8 * 3600, httponly=True, secure=secure, samesite=samesite, path="/")
+        response.set_cookie("ai_csrf", csrf_token, max_age=8 * 3600, httponly=False, secure=secure, samesite=samesite, path="/")
         return response
 
     @http.route("/api/logout", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])
     def logout(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
             return _cors_preflight_response()
+        # Logout is also a state-changing cookie operation.  Requiring the
+        # same CSRF proof prevents a third-party page from silently logging a
+        # user out and keeps all session mutations on one contract.
+        env, err = _require_auth()
+        if err:
+            return err
         token = request.httprequest.cookies.get("ai_session", "").strip()
-        if token and "ai.gateway.session" in request.env:
-            rec = request.env["ai.gateway.session"].sudo().authenticate_token(token)
+        if token and "ai.gateway.session" in env:
+            rec = env["ai.gateway.session"].sudo().authenticate_token(token)
             if rec:
                 rec.revoke()
         response = _json_response({"authenticated": False})
         response.delete_cookie("ai_session", path="/")
+        response.delete_cookie("ai_csrf", path="/")
         return response
 
     @http.route("/api/session/rotate", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])
@@ -201,16 +228,32 @@ class AiSemanticApiController(http.Controller):
         token = request.httprequest.cookies.get("ai_session", "").strip()
         if not token or "ai.gateway.session" not in request.env:
             return _json_response({"error": "not_authenticated"}, status=401)
-        _, new_token, expires = request.env["ai.gateway.session"].sudo().rotate(
+        # Rotation is a mutation and therefore must prove the current
+        # session's CSRF token before the old token is replaced.
+        csrf_token = request.httprequest.headers.get("X-CSRF-Token", "")
+        current = request.env["ai.gateway.session"].sudo().authenticate_token(
+            token, csrf_token=csrf_token, require_csrf=True,
+        )
+        if not current:
+            return _json_response({"error": "invalid_or_expired_session"}, status=401)
+        _, new_token, expires, new_csrf_token = request.env["ai.gateway.session"].sudo().rotate(
             token, user_agent=request.httprequest.headers.get("User-Agent"), ttl_hours=8
         )
         if not new_token:
             return _json_response({"error": "invalid_or_expired_session"}, status=401)
-        response = _json_response({"authenticated": True, "expires_at": expires})
+        response = _json_response({
+            "authenticated": True, "expires_at": expires,
+            "csrf_token": new_csrf_token,
+        })
+        secure = os.environ.get("AI_GATEWAY_COOKIE_SECURE", "1") == "1"
+        samesite = os.environ.get("AI_GATEWAY_COOKIE_SAMESITE", "Lax")
         response.set_cookie(
             "ai_session", new_token, max_age=8 * 3600, httponly=True,
-            secure=os.environ.get("AI_GATEWAY_COOKIE_SECURE", "1") == "1",
-            samesite=os.environ.get("AI_GATEWAY_COOKIE_SAMESITE", "Lax"), path="/"
+            secure=secure, samesite=samesite, path="/"
+        )
+        response.set_cookie(
+            "ai_csrf", new_csrf_token, max_age=8 * 3600, httponly=False,
+            secure=secure, samesite=samesite, path="/"
         )
         return response
 
@@ -226,21 +269,22 @@ class AiSemanticApiController(http.Controller):
         if err:
             return err
         user = env.user
-        employee = env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
+        employee = env["hr.employee"].search([
+            ("user_id", "=", user.id), ("company_id", "=", env.company.id),
+        ], limit=1)
         capabilities = env["ai.control.authorization"].effective_capabilities(user=user) if "ai.control.authorization" in env else self.env["ai.control.capability"].browse()
-        capability_names = sorted(capabilities.mapped("name"))
+        can_manage_documents = bool(user.has_group("base.group_system"))
         return _json_response({
             "id": user.id,
             "name": user.name,
             "login": user.login,
             "company": env.company.name,
             "is_manager": bool(employee.child_ids) if employee else False,
-            # Phase 7: lets the frontend decide whether to show the
-            # "Admin Console" nav item at all - the backend still
-            # re-checks this on every /api/admin/* call regardless,
-            # this is only for not showing a link that would 403.
-            "is_admin": _is_privileged(env, user),  # legacy informational field; never use for authorization
-            "capabilities": capability_names,
+            # The frontend may use these feature flags for navigation. The
+            # backend still re-checks every admin/document action server-side.
+            "is_admin": _is_privileged(env, user),
+            "can_manage_documents": can_manage_documents,
+            "capabilities": _public_capabilities(capabilities),
         })
 
     # ------------------------------------------------------------
@@ -261,7 +305,9 @@ class AiSemanticApiController(http.Controller):
         return self._hr_leaves_create(env)
 
     def _hr_leaves_list(self, env):
-        employee = env["hr.employee"].search([("user_id", "=", env.user.id)], limit=1)
+        employee = env["hr.employee"].search([
+            ("user_id", "=", env.user.id), ("company_id", "=", env.company.id),
+        ], limit=1)
         if not employee:
             return _json_response({"leaves": []})
         leaves = env["hr.leave"].search([("employee_id", "=", employee.id)], order="date_from desc")
@@ -277,7 +323,9 @@ class AiSemanticApiController(http.Controller):
         if not date_from or not date_to:
             return _json_response({"error": "date_from and date_to are required"}, status=400)
 
-        employee = env["hr.employee"].search([("user_id", "=", env.user.id)], limit=1)
+        employee = env["hr.employee"].search([
+            ("user_id", "=", env.user.id), ("company_id", "=", env.company.id),
+        ], limit=1)
         if not employee:
             return _json_response({"error": "no employee record linked to this user"}, status=400)
 
@@ -509,7 +557,9 @@ class AiSemanticApiController(http.Controller):
             if not department.exists():
                 return _json_response({"error": "invalid department_id"}, status=400)
             if not _is_privileged(env, env.user):
-                employee = env["hr.employee"].search([("user_id", "=", env.user.id)], limit=1)
+                employee = env["hr.employee"].search([
+                    ("user_id", "=", env.user.id), ("company_id", "=", env.company.id),
+                ], limit=1)
                 if not employee.department_id or department.id != employee.department_id.id:
                     return _json_response(
                         {"error": "you may only restrict a document to your own department"}, status=403)
@@ -547,7 +597,9 @@ class AiSemanticApiController(http.Controller):
         env, err = _require_auth()
         if err:
             return err
-        employee = env["hr.employee"].search([("user_id", "=", env.user.id)], limit=1)
+        employee = env["hr.employee"].search([
+            ("user_id", "=", env.user.id), ("company_id", "=", env.company.id),
+        ], limit=1)
         if _is_privileged(env, env.user):
             departments = env["hr.department"].search([])
         else:
@@ -740,8 +792,8 @@ class AiSemanticApiController(http.Controller):
                 "name": r.name,
                 "comment": r.comment or "",
                 "implied_roles": [g.name for g in r.implied_ids],
-                "members": [{"id": u.id, "name": u.name, "login": u.login} for u in r.users],
-                "member_count": len(r.users),
+                "members": [{"id": u.id, "name": u.name, "login": u.login} for u in r.users.filtered(lambda u: env.company in u.company_ids)],
+                "member_count": len(r.users.filtered(lambda u: env.company in u.company_ids)),
             }
             for r in roles
         ]})
@@ -758,10 +810,14 @@ class AiSemanticApiController(http.Controller):
         if err:
             return err
         role_category = env.ref("ai_business_tools.role_category", raise_if_not_found=False)
-        users = env["res.users"].sudo().search([("share", "=", False)], order="name")
+        users = env["res.users"].sudo().search([
+            ("share", "=", False), ("company_ids", "in", env.company.id),
+        ], order="name")
         result = []
         for u in users:
-            employee = env["hr.employee"].sudo().search([("user_id", "=", u.id)], limit=1)
+            employee = env["hr.employee"].sudo().search([
+                ("user_id", "=", u.id), ("company_id", "=", env.company.id),
+            ], limit=1)
             roles = u.groups_id.filtered(lambda g: role_category and g.category_id == role_category) \
                 if role_category else env["res.groups"]
             result.append({
@@ -789,7 +845,9 @@ class AiSemanticApiController(http.Controller):
         if request.httprequest.method == "POST":
             return self._admin_access_grant_create(env)
 
-        grants = env["ai.gateway.access.grant"].sudo().search([], order="create_date desc")
+        grants = env["ai.gateway.access.grant"].sudo().search([
+            ("company_id", "=", env.company.id),
+        ], order="create_date desc")
         return _json_response({"grants": [self._serialize_grant(g) for g in grants]})
 
     def _admin_access_grant_create(self, env):
@@ -804,23 +862,52 @@ class AiSemanticApiController(http.Controller):
         if missing:
             return _json_response({"error": f"missing required fields: {', '.join(missing)}"}, status=400)
 
-        to_user = env["res.users"].sudo().browse(to_user_id)
-        group = env["res.groups"].sudo().browse(group_id)
-        if not to_user.exists() or not group.exists():
+        try:
+            to_user = env["res.users"].sudo().browse(int(to_user_id)).exists()
+            group = env["res.groups"].sudo().browse(int(group_id)).exists()
+        except (TypeError, ValueError):
             return _json_response({"error": "invalid to_user_id or group_id"}, status=400)
+        if not to_user or not group or env.company not in to_user.company_ids:
+            return _json_response({"error": "target user is not in the current company"}, status=403)
+        group_xmlid = group.get_external_id().get(group.id, "") or ""
+        if not group_xmlid.startswith("ai_business_tools.role_"):
+            return _json_response({"error": "only product roles may be granted"}, status=403)
 
         delegated_from_id = payload.get("delegated_from_id") or False
-        grant = env["ai.gateway.access.grant"].sudo().create({
-            "to_user_id": to_user.id,
-            "group_id": group.id,
-            "delegated_from_id": delegated_from_id,
-            "start_date": payload.get("start_date") or str(odoo_fields.Date.context_today(env.user)),
-            "expires_on": expires_on,
-            "reason": payload.get("reason", ""),
-            "granted_by_id": env.user.id,
-        })
+        if delegated_from_id:
+            try:
+                delegated_from = env["res.users"].sudo().browse(int(delegated_from_id)).exists()
+            except (TypeError, ValueError):
+                delegated_from = env["res.users"]
+            if not delegated_from or env.company not in delegated_from.company_ids:
+                return _json_response({"error": "delegator is not in the current company"}, status=403)
+            delegated_from_id = delegated_from.id
+        try:
+            start_date = odoo_fields.Date.from_string(
+                payload.get("start_date") or str(odoo_fields.Date.context_today(env.user))
+            )
+            expiry_date = odoo_fields.Date.from_string(str(expires_on))
+        except (TypeError, ValueError):
+            return _json_response({"error": "dates must use YYYY-MM-DD"}, status=400)
+        today = odoo_fields.Date.context_today(env.user)
+        if not expiry_date or expiry_date < today or expiry_date < start_date:
+            return _json_response({"error": "expires_on must be today or later and not before start_date"}, status=400)
+        reason = str(payload.get("reason") or "Admin console access grant").strip()[:1000]
+        try:
+            grant = env["ai.gateway.access.grant"].sudo().create({
+                "company_id": env.company.id,
+                "to_user_id": to_user.id,
+                "group_id": group.id,
+                "delegated_from_id": delegated_from_id,
+                "start_date": start_date,
+                "expires_on": expiry_date,
+                "reason": reason,
+                "granted_by_id": env.user.id,
+            })
+        except (AccessError, UserError, ValidationError):
+            return _json_response({"error": "access grant could not be created"}, status=409)
         _audit(env, env.user.id, "semantic_api", "admin.access_grants.create",
-               {"to_user": to_user.name, "group": group.name, "expires_on": expires_on}, success=True)
+               {"to_user": to_user.name, "group": group.name, "expires_on": str(expiry_date)}, success=True)
         return _json_response(self._serialize_grant(grant), status=201)
 
     @http.route("/api/admin/access-grants/<int:grant_id>/revoke", type="http", auth="none", csrf=False,
@@ -831,10 +918,12 @@ class AiSemanticApiController(http.Controller):
         env, err = _require_privileged()
         if err:
             return err
-        grant = env["ai.gateway.access.grant"].sudo().browse(grant_id)
-        if not grant.exists():
+        grant = env["ai.gateway.access.grant"].sudo().search([
+            ("id", "=", grant_id), ("company_id", "=", env.company.id),
+        ], limit=1)
+        if not grant:
             return _json_response({"error": "not found"}, status=404)
-        grant.action_revoke_now()
+        grant.with_context(authorization_actor_id=env.user.id).action_revoke_now()
         _audit(env, env.user.id, "semantic_api", "admin.access_grants.revoke",
                {"grant_id": grant_id}, success=True)
         return _json_response({"status": "revoked"})
@@ -889,10 +978,10 @@ class AiSemanticApiController(http.Controller):
         risks = env["ai.gateway.tool.risk"].sudo().search([], order="risk_level desc, tool_name")
         tools = [
             {
-                "name": r.tool_name,
+                "name": scrub_public_text(r.tool_name),
                 "risk_level": r.risk_level,
-                "requires_approval_from": r.approver_group_id.name if r.approver_group_id else None,
-                "description": r.description or "",
+                "requires_approval_from": scrub_public_text(r.approver_group_id.name) if r.approver_group_id else None,
+                "description": scrub_public_text(r.description or ""),
             }
             for r in risks
         ]
@@ -935,8 +1024,19 @@ class AiSemanticApiController(http.Controller):
             return err
         if request.httprequest.method == "GET":
             company = env.company.sudo()
-            report_url = env["ir.config_parameter"].sudo().get_param("ai.brand.domain", "")
-            brand_name = env["ir.config_parameter"].sudo().get_param("ai.brand.name", "") or company.report_footer or ""
+            params = env["ir.config_parameter"].sudo()
+            # ir.config_parameter is global, so customer overrides use a
+            # company-qualified key. Keep the unqualified value only as a
+            # one-tenant/bootstrap fallback; an admin in company A must not
+            # overwrite the brand shown to company B.
+            report_url = params.get_param(
+                "ai.brand.domain.%s" % company.id,
+                params.get_param("ai.brand.domain", ""),
+            )
+            brand_name = params.get_param(
+                "ai.brand.name.%s" % company.id,
+                params.get_param("ai.brand.name", ""),
+            ) or company.report_footer or ""
             return _json_response({
                 "brand_name": brand_name,
                 "company_name": company.name or "",
@@ -948,14 +1048,17 @@ class AiSemanticApiController(http.Controller):
         if body_err:
             return body_err
         company = env.company.sudo()
+        params = env["ir.config_parameter"].sudo()
         values = {}
         if "brand_name" in payload:
-            values["report_footer"] = payload["brand_name"]
-            env["ir.config_parameter"].sudo().set_param("ai.brand.name", payload["brand_name"])
+            brand_name = str(payload["brand_name"] or "").strip()[:200]
+            values["report_footer"] = brand_name
+            params.set_param("ai.brand.name.%s" % company.id, brand_name)
         if values:
             company.write(values)
         if "brand_domain" in payload:
-            env["ir.config_parameter"].sudo().set_param("ai.brand.domain", payload["brand_domain"])
+            brand_domain = str(payload["brand_domain"] or "").strip()[:500]
+            params.set_param("ai.brand.domain.%s" % company.id, brand_domain)
         _audit(env, env.user.id, "semantic_api", "admin.branding.update", payload, success=True)
         return _json_response({"status": "updated"})
 
@@ -1088,10 +1191,10 @@ class AiControlPlaneSemanticController(_http.Controller):
         if err:
             return err
         caps = env["ai.control.authorization"].effective_capabilities(user=env.user)
-        return _json_response({"capabilities": [{
-            "name": c.name, "module": c.module_name, "operation": c.operation,
-            "risk_level": c.risk_level, "model": c.model_name,
-        } for c in caps]})
+        return _json_response({
+            "capabilities": _public_capabilities(caps),
+            "is_admin": _is_privileged(env, env.user),
+        })
 
     @http.route("/api/integrations", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def integrations(self, **kwargs):

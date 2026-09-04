@@ -194,7 +194,7 @@ export default function DocumentCenterPage({ user }) {
                 {d.owner ? `مالک: ${d.owner}` : ""} {d.file_name ? `— ${d.file_name}` : ""}
               </div>
             </div>
-            {(d.is_mine || (user && (user.capabilities || []).includes("document.admin.manage"))) && (
+            {(d.is_mine || user?.can_manage_documents) && (
               <Button variant="danger" size="sm" onClick={() => handleDelete(d.id)}>حذف</Button>
             )}
           </div>

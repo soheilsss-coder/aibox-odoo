@@ -316,17 +316,23 @@ class AiUnifiedAdapterService(models.AbstractModel):
         Model = self._model(operation.model_name)
         safe_fields = [
             name for name in fields_json
-            if isinstance(name, str) and (name == 'id' or name in Model._fields)
-            and (name == 'id' or Model._fields[name].type not in ('binary', 'html', 'one2many', 'many2many'))
+            if isinstance(name, str)
+            and name in {'display_name', 'name', 'ref', 'code', 'state', 'active',
+                         'date', 'date_start', 'date_end', 'write_date'}
+            and name in Model._fields
+            and Model._fields[name].type not in (
+                'binary', 'html', 'one2many', 'many2many', 'many2one',
+            )
         ]
         if not safe_fields:
             raise UserError('no safe discovered fields are available')
         records = Model.search([], order='id desc', limit=limit)
+        raw_rows = records.read(safe_fields)
+        rows = [{key: value for key, value in row.items() if key != 'id'} for row in raw_rows]
+        # Model names, ORM field names and internal integration metadata are
+        # control-plane data, never an AI/customer response.
         return {
-            'status': 'ok', 'model': operation.model_name,
-            'fields': safe_fields, 'count': len(records),
-            'records': records.read(safe_fields),
-            'integration_level': 'baseline-only',
+            'status': 'ok', 'count': len(rows), 'records': rows,
         }
 
     _MODULE_READ_MODELS = {

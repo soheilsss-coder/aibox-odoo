@@ -139,16 +139,21 @@ class CustomerSsoController(http.Controller):
         } for group in groups])
 
     def _issue_session(self, provider, user):
-        raw, expires = request.env["ai.gateway.session"].sudo().issue(
+        raw, expires, csrf_token = request.env["ai.gateway.session"].sudo().issue(
             user, user_agent=request.httprequest.headers.get("User-Agent"))
         response = _json({
             "authenticated": True,
             "user": {"id": user.id, "name": user.name, "login": user.login},
             "expires_at": expires,
             "company_id": provider.company_id.id,
+            "csrf_token": csrf_token,
         })
         response.set_cookie(
             "ai_session", raw, max_age=8 * 3600, httponly=True,
+            secure=True, samesite="None", path="/",
+        )
+        response.set_cookie(
+            "ai_csrf", csrf_token, max_age=8 * 3600, httponly=False,
             secure=True, samesite="None", path="/",
         )
         return response

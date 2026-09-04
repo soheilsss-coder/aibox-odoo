@@ -14,8 +14,9 @@
 # then hand off to the pure-HTTP script and clean up.
 set -euo pipefail
 
-ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
-ODOO_CONF="${ODOO_CONF:-/opt/odoo.conf}"
+ODOO_BIN="${ODOO_BIN:-/opt/odoo/src/odoo/odoo-bin}"
+ODOO_PYTHON="${ODOO_PYTHON:-/opt/odoo/venv/bin/python}"
+ODOO_CONF="${ODOO_CONF:-/etc/odoo/odoo.conf}"
 ODOO_DB="${ODOO_DB:-company_ai}"
 BASE_URL="${AI_GATEWAY_BASE_URL:-http://localhost:8069}"
 
@@ -24,7 +25,7 @@ TMP_KEYS=$(mktemp)
 trap 'rm -f "$TMP_RAW" "$TMP_KEYS"' EXIT
 
 echo "Fetching demo users' real API keys..."
-"$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" > "$TMP_RAW" 2>&1 <<'PYEOF'
+"$ODOO_PYTHON" "$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" > "$TMP_RAW" 2>&1 <<'PYEOF'
 import json
 Key = env["ai.gateway.api.key"].sudo()
 
@@ -33,8 +34,10 @@ def key_for(login):
     user = env["res.users"].search([("login", "=", login)], limit=1)
     if not user:
         return None
-    rec = Key.search([("user_id", "=", user.id)], limit=1)
-    return rec.key if rec else None
+    # Plaintext keys are intentionally never stored.  The test harness gets
+    # one short-lived rotated secret directly from create_key(), then removes
+    # it with the temporary file trap after the HTTP run.
+    return Key.create_key(user, scope="evaluation")
 
 
 print("EVAL_KEYS_JSON=" + json.dumps({

@@ -183,6 +183,25 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("assignment_model is not None", authorization)
         self.assertIn("grant_model is not None", rag)
 
+    def test_admin_and_authorization_surfaces_are_current_company_scoped(self):
+        semantic = (ADDONS / "ai_semantic_api/controllers/semantic_api.py").read_text()
+        gateway = (ADDONS / "ai_gateway/controllers/gateway.py").read_text()
+        grants = (ADDONS / "ai_business_tools/models/access_grant.py").read_text()
+        grant_rule = (ADDONS / "ai_business_tools/security/access_grant_role_rules.xml").read_text()
+        assignments = (ADDONS / "ai_customer_plane/models/role_assignment.py").read_text()
+        self.assertIn("_scoped_user_env(user)", semantic)
+        self.assertIn('("company_id", "=", env.company.id)', semantic)
+        self.assertIn("allowed_company_ids=[user.company_id.id]", gateway)
+        self.assertIn('("company_id", "=", self.env.company.id)', grants)
+        self.assertIn("('company_id', 'in', company_ids)", grant_rule)
+        self.assertIn("self.env.company.id", assignments)
+
+    def test_rag_jobs_have_a_durable_lease_and_atomic_claim(self):
+        source = (ADDONS / "ai_rag/models/index_job.py").read_text()
+        self.assertIn("lease expired", source)
+        self.assertIn("FOR UPDATE SKIP LOCKED", source)
+        self.assertIn("attempts >= 3", source)
+
     def test_experience_model_presence_checks_do_not_treat_empty_recordsets_as_missing(self):
         experience = (ADDONS / "ai_experience/controllers/experience_api.py").read_text()
         self.assertNotIn("if not model:", experience)
@@ -238,7 +257,7 @@ class SourceContracts(unittest.TestCase):
 
     def test_release_manifest_matches_current_entries(self):
         manifest = json.loads((ROOT / "SHA256MANIFEST.json").read_text())
-        self.assertEqual(len(manifest), 411)
+        self.assertEqual(len(manifest), 419)
         missing = [path for path in manifest if not (ROOT / path).is_file()]
         self.assertEqual(missing, [])
         mismatched = [

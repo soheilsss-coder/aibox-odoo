@@ -18,6 +18,7 @@
   <record id="cap_pos_order_create" model="ai.control.capability"><field name="name">pos.order.create</field><field name="module_name">point_of_sale</field><field name="operation">create</field><field name="risk_level">2</field><field name="model_name">pos.order</field><field name="source">adapter</field></record>
   <record id="cap_generic_read" model="ai.control.capability">
     <field name="name">odoo.generic.read</field><field name="module_name">ai_integration</field>
-    <field name="operation">read</field><field name="risk_level">0</field><field name="source">control_plane</field>
+    <field name="operation">read</field><field name="risk_level">0</field><field name="source">manual</field>
+    <field name="group_ids" eval="[(4, ref('ai_business_tools.role_system_admin'))]"/>
   </record>
 </odoo>

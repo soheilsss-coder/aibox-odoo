@@ -40,7 +40,7 @@ class AiRoleAssignment(models.Model):
             if not expected:
                 raise ValidationError("Role assignment source fields do not match source type.")
             module = getattr(rec.role_group_id, "module", "") or ""
-            xmlid = rec.role_group_id.get_external_id().get(rec.role_group_id.id, "")
+            xmlid = rec.role_group_id.get_external_id().get(rec.role_group_id.id, "") or ""
             if module != "ai_business_tools" and not xmlid.startswith("ai_business_tools."):
                 raise ValidationError("Only product-defined roles may be assigned.")
 
@@ -49,18 +49,19 @@ class AiRoleAssignment(models.Model):
         now = fields.Datetime.now()
         groups = self.env["res.groups"].browse()
         domain = [
-            ("active", "=", True), ("company_id", "in", [user.company_id.id, False]),
+            ("active", "=", True), ("company_id", "in", [self.env.company.id, False]),
             ("starts_at", "<=", now), "|", ("expires_at", "=", False), ("expires_at", ">=", now),
         ]
+        employee = self.env["hr.employee"].sudo().search([
+            ("user_id", "=", user.id), ("company_id", "=", self.env.company.id),
+        ], limit=1) if "hr.employee" in self.env else False
         for rec in self.sudo().search(domain):
             if rec.source == "direct" and rec.user_id == user:
                 groups |= rec.role_group_id
             elif rec.source == "department":
-                employee = user.employee_id
                 if employee and employee.department_id == rec.department_id:
                     groups |= rec.role_group_id
             elif rec.source == "position":
-                employee = user.employee_id
                 if employee and employee.job_id == rec.position_id:
                     groups |= rec.role_group_id
             elif rec.source in ("temporary", "delegated") and rec.grant_id and rec.grant_id.to_user_id == user:

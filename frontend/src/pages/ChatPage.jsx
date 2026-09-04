@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { streamChat, analyzeFile, ApiError } from "../api/client.js";
-import { Card, Button, Alert, EmptyState, Spinner } from "../components";
+import { Card, Button, Alert, EmptyState, Spinner, TextArea } from "../components";
 
 export default function ChatPage({ user }) {
   const [messages, setMessages] = useState([]);

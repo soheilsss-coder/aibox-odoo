@@ -253,13 +253,12 @@ class AiDocumentChunk(models.Model):
 
         return [
             {
-                "document_id": row["document_id"],
+                # A customer citation needs a business document label and
+                # excerpt, not local record ids, ORM names, or index metadata.
                 "document_name": doc_names.get(row["document_id"], ""),
                 "excerpt": scrub_value(row["content"] or ""),
                 "similarity": round(float(row["vector_score"] or 0.0), 4),
                 "lexical_score": round(float(row["lexical_score"] or 0.0), 4),
-                "retrieval_mode": retrieval_mode,
-                "index_version": RAG_INDEX_VERSION,
             }
             for row in rows
         ]

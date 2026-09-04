@@ -105,6 +105,10 @@ class AiIntegrationDiscovery(models.Model):
         digest = hashlib.sha256((module_name + ":" + model_name).encode()).hexdigest()[:16]
         return "discovered.%s.read" % digest
 
+    def _system_admin_group_commands(self):
+        group = self.env.ref("ai_business_tools.role_system_admin", raise_if_not_found=False)
+        return [(6, 0, [group.id])] if group else []
+
     def _ensure_discovered_adapter(self, module, label):
         Adapter = self.env["ai.integration.adapter"].sudo()
         adapter = Adapter.for_module(module)
@@ -134,7 +138,15 @@ class AiIntegrationDiscovery(models.Model):
                 "risk_level": 0,
                 "model_name": model_name,
                 "source": "discovered",
+                # Automatic inventory must not become an employee-wide ORM
+                # read grant.  A privileged operator can review the inventory;
+                # business users need a source-reviewed adapter instead.
+                "group_ids": self._system_admin_group_commands(),
             })
+        elif capability.source == "discovered":
+            # Upgrade existing databases that were discovered before this
+            # restriction was added.
+            capability.write({"group_ids": self._system_admin_group_commands()})
         fields_json = json.dumps(self._safe_field_names(model_name), ensure_ascii=False)
         tool_name = self._operation_key(module_name, model_name)
         operation = Operation.search([("tool_name", "=", tool_name)], limit=1)
@@ -262,7 +274,10 @@ class AiIntegrationDiscovery(models.Model):
                                 "risk_level": 0,
                                 "model_name": model_name,
                                 "source": "discovered",
+                                "group_ids": self._system_admin_group_commands(),
                             })
+                        elif generic.source == "discovered":
+                            generic.write({"group_ids": self._system_admin_group_commands()})
                 except Exception as exc:  # noqa: BLE001
                     _logger.exception("Could not create discovered capability for %s", model_name)
                     onboarding_error = onboarding_error or str(exc)

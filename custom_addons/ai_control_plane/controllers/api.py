@@ -3,7 +3,7 @@ import json
 from odoo import http
 from odoo.http import request
 
-from odoo.addons.ai_gateway.controllers.gateway import _authenticate, _check_rate_limit
+from odoo.addons.ai_gateway.controllers.gateway import _authenticate, _check_rate_limit, _scoped_user_env
 
 
 class AiControlPlaneController(http.Controller):
@@ -14,9 +14,12 @@ class AiControlPlaneController(http.Controller):
             return request.make_json_response({"error": "rate limited"}, status=429)
         if not user or not _check_rate_limit(key):
             return request.make_json_response({"error": "unauthorized"}, status=401)
-        env = request.env(user=user.id)
+        env = _scoped_user_env(user)
         caps = env["ai.control.capability.resolver"].effective_capabilities(user)
-        return request.make_json_response({"capabilities": caps.mapped(lambda c: c.name)})
+        return request.make_json_response({
+            "capability_count": len(caps),
+            "operations": sorted(set(c.operation for c in caps)),
+        })
 
     # Namespaced under /api/control-plane to avoid colliding with the
     # semantic_api admin surface that also exposes /api/integrations
@@ -30,7 +33,7 @@ class AiControlPlaneController(http.Controller):
             return request.make_json_response({"error": "rate limited"}, status=429)
         if not user or not _check_rate_limit(key):
             return request.make_json_response({"error": "unauthorized"}, status=401)
-        env = request.env(user=user.id)
+        env = _scoped_user_env(user)
         modules = env["ai.control.module"].search([("state", "=", "installed")])
         privileged = user.has_group("base.group_system")
         rows = []
@@ -71,6 +74,6 @@ class AiControlPlaneController(http.Controller):
             return {"error": "unauthorized"}
         if not user.has_group("base.group_system"):
             return {"error": "access_denied"}
-        env = request.env(user=user.id)
+        env = _scoped_user_env(user)
         env["ai.control.module"].sync_installed_modules()
         return {"status": "ok"}

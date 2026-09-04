@@ -45,8 +45,10 @@ BUZZ_BIN_DIR="${BUZZ_DIR}/target/release"
 [ -x "${BUZZ_BIN_DIR}/buzz-acp" ] || BUZZ_BIN_DIR="${BUZZ_DIR}/target/debug"
 
 echo "=== [1/5] Provisioning one low-privilege bot identity per department in Odoo ==="
-source /opt/odoo-venv/bin/activate 2>/dev/null || true
-/opt/odoo/odoo-bin shell -c /opt/odoo.conf -d company_ai < "${SCRIPT_DIR}/20_provision_buzz_bot_users.py"
+ODOO_PYTHON="${ODOO_PYTHON:-/opt/odoo/venv/bin/python}"
+ODOO_BIN="${ODOO_BIN:-/opt/odoo/src/odoo/odoo-bin}"
+ODOO_CONF="${ODOO_CONF:-/etc/odoo/odoo.conf}"
+"$ODOO_PYTHON" "$ODOO_BIN" shell -c "$ODOO_CONF" -d "${ODOO_DB:-company_ai}" < "${SCRIPT_DIR}/20_provision_buzz_bot_users.py"
 
 if [ ! -f "$CSV_PATH" ]; then
   echo "ERROR: ${CSV_PATH} was not created - check the output above for errors."

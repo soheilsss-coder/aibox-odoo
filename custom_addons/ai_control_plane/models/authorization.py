@@ -72,9 +72,9 @@ class AiAuthorizationEngine(models.AbstractModel):
                        (hasattr(record, "user_id") and record.user_id and record.user_id.id == user.id))
                 if own: return True
             elif policy.scope == "company" and "company_id" in record._fields:
-                if not record.company_id or record.company_id.id == user.company_id.id: return True
+                if record.company_id and record.company_id.id == self.env.company.id: return True
             elif policy.scope == "branch" and "branch_id" in record._fields:
-                if record.branch_id and record.branch_id.id == user.company_id.id: return True
+                if record.branch_id and record.branch_id.id == self.env.company.id: return True
             elif policy.scope == "project" and "ai.control.relation" in self.env:
                 if any(self.env["ai.control.relation"].allows(user, rel, record) for rel in ("owner", "manager", "member", "viewer", "editor", "delegate")): return True
             elif policy.scope == "folder" and "ai.control.relation" in self.env:

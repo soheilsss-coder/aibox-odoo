@@ -151,13 +151,15 @@
     </record>
     <record id="risk_fill_document_template" model="ai.gateway.tool.risk">
         <field name="tool_name">fill_document_template</field>
-        <field name="risk_level">1</field>
-        <field name="description">Renders an uploaded docx template with HR/payroll field values; output kept as ir.attachment</field>
+        <field name="risk_level">2</field>
+        <field name="capability_name">document.template.fill</field>
+        <field name="description">Renders an uploaded docx template with HR/payroll field values; output kept as an owner-scoped attachment</field>
     </record>
     <record id="risk_generate_qweb_report" model="ai.gateway.tool.risk">
         <field name="tool_name">generate_qweb_report</field>
-        <field name="risk_level">1</field>
-        <field name="description">Triggers an allowlisted QWeb report render; output kept as ir.attachment</field>
+        <field name="risk_level">2</field>
+        <field name="capability_name">document.report.generate</field>
+        <field name="description">Triggers an allowlisted QWeb report render; output kept as an owner-scoped attachment</field>
     </record>
     <record id="risk_create_scheduled_command" model="ai.gateway.tool.risk">
         <field name="tool_name">create_scheduled_command</field>

@@ -43,8 +43,8 @@ class CustomerControlPlaneApi(http.Controller):
         reviews=request.env["ai.customer.access.review"].search_count([("scope_company_id","=",company.id)])
         sso=request.env["ai.customer.sso.provider"].search([("company_id","=",company.id)])
         scim=request.env["ai.customer.scim.token"].search_count([("company_id","=",company.id),("active","=",True)])
-        departments=request.env["hr.department"].search_count([])
-        positions=request.env["hr.job"].search_count([])
+        departments=request.env["hr.department"].search_count([("company_id", "=", company.id)])
+        positions=request.env["hr.job"].search_count([("company_id", "=", company.id)])
         return {"users": request.env["res.users"].search_count([("company_ids","in",company.id)]),
                 "departments": departments, "positions": positions,
                 "designers": designers, "access_reviews": reviews,

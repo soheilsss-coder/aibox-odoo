@@ -15,6 +15,11 @@ from odoo.addons.ai_semantic_api.controllers.semantic_api import _require_auth, 
 from odoo.addons.ai_gateway.controllers.gateway import _audit, _cors_preflight_response
 from odoo.addons.ai_gateway.controllers.file_policy import validate_upload, MAX_UPLOAD_BYTES
 from odoo.addons.ai_gateway.controllers.output_firewall import scrub_public_text
+from odoo.addons.ai_experience.models.artifact_policy import (
+    MAX_ARTIFACT_REQUEST_BYTES,
+    validate_artifact_output,
+    validate_artifact_payload,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -177,7 +182,10 @@ class AiExperienceApi(http.Controller):
             "company": {"id": env.company.id, "name": env.company.name},
             "department": {"id": employee.department_id.id, "name": employee.department_id.name} if employee and employee.department_id else None,
             "agent": _assigned_agent(env, user),
-            "capabilities": capabilities,
+            # Capability names are internal policy identifiers; the browser
+            # receives only whether the feature surface is available.
+            "capability_count": len(capabilities),
+            "can_manage_documents": bool(env.user.has_group("base.group_system")),
         })
 
     @http.route("/api/departments", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
@@ -401,13 +409,28 @@ class AiExperienceApi(http.Controller):
         if request.httprequest.method == "OPTIONS": return _cors_preflight_response()
         env, err = _require_auth()
         if err: return err
+        payload = {}
         try:
-            payload = json.loads(request.httprequest.data or b"{}")
-            kind = payload.get("type", "csv")
+            raw_body = request.httprequest.data or b""
+            if len(raw_body) > MAX_ARTIFACT_REQUEST_BYTES:
+                return _json_response({"error": "artifact request is too large"}, status=413)
+            payload = validate_artifact_payload(json.loads(raw_body or b"{}"))
+            kind = str(payload.get("type", "csv"))[:20]
+            # The HTTP façade is a second door to the same central contract as
+            # the generate_artifact tool.  Authentication alone is not enough
+            # for a resource-producing endpoint.
+            env["ai.gateway.execution.gate"].authorize(
+                "generate_artifact", args={"type": kind},
+                context_label="artifact generation api",
+            )
             filename, mimetype, data = _artifact_bytes(kind, payload.get("title", "artifact"), payload)
+            validate_artifact_output(data)
             _audit(env, env.user.id, "experience_api", "artifact.generate", {"type": kind, "filename": filename}, True)
             return _json_response({"filename": filename, "mimetype": mimetype, "data_base64": base64.b64encode(data).decode("ascii")})
         except (ValueError, RuntimeError, ImportError) as exc:
             _audit(env, env.user.id, "experience_api", "artifact.generate", {"type": payload.get("type") if isinstance(payload, dict) else ""}, False, str(exc))
-            detail = "unsupported artifact type or missing data" if isinstance(exc, (ValueError, ImportError)) else "artifact generation failed, try again later"
+            detail = "unsupported or oversized artifact request" if isinstance(exc, ValueError) else "artifact generation failed, try again later"
             return _json_response({"error": detail}, status=400 if isinstance(exc, ValueError) else 501)
+        except Exception:
+            _audit(env, env.user.id, "experience_api", "artifact.generate", {"type": payload.get("type") if isinstance(payload, dict) else ""}, False, "artifact gate failed")
+            return _json_response({"error": "artifact generation is unavailable"}, status=403)

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, NavLink, Navigate } from "react-router-dom";
 import * as api from "./api/client.js";
 import LoginPage from "./pages/LoginPage.jsx";
@@ -16,18 +16,14 @@ const NAV = [
 ];
 
 function Shell({ user, onLogout }) {
-  const [caps, setCaps] = useState([]);
   const [notifCount, setNotifCount] = useState(0);
   const [shellError, setShellError] = useState("");
   useEffect(() => {
-    api.getMyCapabilities()
-      .then(x => setCaps(x.capabilities || x || []))
-      .catch(e => setShellError(e instanceof api.ApiError ? e.message : "خطا در بارگذاری دسترسی‌ها"));
     api.getNotifications()
       .then(x => setNotifCount((x.notifications || []).filter(n => !n.is_read).length))
       .catch(e => setShellError(e instanceof api.ApiError ? e.message : "خطا در بارگذاری اعلان‌ها"));
   }, []);
-  const capabilitySet = useMemo(() => new Set(caps.map(c => typeof c === "string" ? c : c.name)), [caps]);
+  const canOpenAdmin = Boolean(user.is_admin);
   return <div className="product-shell">
     <aside className="product-sidebar">
       <div className="brand"><div className="brand-mark">✦</div><div><strong>Nova Enterprise</strong><span>AI Operating System</span></div></div>
@@ -45,7 +41,7 @@ function Shell({ user, onLogout }) {
       <Route path="/knowledge" element={<KnowledgePage />} /><Route path="/approvals" element={<ApprovalsPage />} />
       <Route path="/agents" element={<AgentsPage />} /><Route path="/notifications" element={<NotificationsPage />} />
       <Route path="/integrations" element={<IntegrationsPage />} /><Route path="/leaves" element={<LeavesPage />} />
-      <Route path="/admin" element={capabilitySet.has("admin.console.read") ? <AdminPage /> : <AccessDenied />} />
+      <Route path="/admin" element={canOpenAdmin ? <AdminPage /> : <AccessDenied />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes></main>
   </div>;

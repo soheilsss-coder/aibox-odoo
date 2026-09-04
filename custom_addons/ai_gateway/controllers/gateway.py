@@ -9,7 +9,7 @@ from odoo.exceptions import AccessError, UserError
 from odoo.sql_db import db_connect
 from .rate_limit import check as _shared_rate_limit, blocked as _shared_rate_blocked
 from .chat_queue import get_chat_pool, get_global_chat_gate
-from .output_firewall import scrub_public_text
+from .output_firewall import scrub_public_text, scrub_public_payload
 from odoo.addons.ai_gateway.models.inference_config import classify_request
 from werkzeug.wrappers import Response
 
@@ -35,6 +35,19 @@ _CORS_HEADERS = [
     ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
     ("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization"),
 ]
+
+
+def _scoped_user_env(user):
+    """Build every customer request environment inside the user's tenant.
+
+    Do not inherit an attacker-controlled ``allowed_company_ids`` context from
+    the HTTP request. Multi-company users may switch explicitly in a separate
+    audited flow; the API default is the credential owner's current company.
+    """
+    return request.env(user=user.id).with_context(
+        allowed_company_ids=[user.company_id.id],
+        force_company=user.company_id.id,
+    )
 
 
 def _json_response(data, status=200):
@@ -106,7 +119,15 @@ def _authenticate():
 
     session_token = request.httprequest.cookies.get("ai_session", "").strip()
     if session_token and "ai.gateway.session" in request.env:
-        session = request.env["ai.gateway.session"].sudo().authenticate_token(session_token)
+        # API routes deliberately disable the framework CSRF mechanism because
+        # they also support header-authenticated clients.  A cookie-authenticated
+        # browser request therefore uses a session-bound double-submit token.
+        # Do not accept a mutation with only the HttpOnly session cookie.
+        csrf_token = request.httprequest.headers.get("X-CSRF-Token", "")
+        require_csrf = method not in ("GET", "HEAD", "OPTIONS")
+        session = request.env["ai.gateway.session"].sudo().authenticate_token(
+            session_token, csrf_token=csrf_token, require_csrf=require_csrf,
+        )
         if session:
             return session.user_id, session_token, False
 
@@ -435,10 +456,10 @@ class AiGatewayController(http.Controller):
         args = params.get("args") or {}
         if not tool_name:
             return {"error": "'tool_name' is required"}
-        env = request.env(user=user.id)
+        env = _scoped_user_env(user)
         try:
             result = env["ai.gateway.execution.gate"].execute(tool_name, args)
-            return {"status": "done", "tool": tool_name, "result": result}
+            return {"status": "done", "result": scrub_public_payload(result)}
         except Exception as exc:  # noqa: BLE001
             _audit(env, user.id, "tool", tool_name, {"args": args}, success=False, error_message=str(exc))
             return {"error": "operation failed, check server logs for details"}
@@ -457,7 +478,7 @@ class AiGatewayController(http.Controller):
         if not _check_rate_limit(api_key):
             return _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
 
-        env = request.env(user=user.id)
+        env = _scoped_user_env(user)
 
         top_menus = env["ir.ui.menu"].search(
             [("parent_id", "=", False)], order="sequence"
@@ -540,7 +561,7 @@ class AiGatewayController(http.Controller):
         if not _check_rate_limit(api_key):
             return _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
 
-        env = request.env(user=user.id)
+        env = _scoped_user_env(user)
         if not _is_privileged(env, user):
             return _json_response({"error": "access denied: metrics are restricted to privileged roles"}, status=403)
         if "ai.gateway.audit.log" not in env:
@@ -571,7 +592,7 @@ class AiGatewayController(http.Controller):
         if not _check_rate_limit(api_key):
             return _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
 
-        env = request.env(user=user.id)
+        env = _scoped_user_env(user)
         if not _is_privileged(env, user):
             return _json_response({"error": "access denied: token usage is restricted to privileged roles"}, status=403)
         if "ai.gateway.audit.log" not in env:
