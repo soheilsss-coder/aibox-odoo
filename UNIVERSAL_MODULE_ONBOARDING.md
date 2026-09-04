@@ -35,6 +35,22 @@ history but is deactivated and its tools are removed from the assistant
 catalog. The execution gate independently checks the owning module, so stale
 risk metadata cannot execute a tool for an absent module.
 
+## Personal workspace, shared core
+
+Each employee gets a durable **personal workspace identity** on first access.
+This is useful for private conversation history, personal memory, role-aware
+presentation, and future preferences such as response style. It is not a new
+model, provider, permission principal, or unrestricted agent: every thread
+still points to the single Company Assistant, stores the user's personal
+identity, and receives only that user's effective capability/risk allowlist.
+
+The customer UI therefore presents “دستیار شخصی شما” with the effective role,
+connected-module count, and allowed-tool count. The server never lets a user
+choose an assistant or add tools. Personal memory remains user-scoped, while
+company/department memory follows its existing group and ACL rules. This gives
+the practical benefit of a personal assistant without duplicating policy,
+model routing, module bindings, approvals, or audit boundaries per employee.
+
 ## Safety boundary
 
 Discovery never creates a business mutation. The generated operation is

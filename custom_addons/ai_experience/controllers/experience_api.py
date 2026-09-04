@@ -50,6 +50,60 @@ def _assigned_agent(env, user):
     return "Company Assistant"
 
 
+def _personal_agent_state(env, user):
+    """Return safe product metadata for the user's personal workspace.
+
+    There is one Company Assistant core per appliance. This endpoint exposes a
+    personal assignment/profile and the caller's effective tool count, never a
+    second model, provider or unrestricted tool catalog.
+    """
+    result = {
+        "label": "دستیار شخصی شما",
+        "role": _assigned_agent(env, user),
+        "shared_core": True,
+        "assigned": False,
+        "connection_state": "disconnected",
+        "tool_count": 0,
+        "connected_module_count": 0,
+        "memory_scope": "حافظه شخصی و مجوزهای مؤثر همین کاربر",
+    }
+    identity_model = _model(env, "ai.gateway.agent.identity")
+    if identity_model is not None:
+        identity = identity_model.sudo().ensure_personal(user)
+        result["assigned"] = bool(identity)
+    assistant_model = _model(env, "llm.assistant")
+    binding_model = _model(env, "ai.integration.agent.module")
+    if assistant_model is None or binding_model is None:
+        return result
+    assistant = assistant_model.sudo().search([
+        ("name", "=", "Company Assistant"), ("active", "=", True),
+    ], limit=1)
+    if not assistant:
+        return result
+    try:
+        binding_model.sudo().sync_installed_module_bindings()
+        bindings = binding_model.sudo().search([
+            ("agent_id", "=", assistant.id),
+            ("company_id", "=", env.company.id),
+            ("active", "=", True),
+        ])
+        result["connected_module_count"] = len(bindings.filtered(
+            lambda binding: binding.state in ("connected", "connected_no_tools")
+        ))
+        if bindings and all(binding.state in ("connected", "connected_no_tools") for binding in bindings):
+            result["connection_state"] = "connected"
+        elif bindings:
+            result["connection_state"] = "error"
+        if "ai.gateway.tool.risk" in env:
+            connected_tools = binding_model.sudo().tool_ids_for_agent(assistant)
+            allowed_ids = set(env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(user))
+            result["tool_count"] = len(connected_tools.filtered(lambda tool: tool.id in allowed_ids))
+    except Exception:  # noqa: BLE001
+        _logger.exception("Could not resolve personal agent state")
+        result["connection_state"] = "error"
+    return result
+
+
 def _safe_name(value, fallback="artifact"):
     value = "".join(c if c.isalnum() or c in "-_ ." else "_" for c in (value or ""))
     return value.strip() or fallback
@@ -177,11 +231,14 @@ class AiExperienceApi(http.Controller):
         employee_model = _model(env, "hr.employee")
         employee = employee_model.search([("user_id", "=", user.id)], limit=1) if employee_model is not None else None
         capabilities = env["ai.control.capability.resolver"].effective_capabilities(user=user) if "ai.control.capability.resolver" in env else []
+        personal_agent = _personal_agent_state(env, user)
         return _json_response({
             "user": {"id": user.id, "name": user.name, "login": user.login},
             "company": {"id": env.company.id, "name": env.company.name},
             "department": {"id": employee.department_id.id, "name": employee.department_id.name} if employee and employee.department_id else None,
-            "agent": _assigned_agent(env, user),
+            "agent": personal_agent["label"],
+            "agent_role": personal_agent["role"],
+            "personal_agent": personal_agent,
             # Capability names are internal policy identifiers; the browser
             # receives only whether the feature surface is available.
             "capability_count": len(capabilities),
@@ -206,11 +263,19 @@ class AiExperienceApi(http.Controller):
         if request.httprequest.method == "OPTIONS": return _cors_preflight_response()
         env, err = _require_auth()
         if err: return err
-        assistants = _model(env, "llm.assistant")
-        data = [{"id": "role-default", "name": _assigned_agent(env, env.user), "description": "Agent اختصاصی نقش شما؛ محدود به Capabilityهای مؤثر همان کاربر.", "tools": 0, "assigned_to_user": True}]
-        if assistants is not None:
-            for a in assistants.search([], order="name"):
-                data.append({"id": a.id, "name": a.name, "description": getattr(a, "description", "") or "", "tools": len(a.tool_ids) if hasattr(a, "tool_ids") else 0})
+        personal = _personal_agent_state(env, env.user)
+        data = [{
+            "id": "personal",
+            "name": personal["label"],
+            "description": "دستیار سازمانی با حافظه شخصی و دسترسی‌های مؤثر همین کاربر؛ هسته اصلی بین اعضای سازمان مشترک است.",
+            "tools": personal["tool_count"],
+            "assigned_to_user": personal["assigned"],
+            "shared_core": personal["shared_core"],
+            "role": personal["role"],
+            "connection_state": personal["connection_state"],
+            "connected_module_count": personal["connected_module_count"],
+            "memory_scope": personal["memory_scope"],
+        }]
         return _json_response({"agents": data})
 
     @http.route("/api/tasks", type="http", auth="none", csrf=False, methods=["GET", "POST", "OPTIONS"])

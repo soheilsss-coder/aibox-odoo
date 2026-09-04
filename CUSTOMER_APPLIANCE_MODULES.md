@@ -27,7 +27,9 @@ After the install transaction completes:
 6. menu actions with a safe window view open a generic read-only workspace over
    the real records, still under the user's native ACL and record rules;
 7. the module workspace links back to the AI Workspace with the same user
-   authorization boundary.
+   authorization boundary;
+8. the chat page presents the user's personal workspace identity, while the
+   actual Company Assistant core remains shared and policy-controlled.
 
 No second manual discovery or synchronization command is part of the customer
 handoff flow. A failed install is recorded as failed and is not represented as

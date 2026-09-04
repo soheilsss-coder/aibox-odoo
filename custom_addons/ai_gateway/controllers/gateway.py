@@ -309,6 +309,13 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     if not assistant:
         return {"error": "assistant is not configured"}
 
+    # A personal identity gives each user a durable workspace/profile without
+    # creating a second unrestricted agent. Authorization, tools and model
+    # selection remain bound to the shared Company Assistant and this user.
+    personal_identity = False
+    if "ai.gateway.agent.identity" in env:
+        personal_identity = env["ai.gateway.agent.identity"].sudo().ensure_personal(env.user)
+
     # v19 (roadmap #50) - CLOSED GAP: this used to accept ANY
     # thread_id the client sent and just check .exists(), with no
     # ownership check. llm.thread is not in this project's own
@@ -345,15 +352,23 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
             "assistant_id": assistant.id,
         }, success=False, error_message="installed-module agent catalog unavailable")
         return {"error": "assistant module connections are unavailable"}
+    thread_values = {}
+    if personal_identity and "personal_agent_identity_id" in env["llm.thread"]._fields:
+        thread_values["personal_agent_identity_id"] = personal_identity.id
     if not thread:
         allowed_tools = agent_tools
         if "ai.gateway.tool.risk" in env:
             allowed_ids = set(env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user))
             allowed_tools = agent_tools.filtered(lambda tool: tool.id in allowed_ids)
-        thread = env["llm.thread"].create({
+        thread_values.update({
             "assistant_id": assistant.id,
             "tool_ids": [(6, 0, allowed_tools.ids)],
         })
+        thread = env["llm.thread"].create(thread_values)
+    elif thread_values and thread.personal_agent_identity_id != personal_identity:
+        # Existing threads are already ownership-checked above. Refresh only
+        # the profile link; never replace the shared assistant or its tools.
+        thread.write(thread_values)
 
     # Defense-in-depth: every thread gets the intersection of the installed
     # module-agent connection and this user's risk/capability allowlist.
@@ -409,6 +424,10 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     return {
         "thread_id": thread.id,
         "reply": reply_text,
+        "personal_agent": {
+            "label": "دستیار شخصی شما",
+            "shared_core": True,
+        },
     }
 
 
@@ -754,7 +773,10 @@ class AiGatewayController(http.Controller):
             for word in re.split(r"(\s+)", result.get("reply") or ""):
                 if word:
                     yield _sse("delta", {"text": word})
-            yield _sse("done", {"thread_id": result.get("thread_id")})
+            yield _sse("done", {
+                "thread_id": result.get("thread_id"),
+                "personal_agent": result.get("personal_agent"),
+            })
 
         headers = [
             ("Content-Type", "text/event-stream; charset=utf-8"),

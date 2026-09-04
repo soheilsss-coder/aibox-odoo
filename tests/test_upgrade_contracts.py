@@ -145,6 +145,21 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("postcommit.add", sync)
         self.assertIn('<field name="interval_type">minutes</field>', cron)
 
+    def test_personal_workspace_uses_shared_agent_core(self):
+        identity = (ADDONS / "ai_gateway/models/agent_identity.py").read_text()
+        thread = (ADDONS / "ai_gateway/models/personal_thread.py").read_text()
+        gateway = (ADDONS / "ai_gateway/controllers/gateway.py").read_text()
+        experience = (ADDONS / "ai_experience/controllers/experience_api.py").read_text()
+        frontend = (ROOT / "frontend/src/pages/ChatPage.jsx").read_text()
+        app = (ROOT / "frontend/src/App.jsx").read_text()
+        for marker in (
+            "ensure_personal", "personal_workspace", "current_user_permissions",
+            "personal_agent_identity_id", "shared_core", "personal_agent",
+            "دستیار شخصی شما", '"id": "personal"', "getAgents", "هسته مشترک، پروفایل شخصی",
+        ):
+            self.assertIn(marker, identity + thread + gateway + experience + frontend + app)
+        self.assertNotIn('"id": a.id', experience)
+
     def test_every_installed_module_is_connected_to_the_single_agent_catalog(self):
         binding = (ADDONS / "ai_integration/models/agent_module_binding.py").read_text()
         discovery = (ADDONS / "ai_integration/models/discovery.py").read_text()
