@@ -37,6 +37,10 @@ class AiUniversalCertification(models.AbstractModel):
         checks = []
         installed = self.env['ir.module.module'].sudo().search([('name', '=', module_name), ('state', '=', 'installed')], limit=1)
         self._check(checks, 'module_installed', bool(installed))
+        if 'ai.control.module' in self.env:
+            # Certification is also an onboarding boundary: a newly installed
+            # module must not wait for a cron tick before its binding is tested.
+            self.env['ai.control.module'].sudo().sync_installed_modules()
         module_record = self.env['ai.control.module'].sudo().search([('technical_name', '=', module_name)], limit=1)
         binding = self.env['ai.integration.agent.module'].sudo().binding_for_module(module_name) if 'ai.integration.agent.module' in self.env else False
         self._check(

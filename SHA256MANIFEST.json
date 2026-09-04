@@ -286,7 +286,7 @@
   "custom_addons/ai_integration/models/__init__.py": "b688bd43a2f9eb63c0755119ac969736b4a0da0acf4f609f691ac997680408e6",
   "custom_addons/ai_integration/models/adapter.py": "53a4cdf0b442ca64258a85c336cfea36c36bc2768884eed2df1ab87728450d88",
   "custom_addons/ai_integration/models/agent_module_binding.py": "68d7ecc2a976b8de2a09c4a6810293bb2ba70999be26927d1060b4ed842e52a9",
-  "custom_addons/ai_integration/models/certification.py": "016ab8fb32e66b408016bc842ddb4bf9acfbd700f780aa3b4c7d9966253f00e7",
+  "custom_addons/ai_integration/models/certification.py": "dd8e3de008385f4872c8216f892e8845a1941a47419d93d9c8cc1b31f9cb08e5",
   "custom_addons/ai_integration/models/discovery.py": "40a6e52c17769dd35080cbcdc0ad6918f54b0048c3f7780b8bb97187999a7c45",
   "custom_addons/ai_integration/models/event_dispatch.py": "78867fc1480daaf55fcef0e66a2de59aad42c57ff67cbc7c3aa432bfbcbbd882",
   "custom_addons/ai_integration/models/event_subscribers.py": "8cfeaa918eb7cd1c71321b85dca03ae80bde3eefde64bf77eb020675aeeca090",
