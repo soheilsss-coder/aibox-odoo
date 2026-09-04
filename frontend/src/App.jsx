@@ -7,6 +7,8 @@ import DocumentCenterPage from "./pages/DocumentCenterPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
 import IntegrationsPage from "./pages/IntegrationsPage.jsx";
+import ModuleWorkspacePage from "./pages/ModuleWorkspacePage.jsx";
+import ModuleMenuPage from "./pages/ModuleMenuPage.jsx";
 
 const NAV = [
   ["/", "خانه", "⌂"], ["/chat", "AI Workspace", "✦"], ["/tasks", "کارها", "✓"],
@@ -17,18 +19,26 @@ const NAV = [
 
 function Shell({ user, onLogout }) {
   const [notifCount, setNotifCount] = useState(0);
+  const [moduleNav, setModuleNav] = useState([]);
   const [shellError, setShellError] = useState("");
+  const loadModuleNav = () => api.getModuleNavigation()
+    .then(x => setModuleNav(x.modules || []))
+    .catch(e => setShellError(e instanceof api.ApiError ? e.message : "خطا در بارگذاری برنامه‌ها"));
   useEffect(() => {
     api.getNotifications()
       .then(x => setNotifCount((x.notifications || []).filter(n => !n.is_read).length))
       .catch(e => setShellError(e instanceof api.ApiError ? e.message : "خطا در بارگذاری اعلان‌ها"));
+    loadModuleNav();
+    const refresh = () => loadModuleNav();
+    window.addEventListener("modules:changed", refresh);
+    return () => window.removeEventListener("modules:changed", refresh);
   }, []);
   const canOpenAdmin = Boolean(user.is_admin);
   return <div className="product-shell">
     <aside className="product-sidebar">
       <div className="brand"><div className="brand-mark">✦</div><div><strong>Nova Enterprise</strong><span>AI Operating System</span></div></div>
       <div className="user-card"><div className="avatar">{(user.name || "U").slice(0,1)}</div><div><strong>{user.name}</strong><span>{user.company || "سازمان"}</span></div></div>
-      <nav className="product-nav">{NAV.map(([to,label,icon]) => <NavLink key={to} to={to} end={to === "/"} className={({isActive}) => `nav-item ${isActive ? "active" : ""}`}><i>{icon}</i><span>{label}</span>{label === "اعلان‌ها" && notifCount > 0 && <b>{notifCount}</b>}</NavLink>)}</nav>
+      <nav className="product-nav">{NAV.map(([to,label,icon]) => <NavLink key={to} to={to} end={to === "/"} className={({isActive}) => `nav-item ${isActive ? "active" : ""}`}><i>{icon}</i><span>{label}</span>{label === "اعلان‌ها" && notifCount > 0 && <b>{notifCount}</b>}</NavLink>)}{moduleNav.length > 0 && <div className="module-nav-group"><div className="module-nav-title">برنامه‌های سازمانی</div>{moduleNav.map(module => <NavLink key={module.id} to={`/modules/${module.id}`} className={({isActive}) => `nav-item module-nav-item ${isActive ? "active" : ""}`}><i>▣</i><span>{module.label}</span></NavLink>)}</div>}</nav>
       <div className="sidebar-bottom"><NavLink to="/admin" className="nav-item"><i>⚙</i><span>مدیریت</span></NavLink><button className="nav-item logout" onClick={() => { api.logout().catch(()=>{}); onLogout(); }}><i>↪</i><span>خروج</span></button></div>
     </aside>
     <main className="product-main">
@@ -40,7 +50,7 @@ function Shell({ user, onLogout }) {
       <Route path="/departments" element={<DepartmentsPage />} /><Route path="/documents" element={<DocumentCenterPage user={user} />} />
       <Route path="/knowledge" element={<KnowledgePage />} /><Route path="/approvals" element={<ApprovalsPage />} />
       <Route path="/agents" element={<AgentsPage />} /><Route path="/notifications" element={<NotificationsPage />} />
-      <Route path="/integrations" element={<IntegrationsPage />} /><Route path="/leaves" element={<LeavesPage />} />
+      <Route path="/integrations" element={<IntegrationsPage />} /><Route path="/modules/:moduleId/menus/:menuId" element={<ModuleMenuPage />} /><Route path="/modules/:moduleId" element={<ModuleWorkspacePage />} /><Route path="/leaves" element={<LeavesPage />} />
       <Route path="/admin" element={canOpenAdmin ? <AdminPage /> : <AccessDenied />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes></main>

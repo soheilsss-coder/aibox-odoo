@@ -28,8 +28,11 @@ the service boundary.
   snapshots include the company dimension.
 - **Product UX:** login uses an HttpOnly session cookie; Calendar, Documents,
   Approvals, Tasks, Notifications, Admin and Integrations are API-backed with
-  loading/error/empty states. Chat uses SSE delivery and the same guarded
-  operation path as other entry points.
+  loading/error/empty states. The Admin Console can install selectable business
+  applications on the current customer appliance; post-commit onboarding then
+  adds visible module menus to the product shell automatically. Chat uses SSE
+  delivery and the same guarded operation path as other entry points. See
+  `CUSTOMER_APPLIANCE_MODULES.md` for the exact install/handoff contract.
 - **Verification:** source/contract/security tests and the frontend build run
   in the release script. Native runtime install/upgrade, module certification,
   DGX latency and capacity evidence remain mandatory before production

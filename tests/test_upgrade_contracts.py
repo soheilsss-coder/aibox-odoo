@@ -110,6 +110,26 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("if adapters is not None", source)
         self.assertIn("if subscriptions is not None", source)
 
+    def test_customer_appliance_module_install_and_navigation_contract(self):
+        controller = (ADDONS / "ai_control_plane/controllers/api.py").read_text()
+        installer = (ADDONS / "ai_control_plane/models/module_install.py").read_text()
+        admin = (ROOT / "frontend/src/pages/AdminPage.jsx").read_text()
+        app = (ROOT / "frontend/src/App.jsx").read_text()
+        workspace = (ROOT / "frontend/src/pages/ModuleWorkspacePage.jsx").read_text()
+        docs = (ROOT / "CUSTOMER_APPLIANCE_MODULES.md").read_text()
+        for marker in (
+            "/api/admin/modules", "/api/admin/modules/install", "button_immediate_install",
+            "dependencies_id", "automatic_pending", "request_key", "_is_privileged",
+            "/api/modules/navigation", "/api/modules/menus/", "groups_id",
+            "adminInstallModule", "_safe_action_fields", "read_only",
+        ):
+            self.assertIn(marker, controller + installer + admin + app + workspace)
+        self.assertIn("one appliance", docs)
+        self.assertIn("official business application", docs)
+        self.assertIn("reviewed adapter", docs)
+        self.assertNotIn("payload.get(\"model\")", controller)
+        self.assertNotIn("payload.get(\"command\")", controller)
+
     def test_universal_onboarding_is_automatic_and_statused(self):
         discovery = (ADDONS / "ai_integration/models/discovery.py").read_text()
         module = (ADDONS / "ai_control_plane/models/integration.py").read_text()
@@ -257,7 +277,7 @@ class SourceContracts(unittest.TestCase):
 
     def test_release_manifest_matches_current_entries(self):
         manifest = json.loads((ROOT / "SHA256MANIFEST.json").read_text())
-        self.assertEqual(len(manifest), 419)
+        self.assertEqual(len(manifest), 422)
         missing = [path for path in manifest if not (ROOT / path).is_file()]
         self.assertEqual(missing, [])
         mismatched = [
@@ -274,6 +294,9 @@ class SourceContracts(unittest.TestCase):
             "custom_addons/ai_business_tools/migrations/18.0.1.6.0/post-migrate.py",
             "custom_addons/ai_integration/migrations/18.0.2.1.0/post-migrate.py",
             "custom_addons/ai_integration/models/reviewed_operation_tools.py",
+            "custom_addons/ai_control_plane/models/module_install.py",
+            "frontend/src/pages/ModuleWorkspacePage.jsx",
+            "CUSTOMER_APPLIANCE_MODULES.md",
         ):
             self.assertIn(path, manifest)
 

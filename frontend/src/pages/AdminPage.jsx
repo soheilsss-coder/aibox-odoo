@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   adminListRoles, adminListUsers, adminListAccessGrants, adminCreateAccessGrant,
   adminRevokeAccessGrant, adminListDocuments, adminListAgents, adminGetBranding,
-  adminUpdateBranding, adminGetMetrics, ApiError,
+  adminUpdateBranding, adminGetMetrics, adminListModules, adminInstallModule, ApiError,
 } from "../api/client.js";
 import {
   Card, Table, Badge, Button, Tabs, Alert, Spinner, EmptyState, Modal, Select, Input,
@@ -29,6 +29,7 @@ const TABS = [
   { key: "agents", label: "ایجنت‌ها" },
   { key: "branding", label: "برندینگ" },
   { key: "observability", label: "مانیتورینگ" },
+  { key: "modules", label: "برنامه‌ها" },
   { key: "control", label: "Control Plane" },
 ];
 
@@ -58,6 +59,7 @@ export default function AdminPage() {
       {tab === "agents" && <AgentsTab />}
       {tab === "branding" && <BrandingTab />}
       {tab === "observability" && <ObservabilityTab />}
+      {tab === "modules" && <ModulesTab />}
       {tab === "control" && <ControlPlaneTab />}
     </div>
   );
@@ -360,6 +362,98 @@ function Metric({ label, value }) {
   );
 }
 
+
+function ModulesTab() {
+  const [data, error, refresh] = useLoad(adminListModules, []);
+  const [selected, setSelected] = useState([]);
+  const [busy, setBusy] = useState(null);
+  const [actionError, setActionError] = useState("");
+  const [completed, setCompleted] = useState("");
+
+  function toggle(moduleId) {
+    setSelected((current) => current.includes(moduleId)
+      ? current.filter((id) => id !== moduleId)
+      : [...current, moduleId]);
+  }
+
+  async function installSelected() {
+    if (!selected.length || busy) return;
+    setBusy("batch");
+    setActionError("");
+    setCompleted("");
+    // One request per module makes dependency/install failures explicit and
+    // prevents the UI from claiming an all-or-nothing batch succeeded.
+    for (const moduleId of selected) {
+      const module = data.modules.find((item) => item.id === moduleId);
+      try {
+        await adminInstallModule(moduleId);
+        setCompleted((current) => `${current}${current ? "، " : ""}${module?.label || "برنامه"}`);
+      } catch (err) {
+        setActionError(err instanceof ApiError ? err.message : `نصب ${module?.label || "برنامه"} ناموفق بود`);
+        break;
+      }
+    }
+    setSelected([]);
+    setBusy(null);
+    refresh();
+    window.dispatchEvent(new Event("modules:changed"));
+  }
+
+  const stateLabel = {
+    installed: "نصب‌شده",
+    uninstalled: "آمادهٔ نصب",
+    uninstallable: "روی این دستگاه قابل نصب نیست",
+    "to install": "در صف نصب",
+    "to upgrade": "در حال ارتقا",
+    "to remove": "در حال حذف",
+    installing: "در حال نصب",
+  };
+  const levelLabel = {
+    discovered_read_only: "پایهٔ خواندن",
+    reviewed_operational: "عملیاتیِ بررسی‌شده",
+    blocked: "محدود تا بررسی",
+  };
+
+  if (error) return <Alert>{error}</Alert>;
+  if (!data) return <Spinner />;
+  return (
+    <>
+      <Card
+        title="برنامه‌های سازمانی روی این دستگاه"
+        actions={<Button size="sm" onClick={installSelected} loading={busy === "batch"} disabled={!selected.length || Boolean(busy)}>نصب موارد انتخاب‌شده</Button>}
+      >
+        <p className="muted">
+          این فهرست مخصوص همین دستگاه و همین مشتری است. نصب هر برنامه از مسیر رسمی انجام می‌شود و بعد از آن، شناسایی و اتصال AI به‌صورت خودکار شروع می‌شود.
+        </p>
+        {completed && <Alert tone="success">نصب موفق: {completed}. همگام‌سازی منو و قابلیت‌ها به‌صورت خودکار در حال انجام است.</Alert>}
+        {actionError && <Alert>{actionError}</Alert>}
+        {!data.modules.length && <EmptyState text="برنامهٔ قابل ارائه‌ای روی این دستگاه پیدا نشد." />}
+        {data.modules.length > 0 && (
+          <Table
+            columns={[
+              {
+                key: "select", header: "انتخاب",
+                render: (module) => module.state === "installed" ? <Badge tone="success">فعال</Badge> : module.request?.state === "installing" ? <Badge tone="info">در حال نصب</Badge> : <input className="modules-checkbox" type="checkbox" checked={selected.includes(module.id)} onChange={() => toggle(module.id)} disabled={Boolean(busy) || module.state !== "uninstalled" || module.request?.state === "installing"} aria-label={`انتخاب ${module.label}`} />,
+              },
+              { key: "label", header: "برنامه" },
+              { key: "category", header: "دسته‌بندی", render: (module) => module.category || "—" },
+              { key: "state", header: "وضعیت", render: (module) => { const state = module.request?.state === "installing" ? "installing" : module.state; return <Badge tone={state === "installed" ? "success" : state === "uninstallable" ? "danger" : "info"}>{stateLabel[state] || state}</Badge>; } },
+              { key: "dependencies", header: "پیش‌نیازها", render: (module) => module.dependencies.join("، ") || "—" },
+              { key: "integration", header: "AI", render: (module) => <span>{levelLabel[module.integration_level] || "در حال شناسایی"}<small className="module-row-detail">{module.capability_count} قابلیت</small></span> },
+              { key: "menu_count", header: "منو", render: (module) => module.state === "installed" ? `${module.menu_count}` : "پس از نصب" },
+            ]}
+            rows={data.modules}
+          />
+        )}
+      </Card>
+      <Card title="مرز امنیتی">
+        <p className="muted">
+          نصب یک برنامه، به‌معنی فعال‌شدن خودکار همهٔ عملیات AI آن نیست. خواندن، audit و event پایه خودکار است؛ عملیات مالی، حذف، تأیید و تغییرات حساس فقط با capability و adapter بررسی‌شده فعال می‌شوند.
+        </p>
+      </Card>
+    </>
+  );
+}
 
 function ControlPlaneTab() {
   const [data, error] = useLoad(() => fetch("/api/admin/control-plane", { credentials: "include" }).then(async r => { const j=await r.json(); if(!r.ok) throw new Error(j.error || "خطا"); return j; }), []);
