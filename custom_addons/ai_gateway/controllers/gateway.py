@@ -261,6 +261,31 @@ def _select_assistant(env, message, has_attachment=False):
     return assistant, budget
 
 
+def _agent_tools(env, assistant):
+    """Return tools attached to the installed-module Company Assistant.
+
+    The assistant record is deliberately the source of the third-party
+    framework's tool catalog, while the binding model is the source of truth
+    for which installed modules currently own that catalog. A binding does
+    not grant permissions; the caller-specific risk/capability intersection
+    happens immediately after this helper returns.
+    """
+    if "ai.integration.agent.module" not in env:
+        return assistant.tool_ids
+    try:
+        Binding = env["ai.integration.agent.module"].sudo()
+        # The cron is the normal path. This idempotent refresh closes the
+        # small install-to-cron window without asking an administrator to
+        # press a second sync button.
+        Binding.sync_installed_module_bindings()
+        return Binding.tool_ids_for_agent(assistant)
+    except Exception:  # noqa: BLE001
+        # Fail closed: stale assistant tools must not survive a broken module
+        # connection and become an accidental capability path.
+        _logger.exception("Could not resolve installed-module tools for the agent")
+        return None
+
+
 def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     """Business logic for one assistant turn, executed wholly as the
     environment's user (env.uid).
@@ -311,27 +336,33 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     # existing thread owned by them. The previous implementation had
     # the create block outside this branch, silently replacing every
     # continuation with a new thread and breaking conversation memory.
+    # Resolve the installed-module catalog once per turn. The returned tools
+    # are the agent connection, not user authorization; the latter is applied
+    # below for both new and existing threads.
+    agent_tools = _agent_tools(env, assistant)
+    if agent_tools is None:
+        _audit(env, user_id, "chat", "chat_agent_module_connection_failed", {
+            "assistant_id": assistant.id,
+        }, success=False, error_message="installed-module agent catalog unavailable")
+        return {"error": "assistant module connections are unavailable"}
     if not thread:
-        allowed_tools = assistant.tool_ids
+        allowed_tools = agent_tools
         if "ai.gateway.tool.risk" in env:
-            allowed_ids = env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user)
-            # The assistant seed intentionally carries no blanket tool list.
-            # Resolve only tools present in the explicit risk registry, then
-            # apply capability authorization for this user. This also makes
-            # newly installed reviewed tools available without mutating the
-            # assistant record or reintroducing an unreviewed default.
-            allowed_tools = env["llm.tool"].browse(allowed_ids)
+            allowed_ids = set(env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user))
+            allowed_tools = agent_tools.filtered(lambda tool: tool.id in allowed_ids)
         thread = env["llm.thread"].create({
             "assistant_id": assistant.id,
             "tool_ids": [(6, 0, allowed_tools.ids)],
         })
 
-    # Defense-in-depth: every thread gets a user-specific allowlist.
+    # Defense-in-depth: every thread gets the intersection of the installed
+    # module-agent connection and this user's risk/capability allowlist.
     # Generic framework CRUD tools are never exposed through chat.
     if "ai.gateway.tool.risk" in env:
-        allowed_ids = env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user)
+        allowed_ids = set(env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user))
+        allowed_ids.intersection_update(agent_tools.ids)
         allowed_tools = thread.tool_ids.filtered(lambda t: t.id in allowed_ids)
-        allowed_tools |= env["llm.tool"].browse(allowed_ids)
+        allowed_tools |= env["llm.tool"].browse(sorted(allowed_ids))
         thread.write({"tool_ids": [(6, 0, allowed_tools.ids)]})
 
     # Attachments are persisted on a mail.message belonging to this exact

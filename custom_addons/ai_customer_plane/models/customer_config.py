@@ -146,6 +146,7 @@ class AiDeploymentWizard(models.TransientModel):
             "ai.control.authorization", "ai.control.capability", "ai.control.module",
             "ai.integration.adapter", "ai.integration.operation", "ai.integration.subscription",
             "ai.gateway.execution.gate", "ai.gateway.approval", "ai.gateway.access.grant",
+            "ai.integration.agent.module",
             "ai.customer.role.assignment", "ai.customer.role.policy", "ai.workflow",
             "ai.document.index.job", "ai.rag.index.snapshot", "ai.model.profile", "ai.gateway.session",
             "ai.customer.sso.provider", "ai.customer.scim.token",
@@ -169,6 +170,33 @@ class AiDeploymentWizard(models.TransientModel):
         checks["installed_module_count"] = len(installed_names)
         checks["unregistered_installed_modules"] = missing_registry
         checks["all_installed_modules_registered"] = not missing_registry
+
+        # Installation is incomplete until every installed module is joined to
+        # the local Company Assistant. Refreshing here is idempotent and keeps
+        # the handoff check independent of whether the one-minute onboarding
+        # cron has already run.
+        bindings = self.env["ai.integration.agent.module"].sudo() if "ai.integration.agent.module" in self.env else None
+        if bindings is not None:
+            try:
+                bindings.sync_installed_module_bindings()
+            except Exception:  # noqa: BLE001
+                checks["agent_binding_error"] = True
+        checks["installed_module_agent_connections"] = {}
+        if bindings is not None and "ai.control.module" in self.env:
+            for module in self.env["ai.control.module"].sudo().search([
+                ("technical_name", "in", sorted(installed_names)),
+                ("state", "=", "installed"),
+            ]):
+                checks["installed_module_agent_connections"][module.technical_name] = bool(
+                    module.agent_connected and module.agent_connection_state in (
+                        "connected", "connected_no_tools"
+                    )
+                )
+        checks["all_installed_modules_agent_connected"] = bool(
+            bindings is not None
+            and checks["installed_module_agent_connections"]
+            and all(checks["installed_module_agent_connections"].values())
+        )
 
         adapters = self.env["ai.integration.adapter"].sudo() if "ai.integration.adapter" in self.env else None
         all_operations = self.env["ai.integration.operation"].sudo() if "ai.integration.operation" in self.env else None
@@ -242,6 +270,7 @@ class AiDeploymentWizard(models.TransientModel):
         checks["ready"] = bool(
             checks["profile"] and checks["company"] and checks["profile_compiled"]
             and checks["all_required_models"] and checks["all_installed_modules_registered"]
+            and checks["all_installed_modules_agent_connected"]
             and checks["all_required_adapters"] and checks["all_operation_modules_installed"]
             and checks["all_operation_contracts"] and checks["all_subscribers"]
             and checks["capability_count"] and checks["operation_coverage"]

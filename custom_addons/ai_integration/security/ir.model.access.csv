@@ -11,3 +11,5 @@ access_ai_integration_certification,access.ai.integration.certification,model_ai
 access_ai_integration_ai_event,ai.integration.ai.event,model_ai_integration_ai_event,base.group_system,1,1,1,1
 access_ai_integration_operation_admin,ai.integration.operation.admin,model_ai_integration_operation,base.group_system,1,1,1,1
 access_ai_integration_operation_user,ai.integration.operation.user,model_ai_integration_operation,base.group_user,1,0,0,0
+access_ai_integration_agent_module_admin,ai.integration.agent.module.admin,model_ai_integration_agent_module,base.group_system,1,1,1,1
+access_ai_integration_agent_module_user,ai.integration.agent.module.user,model_ai_integration_agent_module,base.group_user,1,0,0,0

@@ -413,6 +413,12 @@ function ModulesTab() {
     reviewed_operational: "عملیاتیِ بررسی‌شده",
     blocked: "محدود تا بررسی",
   };
+  const agentStateLabel = {
+    connected: "متصل به ایجنت",
+    connected_no_tools: "متصل؛ ابزار تاییدشده ندارد",
+    error: "اتصال ایجنت نیازمند بررسی",
+    disconnected: "به ایجنت متصل نیست",
+  };
 
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Spinner />;
@@ -423,7 +429,7 @@ function ModulesTab() {
         actions={<Button size="sm" onClick={installSelected} loading={busy === "batch"} disabled={!selected.length || Boolean(busy)}>نصب موارد انتخاب‌شده</Button>}
       >
         <p className="muted">
-          این فهرست مخصوص همین دستگاه و همین مشتری است. نصب هر برنامه از مسیر رسمی انجام می‌شود و بعد از آن، شناسایی و اتصال AI به‌صورت خودکار شروع می‌شود.
+          این فهرست مخصوص همین دستگاه و همین مشتری است. نصب هر برنامه از مسیر رسمی انجام می‌شود و بعد از آن، اتصال آن به ایجنت و رجیستری ابزارها به‌صورت خودکار انجام می‌شود؛ مدل محلی یک‌بار در سطح دستگاه provision می‌شود و برای هر برنامه دوباره دانلود نمی‌شود.
         </p>
         {completed && <Alert tone="success">نصب موفق: {completed}. همگام‌سازی منو و قابلیت‌ها به‌صورت خودکار در حال انجام است.</Alert>}
         {actionError && <Alert>{actionError}</Alert>}
@@ -439,7 +445,16 @@ function ModulesTab() {
               { key: "category", header: "دسته‌بندی", render: (module) => module.category || "—" },
               { key: "state", header: "وضعیت", render: (module) => { const state = module.request?.state === "installing" ? "installing" : module.state; return <Badge tone={state === "installed" ? "success" : state === "uninstallable" ? "danger" : "info"}>{stateLabel[state] || state}</Badge>; } },
               { key: "dependencies", header: "پیش‌نیازها", render: (module) => module.dependencies.join("، ") || "—" },
-              { key: "integration", header: "AI", render: (module) => <span>{levelLabel[module.integration_level] || "در حال شناسایی"}<small className="module-row-detail">{module.capability_count} قابلیت</small></span> },
+              { key: "integration", header: "AI", render: (module) => {
+                const agent = module.agent_connection || {};
+                return <span>
+                  {levelLabel[module.integration_level] || "در حال شناسایی"}
+                  <small className="module-row-detail">{module.capability_count} قابلیت</small>
+                  <small className={`module-row-detail ${agent.connected ? "module-agent-ok" : "module-agent-warning"}`}>
+                    {agentStateLabel[agent.state] || "وضعیت اتصال نامشخص"}{agent.tool_count ? ` · ${agent.tool_count} ابزار` : ""}
+                  </small>
+                </span>;
+              } },
               { key: "menu_count", header: "منو", render: (module) => module.state === "installed" ? `${module.menu_count}` : "پس از نصب" },
             ]}
             rows={data.modules}

@@ -19,16 +19,47 @@ After the install transaction completes:
 2. the restart-safe onboarding cron refreshes the module registry;
 3. models, views, menus, safe fields, capabilities, event mappings and the
    audit baseline are recorded;
-4. visible menus are filtered by the current user's native groups and appear in
+4. the installed module is durably connected to the single **Company
+   Assistant** agent; its registered tools and operations are attached to that
+   agent catalog, and the connection status is recorded;
+5. visible menus are filtered by the current user's native groups and appear in
    the product shell under **Business Apps**;
-5. menu actions with a safe window view open a generic read-only workspace over
+6. menu actions with a safe window view open a generic read-only workspace over
    the real records, still under the user's native ACL and record rules;
-6. the module workspace links back to the AI Workspace with the same user
+7. the module workspace links back to the AI Workspace with the same user
    authorization boundary.
 
 No second manual discovery or synchronization command is part of the customer
 handoff flow. A failed install is recorded as failed and is not represented as
 an active checkbox.
+
+## Module-to-agent connection
+
+The local model and the installed business modules are one product flow, but
+not one permission boundary. The model is provisioned once at the appliance
+level; installing a business module does not download a second model or copy
+its official source. Automatic onboarding creates an
+`ai.integration.agent.module` connection for every installed module and the
+single Company Assistant. The connection:
+
+- updates the assistant's actual `tool_ids` catalog with the tools owned by
+  installed addons;
+- attaches reviewed operation dispatchers for modules such as Accounting,
+  Inventory, POS/Restaurant, Sales, Purchase and Manufacturing;
+- removes tools from the active agent catalog when their owning addon is
+  uninstalled;
+- records `connected`, `connected_no_tools`, or `error` and exposes the tool
+  and operation counts to the admin UI;
+- never grants a user access. Every chat turn intersects the agent catalog with
+  the current user's native ACL, capability, risk and approval decision.
+
+A module with no reviewed business adapter is still connected to the agent for
+its discovered read/audit/event baseline, but it receives no invented mutation
+tool. The LLM cannot execute a stale tool merely because a risk row remains in
+the database: both the agent catalog and the central execution gate require
+the owning module to be installed in the current database. If the Company
+Assistant or the connection service is unavailable, the connection is shown as
+an error and chat fails closed rather than using an old global tool list.
 
 ## Accounting and other sensitive applications
 

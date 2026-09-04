@@ -17,6 +17,13 @@ const CERT_LABEL = {
   blocked: "مسدود",
 };
 
+const AGENT_LABEL = {
+  connected: "متصل به ایجنت",
+  connected_no_tools: "متصل؛ ابزار تاییدشده ندارد",
+  error: "اتصال ایجنت نیازمند بررسی",
+  disconnected: "به ایجنت متصل نیست",
+};
+
 function MenuTree({ menus, moduleId }) {
   const roots = menus.filter((item) => !item.parent_id || !menus.some((p) => p.id === item.parent_id));
   const children = (parentId) => menus.filter((item) => item.parent_id === parentId);
@@ -57,6 +64,7 @@ export default function ModuleWorkspacePage() {
   if (!module) return <EmptyState text="این برنامه برای حساب کاربری شما فعال نیست." />;
 
   const operational = module.integration_level === "reviewed_operational";
+  const agent = module.agent_connection || {};
   return (
     <div>
       <header className="page-head">
@@ -69,12 +77,18 @@ export default function ModuleWorkspacePage() {
       </header>
 
       <div className="module-summary-grid">
-        <Card><div className="module-stat"><span>وضعیت اتصال</span><strong>{STATUS_LABEL[module.integration_level] || "در حال بررسی"}</strong></div></Card>
+        <Card><div className="module-stat"><span>وضعیت یکپارچگی</span><strong>{STATUS_LABEL[module.integration_level] || "در حال بررسی"}</strong></div></Card>
+        <Card><div className="module-stat"><span>اتصال به ایجنت</span><strong>{AGENT_LABEL[agent.state] || "وضعیت اتصال نامشخص"}</strong><small>{agent.tool_count || 0} ابزار ثبت‌شده · {agent.operation_count || 0} عملیات</small></div></Card>
         <Card><div className="module-stat"><span>وضعیت گواهی</span><strong>{CERT_LABEL[module.certification_state] || "در حال بررسی"}</strong></div></Card>
-        <Card><div className="module-stat"><span>قابلیت‌های AI</span><strong>{module.capability_count}</strong></div></Card>
       </div>
 
-      {!operational && (
+      {agent.state === "error" && (
+        <Alert>
+          اتصال این برنامه به ایجنت کامل نشده است؛ تا رفع خطا ابزارهای آن در AI فعال نمی‌شوند. {agent.error || "وضعیت اتصال را در کنسول مدیریت بررسی کنید."}
+        </Alert>
+      )}
+
+      {!operational && agent.state !== "error" && (
         <Alert>
           این برنامه نصب و شناسایی شده است؛ اما عملیات حساس آن تا زمان بررسی adapter و اجرای تست واقعی، از طریق AI فعال نمی‌شود.
         </Alert>

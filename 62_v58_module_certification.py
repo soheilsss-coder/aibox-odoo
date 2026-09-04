@@ -55,6 +55,7 @@ def main(env, output=None):
         name = module.name
         item = registry.search([("technical_name", "=", name)], limit=1)
         adapter = adapters.search([("module_name", "=", name), ("active", "=", True)], limit=1)
+        agent_connection = bool(item and item.agent_connected and item.agent_connection_state in ("connected", "connected_no_tools"))
         module_ops = operations.filtered(lambda op: op.module_name == name)
         module_caps = capabilities.filtered(lambda cap: cap.module_name == name)
         reviewed = bool(adapter and adapter.state == "ready")
@@ -75,7 +76,10 @@ def main(env, output=None):
             and not name.startswith("ai_")
             and name != "company_ai_demo"
         )
-        if business and not (reviewed and reviewed_operations and contracts and all(contracts)):
+        if not agent_connection:
+            status = "blocked"
+            blocked.append(name)
+        elif business and not (reviewed and reviewed_operations and contracts and all(contracts)):
             status = "blocked"
             blocked.append(name)
         elif reviewed and reviewed_operations and all(contracts):
@@ -91,6 +95,10 @@ def main(env, output=None):
             "installed_version": module.installed_version or module.latest_version or "",
             "business_module": business,
             "registered": bool(item and item.state == "installed"),
+            "agent_connected": agent_connection,
+            "agent_connection_state": item.agent_connection_state if item else "disconnected",
+            "agent_tool_count": item.agent_tool_count if item else 0,
+            "agent_operation_count": item.agent_operation_count if item else 0,
             "discovered_models": item.discovered_models if item else 0,
             "discovered_groups": item.discovered_groups if item else 0,
             "capability_count": len(module_caps),

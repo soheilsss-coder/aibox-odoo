@@ -22,6 +22,11 @@ class AiIntegrationTestRunner(models.AbstractModel):
         checks=[]
         mod=self.env["ai.control.module"].sudo().search([("technical_name","=",module_name)],limit=1)
         checks.append({"name":"module_discovered","pass":bool(mod)})
+        binding = self.env["ai.integration.agent.module"].sudo().binding_for_module(module_name) if "ai.integration.agent.module" in self.env else False
+        checks.append({
+            "name": "agent_connection",
+            "pass": bool(binding and binding.state in ("connected", "connected_no_tools")),
+        })
         adapter=self.env["ai.integration.adapter"].sudo().for_module(module_name)
         checks.append({"name":"reviewed_adapter_or_discovery","pass":bool(adapter or (mod and mod.discovered_models))})
         caps=self.env["ai.control.capability"].sudo().search([("module_name","=",module_name),("active","=",True)])

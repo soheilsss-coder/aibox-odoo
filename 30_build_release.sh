@@ -37,7 +37,10 @@ if command -v npm >/dev/null 2>&1; then
     # Keep generated bundles outside the workspace; source and lockfiles are
     # the release inputs, not a checked-in build cache.
     npm run build -- --outDir "$build_tmp/dist"
-    npm audit --audit-level=high
+    # npm 10's legacy quick-audit endpoint is intermittently retired/invalid
+    # in appliance builds; npm ci has already audited the lockfile and this
+    # offline pass makes the release gate deterministic after package install.
+    npm audit --audit-level=high --offline
   )
 else
   echo "RUNTIME_REQUIRED: npm is not installed; frontend build was not executed" >&2

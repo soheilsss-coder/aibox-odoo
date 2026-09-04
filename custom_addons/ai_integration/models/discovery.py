@@ -332,12 +332,41 @@ class AiIntegrationDiscovery(models.Model):
                 "unavailable_mutations_json": json.dumps(unavailable),
                 "last_error": trigger_error or onboarding_error or False,
             })
-            if "ai.integration.test.runner" in self.env:
+        # Module discovery and AI-agent attachment are one onboarding unit.
+        # Keep this after registry/event work because the agent must receive
+        # the final operation/tool set, never a half-built registry. The
+        # binding service is idempotent and is also called by the chat safety
+        # path so a newly installed module is usable before the next cron tick.
+        agent_result = {"assistant": False, "connected_modules": 0, "attached_tools": 0}
+        if "ai.integration.agent.module" in self.env:
+            try:
+                agent_result = self.env[
+                    "ai.integration.agent.module"
+                ].sudo().sync_installed_module_bindings()
+            except Exception as exc:  # noqa: BLE001
+                _logger.exception("Universal module-to-agent binding failed")
+                for rec in self.sudo().search([("state", "=", "installed")]):
+                    rec.write({
+                        "agent_connected": False,
+                        "agent_connection_state": "error",
+                        "agent_error": "module-to-agent connection failed",
+                        "agent_last_sync": fields.Datetime.now(),
+                    })
+                agent_result["error"] = "module-to-agent connection failed"
+
+        # Run the structural integration test only after the module-agent
+        # bindings exist; otherwise a healthy fresh install would be recorded
+        # as warning merely because the test ran one phase too early.
+        if "ai.integration.test.runner" in self.env:
+            for mod in installed:
+                rec = self.sudo().search([("technical_name", "=", mod.name)], limit=1)
                 try:
                     test = self.env["ai.integration.test.runner"].run_for_module(mod.name)
-                    if test["status"] != "pass":
+                    if rec and test["status"] != "pass":
                         rec.write({"integration_status": "warning"})
                 except Exception as exc:  # noqa: BLE001
-                    rec.write({"integration_status": "warning", "last_error": str(exc)})
+                    if rec:
+                        rec.write({"integration_status": "warning", "last_error": str(exc)})
+
         base_result = result if isinstance(result, dict) else {}
-        return dict(base_result, universal_onboarding=True, **trigger_result)
+        return dict(base_result, universal_onboarding=True, **trigger_result, **agent_result)

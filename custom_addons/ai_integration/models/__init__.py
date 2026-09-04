@@ -1,4 +1,5 @@
 from . import adapter
+from . import agent_module_binding
 from . import discovery
 from . import event_dispatch
 from . import model_registry

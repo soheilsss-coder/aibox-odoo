@@ -29,6 +29,21 @@ class AiIntegrationModule(models.Model):
     automatic_read = fields.Boolean(default=True)
     automatic_events = fields.Boolean(default=True)
     automatic_audit = fields.Boolean(default=True)
+    # This is deliberately separate from integration_level: a module can have
+    # a read-only/discovered integration and still be connected to the one
+    # local Company Assistant. Connection means the agent knows the module's
+    # registered tool surface; authorization decides what a user may invoke.
+    agent_connected = fields.Boolean(default=False, index=True)
+    agent_connection_state = fields.Selection([
+        ("connected", "Connected"),
+        ("connected_no_tools", "Connected / no approved tools"),
+        ("error", "Connection error"),
+        ("disconnected", "Disconnected"),
+    ], default="disconnected", required=True, index=True)
+    agent_tool_count = fields.Integer(default=0)
+    agent_operation_count = fields.Integer(default=0)
+    agent_last_sync = fields.Datetime()
+    agent_error = fields.Text()
     discovered_models = fields.Integer(default=0)
     discovered_groups = fields.Integer(default=0)
     discovered_menus = fields.Integer(default=0)
@@ -76,6 +91,10 @@ class AiIntegrationModule(models.Model):
         self.sudo().search([("technical_name", "not in", list(installed_names))]).write({
             "state": "not_installed", "integration_level": "blocked", "certification_state": "blocked",
             "automatic_read": False, "automatic_events": False, "automatic_audit": False,
+            "agent_connected": False, "agent_connection_state": "disconnected",
+            "agent_tool_count": 0, "agent_operation_count": 0,
+            "agent_last_sync": fields.Datetime.now(),
+            "agent_error": False,
         })
         return True
 

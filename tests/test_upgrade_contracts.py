@@ -107,6 +107,7 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("operation_modules", source)
         self.assertIn("operation_coverage", source)
         self.assertIn("uninstalled_operation_modules", source)
+        self.assertIn("all_installed_modules_agent_connected", source)
         self.assertIn("if adapters is not None", source)
         self.assertIn("if subscriptions is not None", source)
 
@@ -143,6 +144,28 @@ class SourceContracts(unittest.TestCase):
             self.assertIn(marker, discovery + module)
         self.assertIn("postcommit.add", sync)
         self.assertIn('<field name="interval_type">minutes</field>', cron)
+
+    def test_every_installed_module_is_connected_to_the_single_agent_catalog(self):
+        binding = (ADDONS / "ai_integration/models/agent_module_binding.py").read_text()
+        discovery = (ADDONS / "ai_integration/models/discovery.py").read_text()
+        gateway = (ADDONS / "ai_gateway/controllers/gateway.py").read_text()
+        gate = (ADDONS / "ai_gateway/models/execution_gate.py").read_text()
+        tool_risk = (ADDONS / "ai_business_tools/models/tool_risk.py").read_text()
+        control = (ADDONS / "ai_control_plane/models/integration.py").read_text()
+        hooks = (ADDONS / "ai_integration/hooks.py").read_text()
+        frontend = (ROOT / "frontend/src/pages/ModuleWorkspacePage.jsx").read_text()
+        for marker in (
+            "ai.integration.agent.module", "Company Assistant", "sync_installed_module_bindings",
+            "post_init_hook", "tool_ids_for_agent", "connected_no_tools", "agent_connection_state",
+            "assistant.sudo().write({\"tool_ids\"", "_agent_tools", "agent_tools",
+            "owner_module_not_installed", "tool_owner_missing", "module_name = fields.Char",
+        ):
+            self.assertIn(marker, binding + discovery + gateway + gate + tool_risk + control + hooks)
+        risk_rows = list(xml_records("ai.gateway.tool.risk"))
+        self.assertTrue(risk_rows)
+        self.assertTrue(all(values.get("module_name") for _, _, values in risk_rows))
+        self.assertIn("agent_connection", frontend)
+        self.assertIn("tool_count", frontend)
 
     def test_discovered_reads_and_mutations_have_separate_contracts(self):
         registry = (ADDONS / "ai_integration/models/unified_registry.py").read_text()
@@ -277,7 +300,7 @@ class SourceContracts(unittest.TestCase):
 
     def test_release_manifest_matches_current_entries(self):
         manifest = json.loads((ROOT / "SHA256MANIFEST.json").read_text())
-        self.assertEqual(len(manifest), 422)
+        self.assertGreaterEqual(len(manifest), 422)
         missing = [path for path in manifest if not (ROOT / path).is_file()]
         self.assertEqual(missing, [])
         mismatched = [

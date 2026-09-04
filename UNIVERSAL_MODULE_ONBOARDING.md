@@ -9,11 +9,31 @@ due immediately; the one-minute cron remains the restart-safe fallback.
 Onboarding records:
 
 - installed version and lifecycle state;
+- an explicit connection to the single Company Assistant agent, including
+  connection state, attached tool count, and operation count;
 - model, menu, view, and security-group inventory;
 - per-model company, department, employee, and user scope signals;
 - bounded read-only capability and read-summary operation contracts;
 - lifecycle event mappings and the audit/event baseline;
 - counts of discovered versus source-reviewed operations.
+
+## Agent tool connection
+
+The installed registry is also the source for the agent's tool catalog. The
+onboarding service creates one durable `ai.integration.agent.module` binding
+per installed module and the single Company Assistant. Reviewed operation
+contracts are attached through `run_reviewed_operation` (or an explicitly
+registered first-class tool), while legacy named tools carry an explicit owner
+such as `hr_holidays`, `project`, or `calendar`. The assistant record's
+`tool_ids` is refreshed from these bindings; a per-user thread then narrows it
+again using capability, native ACL, risk, and approval checks.
+
+The binding is intentionally not a permission grant. A module can be
+`connected_no_tools` when only discovery exists, and a missing model/adapter is
+reported as `error`. When a module is uninstalled, its binding remains in audit
+history but is deactivated and its tools are removed from the assistant
+catalog. The execution gate independently checks the owning module, so stale
+risk metadata cannot execute a tool for an absent module.
 
 ## Safety boundary
 

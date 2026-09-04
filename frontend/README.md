@@ -61,6 +61,21 @@ component list, the styling convention (`ds-*` classes in
 limits (no Storybook, no accessibility audit, `Table`/`Modal` are
 intentionally minimal for this app's current data volume).
 
+## Module tools are connected to the agent
+
+After an application is installed, automatic onboarding creates a durable
+connection between that application and the one Company Assistant agent. The
+agent's tool catalog is refreshed from installed, explicitly owned tool and
+operation contracts. Each chat thread narrows that catalog again by the
+current user's capability, native ACL, risk, and approval state. The UI shows
+whether the module is connected and how many registered tools/operations it
+has.
+
+This is not a blanket permission grant and it is not a fake module screen. A
+module with only automatic discovery is connected with no invented mutation
+tools; an uninstalled module's tools are removed from the agent catalog and
+rejected by the execution gate.
+
 ## What's still intentionally limited
 
 The Business Apps flow can install the real application, discover its native

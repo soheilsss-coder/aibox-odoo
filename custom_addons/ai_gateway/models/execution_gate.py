@@ -109,6 +109,20 @@ class AiGatewayExecutionGate(models.AbstractModel):
             raise AccessError("access_denied: AI tool is not registered in the central risk registry")
 
         operation, rec, cap = contract
+        # Risk rows for optional tools are durable metadata, not proof that the
+        # owning official addon is installed in this database. Reject stale
+        # direct-tool calls here as well as in the assistant catalog.
+        owner = getattr(rec, "module_name", False) if rec else getattr(operation, "module_name", False)
+        if rec and not operation and not owner:
+            self._audit(tool_name, {"reason": "tool_owner_missing"}, False, "tool_owner_missing")
+            raise AccessError("access_denied: AI tool has no owning module connection")
+        if owner and "ir.module.module" in self.env:
+            installed = self.env["ir.module.module"].sudo().search([
+                ("name", "=", owner), ("state", "=", "installed"),
+            ], limit=1)
+            if not installed:
+                self._audit(tool_name, {"reason": "owner_module_not_installed", "module": owner}, False, "owner_module_not_installed")
+                raise AccessError("access_denied: the owning module is not installed")
         # The binding is the single runtime join between Capability, Tool,
         # Risk and Approval. Older releases accidentally referenced a
         # non-existent local variable here, which made every gate call fail

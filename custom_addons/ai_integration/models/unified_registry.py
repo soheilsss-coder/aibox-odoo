@@ -403,6 +403,15 @@ class AiUnifiedRegistry(models.AbstractModel):
         op = self.resolve(tool_name)
         if not op:
             raise AccessError('unregistered integration operation: %s' % tool_name)
+        # Registry rows are loaded with the integration addon and may outlive
+        # an optional business addon. The official module must be installed in
+        # this database before its operation can be exposed to the agent or
+        # executed through the direct gateway.
+        installed = self.env['ir.module.module'].sudo().search([
+            ('name', '=', op.module_name), ('state', '=', 'installed'),
+        ], limit=1)
+        if not installed:
+            raise AccessError('module is not installed for operation: %s' % op.tool_name)
         risk = self.env['ai.gateway.tool.risk'].sudo().search([('tool_name', '=', tool_name)], limit=1)
         cap = self.env['ai.control.capability'].sudo().search([('name', '=', op.capability_name), ('active', '=', True)], limit=1)
         if not risk or not cap:

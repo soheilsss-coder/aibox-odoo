@@ -38,6 +38,12 @@ class AiUniversalCertification(models.AbstractModel):
         installed = self.env['ir.module.module'].sudo().search([('name', '=', module_name), ('state', '=', 'installed')], limit=1)
         self._check(checks, 'module_installed', bool(installed))
         module_record = self.env['ai.control.module'].sudo().search([('technical_name', '=', module_name)], limit=1)
+        binding = self.env['ai.integration.agent.module'].sudo().binding_for_module(module_name) if 'ai.integration.agent.module' in self.env else False
+        self._check(
+            checks, 'agent_module_connection',
+            bool(binding and binding.state in ('connected', 'connected_no_tools')),
+            'Every installed module must be connected to the Company Assistant agent',
+        )
         adapter = self.env['ai.integration.adapter'].sudo().for_module(module_name)
         reviewed_adapter = bool(adapter and adapter.module_name == module_name and adapter.state == 'ready')
         self._check(checks, 'reviewed_adapter', reviewed_adapter)

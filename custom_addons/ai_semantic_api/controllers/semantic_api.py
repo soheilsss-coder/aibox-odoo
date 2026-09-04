@@ -986,15 +986,31 @@ class AiSemanticApiController(http.Controller):
             for r in risks
         ]
 
+        if "ai.integration.agent.module" in env:
+            try:
+                env["ai.integration.agent.module"].sudo().sync_installed_module_bindings()
+            except Exception:  # noqa: BLE001
+                _logger.exception("Could not refresh module-agent connections for admin view")
+
         assistants = []
         if "llm.assistant" in env:
             for a in env["llm.assistant"].sudo().search([]):
+                bindings = env["ai.integration.agent.module"].sudo().search([
+                    ("agent_id", "=", a.id), ("company_id", "=", env.company.id),
+                    ("active", "=", True),
+                ]) if "ai.integration.agent.module" in env else []
                 assistants.append({
                     "name": a.name,
                     # Infrastructure identifiers are intentionally not part of
                     # the product/admin API; only capability and health state
                     # are customer-visible.
                     "tool_count": len(a.tool_ids) if hasattr(a, "tool_ids") else None,
+                    "connected_module_count": len(bindings),
+                    "connected_modules": [{
+                        "label": b.module_label,
+                        "state": b.state,
+                        "tool_count": b.tool_count,
+                    } for b in bindings],
                     "active": a.active,
                 })
 
@@ -1228,6 +1244,14 @@ class AiControlPlaneSemanticController(_http.Controller):
                 "automatic_read": m.automatic_read,
                 "automatic_events": m.automatic_events,
                 "automatic_audit": m.automatic_audit,
+                "agent_connection": {
+                    "connected": bool(getattr(m, "agent_connected", False)),
+                    "state": getattr(m, "agent_connection_state", "disconnected"),
+                    "tool_count": getattr(m, "agent_tool_count", 0),
+                    "operation_count": getattr(m, "agent_operation_count", 0),
+                    "last_sync": str(getattr(m, "agent_last_sync", False)) if getattr(m, "agent_last_sync", False) else None,
+                    "error": getattr(m, "agent_error", False),
+                },
                 "last_sync": m.last_sync,
                 "status": getattr(m, "integration_status", "ready"),
                 "error": m.last_error,

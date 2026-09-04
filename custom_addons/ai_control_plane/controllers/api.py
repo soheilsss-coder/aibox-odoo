@@ -69,6 +69,14 @@ class AiControlPlaneController(http.Controller):
                 "automatic_read": m.automatic_read,
                 "automatic_events": m.automatic_events,
                 "automatic_audit": m.automatic_audit,
+                "agent_connection": {
+                    "connected": bool(getattr(m, "agent_connected", False)),
+                    "state": getattr(m, "agent_connection_state", "disconnected"),
+                    "tool_count": getattr(m, "agent_tool_count", 0),
+                    "operation_count": getattr(m, "agent_operation_count", 0),
+                    "last_sync": str(getattr(m, "agent_last_sync", False)) if getattr(m, "agent_last_sync", False) else None,
+                    "error": getattr(m, "agent_error", False),
+                },
                 "last_sync": str(m.last_sync) if m.last_sync else None,
                 "error": m.last_error,
             })
@@ -145,6 +153,14 @@ class AiControlPlaneController(http.Controller):
             "automatic_read": bool(registry.automatic_read) if registry else False,
             "automatic_events": bool(registry.automatic_events) if registry else False,
             "automatic_audit": bool(registry.automatic_audit) if registry else False,
+            "agent_connection": {
+                "connected": bool(getattr(registry, "agent_connected", False)) if registry else False,
+                "state": getattr(registry, "agent_connection_state", "disconnected") if registry else "disconnected",
+                "tool_count": getattr(registry, "agent_tool_count", 0) if registry else 0,
+                "operation_count": getattr(registry, "agent_operation_count", 0) if registry else 0,
+                "last_sync": str(getattr(registry, "agent_last_sync", False)) if registry and getattr(registry, "agent_last_sync", False) else None,
+                "error": getattr(registry, "agent_error", False) if registry else False,
+            },
             "capability_count": registry.capability_count if registry else 0,
             "reviewed_operation_count": registry.reviewed_operation_count if registry else 0,
             "last_error": registry.last_error if registry else False,
@@ -173,6 +189,11 @@ class AiControlPlaneController(http.Controller):
             return err
         if not _is_privileged(env, env.user):
             return _json_response({"error": "access denied"}, status=403)
+        if "ai.integration.agent.module" in env:
+            try:
+                env["ai.integration.agent.module"].sudo().sync_installed_module_bindings()
+            except Exception:  # noqa: BLE001
+                _logger.exception("Could not refresh module-agent connections for catalog")
         modules = env["ir.module.module"].sudo().search([
             ("state", "in", ["installed", "uninstalled", "uninstallable"]),
         ], order="application desc, shortdesc, name")
@@ -299,6 +320,11 @@ class AiControlPlaneController(http.Controller):
         env, err = self._auth_response()
         if err:
             return err
+        if "ai.integration.agent.module" in env:
+            try:
+                env["ai.integration.agent.module"].sudo().sync_installed_module_bindings()
+            except Exception:  # noqa: BLE001
+                _logger.exception("Could not refresh module-agent connections for navigation")
         installed = env["ir.module.module"].sudo().search([
             ("state", "=", "installed"), ("application", "=", True),
         ], order="shortdesc,name")
@@ -336,6 +362,12 @@ class AiControlPlaneController(http.Controller):
                 "certification_state": registry.certification_state,
                 "capability_count": registry.capability_count,
                 "reviewed_operation_count": registry.reviewed_operation_count,
+                "agent_connection": {
+                    "connected": bool(getattr(registry, "agent_connected", False)),
+                    "state": getattr(registry, "agent_connection_state", "disconnected"),
+                    "tool_count": getattr(registry, "agent_tool_count", 0),
+                    "operation_count": getattr(registry, "agent_operation_count", 0),
+                },
             })
         return _json_response({"modules": result})
 
