@@ -40,7 +40,7 @@
   "48_auto_integration_certification.py": "b85f8e465e4e9c6e95e9aee86656ecbb5d54c688e74648e04a0de46ed3a5cc7a",
   "49_v47_release_integrity.py": "7cbe189bfda8a24f663522255abed8fe8e31505faaa8be68ff38ac4e9561425b",
   "50_v47_static_security_tests.py": "650cad3427534dccbe3f1d090638dc9d3a2835870144880aeaa764aa9f79021b",
-  "51_v48_runtime_e2e.py": "a56d87e7f47062e3013b629467c8874fdec6873549727fa244a3a97b4530b9e8",
+  "51_v48_runtime_e2e.py": "68cb9ba8dcd8d3c58068bde15147064ef722fb8f07b17ad681e74f0abb4ac176",
   "52_v48_runtime_e2e_tests.py": "857ebd8970054323a01ce1d1bb94cfbfe30ffcc8d83a0a2a54fe3d8870a01173",
   "53_v48_release_integrity.py": "876ef0cb3e0010eabed3d40ba1ee955c44266953666bb0ea0e99f1d3596b0ad9",
   "54_v49_release_integrity.py": "0b912b8cbbd1ae5aa9b4bb515574cf336bbbdbf1917fc172056f90141dad51a4",
@@ -51,7 +51,7 @@
   "59_v57_hardening_audit.py": "d9bbc0d05a06ff8dd513ad7bc19dc4710bc42c19e930b36b3ff699b315b9e159",
   "60_v58_llm_benchmark.py": "18d7beca4e8eeeb99b1dcfa660756f41d6c0578b76cfdac3740e3f4428935ce9",
   "61_v58_capacity_gate.py": "0a08646a9538444e8d657af41d042bd4cd9dfb1ba6d52f8c0f3097dd04ecf44d",
-  "62_v58_module_certification.py": "5f827dbbd3b73ba1887bf7665c962012b8b019e40b46c8f52c775f3eca5b4def",
+  "62_v58_module_certification.py": "5e412f07d83c65b0a83e09079a3579beb5ba848d1c05febd049b0a660c1d55c8",
   "ARCHITECTURE_V33.md": "b00598bbb517bc8a67ed1ecdafe54decc4715a04cd0fb0463ad77c4c421394c7",
   "CANONICAL_REQUIREMENTS_AND_AUDIT.md": "432f214b19773ff6bf137c12d3ded279905db090c9df2511a9c28bd754bde8c2",
   "CUSTOMER_APPLIANCE_MODULES.md": "5807c04b0666bccf9fa2070a6cace8dbf9075aab8a63f5b11b7bfa21570bd171",
@@ -286,7 +286,7 @@
   "custom_addons/ai_integration/models/__init__.py": "b688bd43a2f9eb63c0755119ac969736b4a0da0acf4f609f691ac997680408e6",
   "custom_addons/ai_integration/models/adapter.py": "53a4cdf0b442ca64258a85c336cfea36c36bc2768884eed2df1ab87728450d88",
   "custom_addons/ai_integration/models/agent_module_binding.py": "68d7ecc2a976b8de2a09c4a6810293bb2ba70999be26927d1060b4ed842e52a9",
-  "custom_addons/ai_integration/models/certification.py": "99a03464c86265fcd0a29492867afd346076013e4587f6c3a607d336bd7dadad",
+  "custom_addons/ai_integration/models/certification.py": "016ab8fb32e66b408016bc842ddb4bf9acfbd700f780aa3b4c7d9966253f00e7",
   "custom_addons/ai_integration/models/discovery.py": "40a6e52c17769dd35080cbcdc0ad6918f54b0048c3f7780b8bb97187999a7c45",
   "custom_addons/ai_integration/models/event_dispatch.py": "78867fc1480daaf55fcef0e66a2de59aad42c57ff67cbc7c3aa432bfbcbbd882",
   "custom_addons/ai_integration/models/event_subscribers.py": "8cfeaa918eb7cd1c71321b85dca03ae80bde3eefde64bf77eb020675aeeca090",
@@ -400,6 +400,7 @@
   "frontend/src/pages/IntegrationsPage.jsx": "93db0fa219dcb40305de7bac2c83aeb88511f42b906c34d40cceff2efb111faa",
   "frontend/src/pages/LeavesPage.jsx": "46e58ab16d3cfdd9d6591890a654cde27b2338d7951a0ce9ef7597cb98ffe94a",
   "frontend/src/pages/LoginPage.jsx": "edd674aafc9c546bcb668b72f63e666e7f913713f84292653c8beb9b31544fbd",
+  "frontend/src/pages/ModuleMenuPage.jsx": "d8095b8963f9423ba4821536d809352e31dc6de93e60357176af3386d1b8be18",
   "frontend/src/pages/ModuleWorkspacePage.jsx": "d35ee8c95612851afdc510dc92993f4a7120c776a9f3e8c5d59616da8a177968",
   "frontend/src/styles/app.css": "2fe304ec47365982a8c8674160e1864d602d9b36ca1356479216ef91bf4b4d7f",
   "frontend/src/styles/tokens.css": "e141907f5fafa334996129c5a1a24a5977dfa8015929b3b2e14cbab7e65bb03e",
@@ -426,5 +427,5 @@
   "systemd/ai-vllm-chat.service": "e23e39cede8d228a7ea3a564ed82132cc25458883fe0354577f7a5cd6e61fbca",
   "systemd/ai-vllm-embedding.service": "07a1f895f1e571ca921ee46e13ad7f47e3baf0a5445ced00db9e6beaf78d9ec5",
   "systemd/ai-vllm-vision.service": "fdaddb0e614d6c2d243bed7ec89a5a93ce0889280d7d0bf90758e33d1969e03d",
-  "tests/test_upgrade_contracts.py": "f4cf6a3a12bdb55c417ec4746eca91b1e99949c7689b23afe34a045c043b4c78"
+  "tests/test_upgrade_contracts.py": "e1ca033a77cce3b18583ff4d2cfd3ae258c324d5d8a5fd21fa3f8bf70937aade"
 }

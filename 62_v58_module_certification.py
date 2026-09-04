@@ -55,7 +55,20 @@ def main(env, output=None):
         name = module.name
         item = registry.search([("technical_name", "=", name)], limit=1)
         adapter = adapters.search([("module_name", "=", name), ("active", "=", True)], limit=1)
-        agent_connection = bool(item and item.agent_connected and item.agent_connection_state in ("connected", "connected_no_tools"))
+        binding = env["ai.integration.agent.module"].sudo().binding_for_module(name) if "ai.integration.agent.module" in env else False
+        assistant = binding.agent_id if binding else False
+        binding_catalog_consistent = bool(
+            binding and assistant and set(binding.tool_ids.ids).issubset(set(assistant.tool_ids.ids))
+            and binding.tool_count == len(binding.tool_ids)
+            and binding.operation_count == len(binding.operation_ids)
+        )
+        agent_connection = bool(
+            item and item.agent_connected
+            and item.agent_connection_state in ("connected", "connected_no_tools")
+            and binding and binding.state in ("connected", "connected_no_tools")
+            and assistant and assistant.name == "Company Assistant"
+            and binding_catalog_consistent
+        )
         module_ops = operations.filtered(lambda op: op.module_name == name)
         module_caps = capabilities.filtered(lambda cap: cap.module_name == name)
         reviewed = bool(adapter and adapter.state == "ready")
@@ -99,6 +112,7 @@ def main(env, output=None):
             "agent_connection_state": item.agent_connection_state if item else "disconnected",
             "agent_tool_count": item.agent_tool_count if item else 0,
             "agent_operation_count": item.agent_operation_count if item else 0,
+            "binding_catalog_consistent": binding_catalog_consistent,
             "discovered_models": item.discovered_models if item else 0,
             "discovered_groups": item.discovered_groups if item else 0,
             "capability_count": len(module_caps),

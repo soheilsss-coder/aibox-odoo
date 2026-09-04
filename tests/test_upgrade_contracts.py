@@ -153,6 +153,8 @@ class SourceContracts(unittest.TestCase):
         tool_risk = (ADDONS / "ai_business_tools/models/tool_risk.py").read_text()
         control = (ADDONS / "ai_control_plane/models/integration.py").read_text()
         hooks = (ADDONS / "ai_integration/hooks.py").read_text()
+        certification = (ADDONS / "ai_integration/models/certification.py").read_text()
+        runtime = (ROOT / "51_v48_runtime_e2e.py").read_text()
         frontend = (ROOT / "frontend/src/pages/ModuleWorkspacePage.jsx").read_text()
         for marker in (
             "ai.integration.agent.module", "Company Assistant", "sync_installed_module_bindings",
@@ -161,6 +163,11 @@ class SourceContracts(unittest.TestCase):
             "owner_module_not_installed", "tool_owner_missing", "module_name = fields.Char",
         ):
             self.assertIn(marker, binding + discovery + gateway + gate + tool_risk + control + hooks)
+        for marker in (
+            "company_assistant_identity", "agent_tool_catalog_binding", "binding_counts_consistent",
+            "single_company_assistant_binding", "binding.catalog.", "binding.counts.",
+        ):
+            self.assertIn(marker, certification + runtime)
         risk_rows = list(xml_records("ai.gateway.tool.risk"))
         self.assertTrue(risk_rows)
         self.assertTrue(all(values.get("module_name") for _, _, values in risk_rows))

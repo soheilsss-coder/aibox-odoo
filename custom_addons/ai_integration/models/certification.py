@@ -44,6 +44,24 @@ class AiUniversalCertification(models.AbstractModel):
             bool(binding and binding.state in ('connected', 'connected_no_tools')),
             'Every installed module must be connected to the Company Assistant agent',
         )
+        assistant = binding.agent_id if binding else False
+        self._check(
+            checks, 'company_assistant_identity',
+            bool(assistant and assistant.name == 'Company Assistant'),
+            'The durable binding must point to the single Company Assistant agent',
+        )
+        linked_tools = set(binding.tool_ids.ids) if binding else set()
+        assistant_tools = set(assistant.tool_ids.ids) if assistant else set()
+        self._check(
+            checks, 'agent_tool_catalog_binding',
+            bool(binding and linked_tools.issubset(assistant_tools)),
+            'Binding tools must be present in the Company Assistant catalog',
+        )
+        self._check(
+            checks, 'binding_counts_consistent',
+            bool(binding and binding.tool_count == len(linked_tools) and binding.operation_count == len(binding.operation_ids)),
+            'Durable binding counts must match the connected operation/tool relations',
+        )
         adapter = self.env['ai.integration.adapter'].sudo().for_module(module_name)
         reviewed_adapter = bool(adapter and adapter.module_name == module_name and adapter.state == 'ready')
         self._check(checks, 'reviewed_adapter', reviewed_adapter)
