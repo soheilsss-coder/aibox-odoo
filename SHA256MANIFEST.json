@@ -437,5 +437,6 @@
   "custom_addons/company_ai_demo/models/document_extractor.py": "1564cf1e20ce1b52087dbded2518eb7e450ba6b1be705276820fdd22d487dcfb",
   "tests/test_rag_ingestion.py": "20d79ea1259a8f665fc9109308ccfa69a51d2813d1cdd7f3ef90c50ea9f498e4",
   "custom_addons/ai_rag/migrations/18.0.1.3.0/post-migrate.py": "e68ac4255d3b7fa05be47fcae40506a9e4ea3466fc632ed33916b0e8e602e34f",
-  "DOCUMENT_INGESTION_RUNBOOK.md": "a88cad327abd8974192183a41b2e018e32fe0e028477a495f38e57d62ebbaae7"
+  "DOCUMENT_INGESTION_RUNBOOK.md": "a88cad327abd8974192183a41b2e018e32fe0e028477a495f38e57d62ebbaae7",
+  "DOCUMENT_INGESTION_UPGRADE_PLAN_FA.md": "973deeffefb6de36f08b37b6d0b3c7b6b5cc90b3776b320d51a991988dff6a77"
 }
