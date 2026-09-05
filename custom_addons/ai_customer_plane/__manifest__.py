@@ -1,6 +1,6 @@
 {
     "name": "AI Customer Control Plane",
-    "version": "18.0.8.0.0",
+    "version": "18.0.9.0.0",
     "summary": "Customer roles, policy, delegation, access review, SSO and SCIM control plane",
     "category": "Technical",
     "depends": [

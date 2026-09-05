@@ -65,6 +65,9 @@ export const adminGetConfigurationProfile = (id) => request(`/api/admin/configur
 export const adminUpdateConfigurationProfile = (id, payload) => request(`/api/admin/configuration-profiles/${id}`, { method: "PATCH", body: payload });
 export const adminCloneConfigurationProfile = (id, name) => request(`/api/admin/configuration-profiles/${id}/clone`, { method: "POST", body: { name } });
 export const adminGetConfigurationProfileHistory = (id) => request(`/api/admin/configuration-profiles/${id}/history`);
+export const adminExportConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/export`);
+export const adminImportConfigurationProfile = (snapshot, name) => request("/api/admin/configuration-profiles/import", { method: "POST", body: { snapshot, name } });
+export const adminRollbackConfigurationProfile = (id, historyId, name) => request(`/api/admin/configuration-profiles/${id}/rollback`, { method: "POST", body: { history_id: historyId, name } });
 export const adminValidateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/validate`, { method: "POST" });
 export const adminCompileConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/compile`, { method: "POST" });
 export const adminActivateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/activate`, { method: "POST" });
@@ -74,6 +77,21 @@ export const adminGetSetupChecklist = () => request("/api/admin/setup/checklist"
 export const adminRunSetupChecklist = () => request("/api/admin/setup/checklist/run", { method: "POST" });
 export const adminListSetupRuns = () => request("/api/admin/setup/runs");
 export const adminGetSetupRun = (runKey) => request(`/api/admin/setup/runs/${encodeURIComponent(runKey)}`);
+export const adminRecordSetupEvidence = (runKey, payload) => request(`/api/admin/setup/runs/${encodeURIComponent(runKey)}/evidence`, { method: "POST", body: payload });
+export const adminListSsoProviders = () => request("/api/admin/sso/providers");
+export const adminCreateSsoProvider = (payload) => request("/api/admin/sso/providers", { method: "POST", body: payload });
+export const adminUpdateSsoProvider = (id, payload) => request(`/api/admin/sso/providers/${id}`, { method: "PATCH", body: payload });
+export const adminDisableSsoProvider = (id) => request(`/api/admin/sso/providers/${id}`, { method: "DELETE" });
+export const adminListScimTokens = () => request("/api/admin/scim/tokens");
+export const adminCreateScimToken = (name, expires_at) => request("/api/admin/scim/tokens", { method: "POST", body: { name, expires_at } });
+export const adminRevokeScimToken = (id) => request(`/api/admin/scim/tokens/${id}/revoke`, { method: "POST" });
+export const adminListScimGroups = () => request("/api/admin/scim/groups");
+export const adminCreateScimGroup = (payload) => request("/api/admin/scim/groups", { method: "POST", body: payload });
+export const adminListDepartments = () => request("/api/admin/departments");
+export const adminCreateDepartment = (payload) => request("/api/admin/departments", { method: "POST", body: payload });
+export const adminListRoleAssignments = () => request("/api/admin/role-assignments");
+export const adminCreateRoleAssignment = (payload) => request("/api/admin/role-assignments", { method: "POST", body: payload });
+export const adminRevokeRoleAssignment = (id) => request(`/api/admin/role-assignments/${id}/revoke`, { method: "POST" });
 export const sendChatMessage = (message, threadId) => request("/api/chat", { method: "POST", body: { message, thread_id: threadId } });
 
 export function streamChat(payload, handlers) {

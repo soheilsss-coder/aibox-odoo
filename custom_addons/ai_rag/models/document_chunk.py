@@ -441,6 +441,17 @@ class AiDocumentChunk(models.Model):
         if not rows:
             return []
 
+        if "ai.customer.configuration.profile" in self.env:
+            profile = self.env["ai.customer.configuration.profile"].active_for_company(self.env.company)
+            document_policy = profile.runtime_config().get("sections", {}).get("document_policy", {}) if profile else {}
+            if document_policy.get("citation_required"):
+                rows = [row for row in rows if any(
+                    row.get(key) not in (None, "")
+                    for key in ("source_page", "source_section", "source_type", "source_table", "source_sheet", "source_slide")
+                )]
+                if not rows:
+                    return []
+
         docs = self.env["company.document"].browse(
             [row["document_id"] for row in rows]
         )

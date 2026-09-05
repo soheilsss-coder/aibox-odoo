@@ -219,6 +219,19 @@ def _is_privileged(env, user):
     return False
 
 
+def _active_profile_section(env, section_name):
+    if "ai.customer.configuration.profile" not in env:
+        return {}
+    try:
+        profile = env["ai.customer.configuration.profile"].active_for_company(env.company)
+        sections = profile.runtime_config().get("sections", {}) if profile else {}
+        value = sections.get(section_name, {})
+        return value if isinstance(value, dict) else {}
+    except Exception:  # noqa: BLE001
+        _logger.exception("Could not read active customer profile section")
+        return {}
+
+
 def _select_assistant(env, message, has_attachment=False):
     """Select a certified assistant for the workload without exposing routing data.
 
@@ -231,7 +244,14 @@ def _select_assistant(env, message, has_attachment=False):
     """
     budget = classify_request(message, has_attachment=has_attachment)
     Assistant = env["llm.assistant"]
-    base_domain = [("name", "=", "Company Assistant"), ("active", "=", True)]
+    agent_policy = _active_profile_section(env, "agent")
+    assistant_name = str(agent_policy.get("assistant_name") or agent_policy.get("agent_name") or "Company Assistant").strip()
+    base_domain = [("name", "=", assistant_name), ("active", "=", True)]
+    preferred_model = str(agent_policy.get("model") or "").strip()
+    if preferred_model:
+        preferred = Assistant.search(base_domain + [("model_id.name", "=", preferred_model)], limit=1)
+        if preferred:
+            return preferred, budget
     if "ai.model.router" in env:
         try:
             profile = env["ai.model.router"].route(

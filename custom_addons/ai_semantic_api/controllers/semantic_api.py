@@ -83,7 +83,7 @@ _BRAND_COLOR_FIELDS = {
 }
 _PROFILE_SECTIONS = (
     "role_policy", "capability_policy", "approval_matrix", "document_policy",
-    "agent_config", "tool_config", "workflow_config",
+    "agent_config", "tool_config", "workflow_config", "feature_config",
 )
 _BRAND_DEFAULTS = {
     "primary_color": "#4f8cff",
@@ -134,6 +134,10 @@ def _profile_json_values(profile, include_sections=False):
         "version": profile.version,
         "compiled_hash": profile.compiled_hash or "",
         "compiled_at": str(profile.compiled_at) if profile.compiled_at else None,
+        "activated_by": profile.activated_by_id.name if profile.activated_by_id else None,
+        "activated_at": str(profile.activated_at) if profile.activated_at else None,
+        "previous_profile_id": profile.previous_profile_id.id if profile.previous_profile_id else None,
+        "deployment_result": _json.loads(profile.deployment_result_json or "{}"),
     }
     if include_sections:
         sections = {}
@@ -146,6 +150,17 @@ def _profile_json_values(profile, include_sections=False):
             sections[section] = parsed
         values["sections"] = sections
     return values
+
+
+def _active_profile_section(env, section_name):
+    if "ai.customer.configuration.profile" not in env:
+        return {}
+    profile = env["ai.customer.configuration.profile"].active_for_company(env.company)
+    if not profile:
+        return {}
+    sections = profile.runtime_config().get("sections", {})
+    value = sections.get(section_name, {})
+    return value if isinstance(value, dict) else {}
 
 
 def _profile_values_from_payload(payload, require_name=False):
@@ -615,11 +630,19 @@ class AiSemanticApiController(http.Controller):
         if err:
             return err
         name = (payload.get("name") or "").strip()
-        access_level = payload.get("access_level", "personal")
+        document_policy = _active_profile_section(env, "document_policy")
+        access_level = payload.get(
+            "access_level", document_policy.get("default_access_level", "personal")
+        )
+        allowed_levels = document_policy.get("allowed_access_levels", [])
         if not name:
             return _json_response({"error": "'name' is required"}, status=400)
         if access_level not in ("company", "group", "department", "personal"):
             return _json_response({"error": "invalid access_level"}, status=400)
+        if allowed_levels and (
+            not isinstance(allowed_levels, list) or access_level not in {str(item) for item in allowed_levels}
+        ):
+            return _json_response({"error": "access_level is disabled by the active customer profile"}, status=403)
 
         values = {
             "name": name,
@@ -1456,6 +1479,93 @@ class AiSemanticApiController(http.Controller):
             })
         return _json_response({"profile_id": profile.id, "history": rows})
 
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/export", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def admin_configuration_profile_export(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        snapshot = profile.export_snapshot()
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.export", {
+            "profile_id": profile.id, "version": profile.version,
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(profile, include_sections=True), "snapshot": snapshot})
+
+    @http.route("/api/admin/configuration-profiles/import", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_configuration_profile_import(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        snapshot = payload.get("snapshot")
+        if not isinstance(snapshot, dict):
+            return _json_response({"error": "snapshot object is required"}, status=400)
+        name = str(payload.get("name") or snapshot.get("name") or "").strip()
+        if not name:
+            return _json_response({"error": "imported profile name is required"}, status=400)
+        if env["ai.customer.configuration.profile"].search_count([
+            ("company_id", "=", env.company.id), ("name", "=", name),
+        ]):
+            return _json_response({"error": "a profile with this name already exists"}, status=409)
+        try:
+            profile = env["ai.customer.configuration.profile"].create_from_snapshot(
+                snapshot, name=name, company=env.company,
+            )
+        except (ValidationError, AccessError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.import", {
+            "profile_id": profile.id, "name": profile.name,
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(profile, include_sections=True)}, status=201)
+
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/rollback", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_configuration_profile_rollback(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        try:
+            history_id = int(payload.get("history_id"))
+        except (TypeError, ValueError):
+            return _json_response({"error": "history_id is required"}, status=400)
+        history = env["ai.customer.configuration.profile.history"].search([
+            ("id", "=", history_id), ("company_id", "=", env.company.id),
+            ("profile_id", "=", profile.id),
+        ], limit=1)
+        if not history:
+            return _json_response({"error": "history snapshot not found"}, status=404)
+        name = str(payload.get("name") or "%s rollback v%s" % (profile.name, history.profile_version)).strip()
+        if env["ai.customer.configuration.profile"].search_count([
+            ("company_id", "=", env.company.id), ("name", "=", name),
+        ]):
+            return _json_response({"error": "a profile with this name already exists"}, status=409)
+        try:
+            rollback = profile.rollback_from_history(history, name=name)
+        except (ValidationError, AccessError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.rollback", {
+            "source_profile_id": profile.id, "history_id": history.id, "profile_id": rollback.id,
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(rollback, include_sections=True), "source_history_id": history.id}, status=201)
+
     @staticmethod
     def _setup_checklist(env):
         company = env.company.sudo()
@@ -1676,6 +1786,351 @@ class AiSemanticApiController(http.Controller):
         if not run:
             return _json_response({"error": "setup run not found"}, status=404)
         return _json_response({"run": self._setup_run_values(run)})
+
+    @http.route("/api/admin/setup/runs/<string:run_key>/evidence", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_setup_run_evidence(self, run_key, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        run = env["ai.customer.setup.run"].search([
+            ("run_key", "=", run_key), ("company_id", "=", env.company.id),
+        ], limit=1)
+        if not run:
+            return _json_response({"error": "setup run not found"}, status=404)
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        allowed = {"backup_reference", "rollback_reference", "runtime_certification_state"}
+        if sorted(set(payload) - allowed):
+            return _json_response({"error": "unsupported evidence fields"}, status=400)
+        values = {}
+        for key in ("backup_reference", "rollback_reference"):
+            if key in payload:
+                value = str(payload[key] or "").strip()
+                if len(value) > 500:
+                    return _json_response({"error": "%s is too long" % key}, status=400)
+                values[key] = value or False
+        if "runtime_certification_state" in payload:
+            state = str(payload["runtime_certification_state"] or "")
+            if state not in ("not_run", "required", "passed", "failed"):
+                return _json_response({"error": "invalid runtime_certification_state"}, status=400)
+            values["runtime_certification_state"] = state
+        if not values:
+            return _json_response({"error": "at least one evidence field is required"}, status=400)
+        run.write(values)
+        _audit(env, env.user.id, "semantic_api", "admin.setup.run.evidence", {
+            "run_key": run.run_key, "fields": sorted(values),
+        }, success=True)
+        return _json_response({"run": self._setup_run_values(run)})
+
+    @staticmethod
+    def _serialize_sso_provider(provider):
+        return {
+            "id": provider.id, "name": provider.name, "protocol": provider.protocol,
+            "issuer": provider.issuer or "", "client_id": provider.client_id or "",
+            "client_secret_ref": provider.client_secret_ref or "",
+            "authorization_url": provider.authorization_url or "",
+            "token_url": provider.token_url or "", "jwks_url": provider.jwks_url or "",
+            "audience": provider.audience or "", "claim_user_id": provider.claim_user_id or "sub",
+            "claim_email": provider.claim_email or "email", "claim_groups": provider.claim_groups or "groups",
+            "claim_group_mapping_json": provider.claim_group_mapping_json or "{}",
+            "active": provider.active, "enforce_for_company": provider.enforce_for_company,
+            "auto_provision": provider.auto_provision, "redirect_uri": provider.redirect_uri or "",
+            "saml_metadata_url": provider.saml_metadata_url or "",
+            "saml_entity_id": provider.saml_entity_id or "",
+        }
+
+    @http.route("/api/admin/sso/providers", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "OPTIONS"])
+    def admin_sso_providers(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        Provider = env["ai.customer.sso.provider"].sudo()
+        if request.httprequest.method == "GET":
+            providers = Provider.search([("company_id", "=", env.company.id)], order="name,id")
+            return _json_response({"providers": [self._serialize_sso_provider(item) for item in providers]})
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        allowed = {
+            "name", "protocol", "issuer", "client_id", "client_secret_ref", "authorization_url",
+            "token_url", "jwks_url", "audience", "claim_user_id", "claim_email", "claim_groups",
+            "claim_group_mapping_json", "active", "enforce_for_company", "auto_provision",
+            "redirect_uri", "saml_metadata_url", "saml_entity_id",
+        }
+        if sorted(set(payload) - allowed):
+            return _json_response({"error": "unsupported SSO provider fields"}, status=400)
+        name = str(payload.get("name") or "").strip()
+        protocol = str(payload.get("protocol") or "oidc")
+        if not name or protocol not in ("oidc", "saml"):
+            return _json_response({"error": "name and a valid protocol are required"}, status=400)
+        values = {key: payload[key] for key in allowed if key in payload}
+        values.update({"name": name, "protocol": protocol, "company_id": env.company.id})
+        try:
+            provider = Provider.create(values)
+        except (ValidationError, AccessError, UserError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.sso_provider.create", {
+            "provider_id": provider.id, "protocol": provider.protocol,
+        }, success=True)
+        return _json_response({"provider": self._serialize_sso_provider(provider)}, status=201)
+
+    @http.route("/api/admin/sso/providers/<int:provider_id>", type="http", auth="none", csrf=False,
+                methods=["PATCH", "DELETE", "OPTIONS"])
+    def admin_sso_provider_update(self, provider_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        provider = env["ai.customer.sso.provider"].sudo().search([
+            ("id", "=", provider_id), ("company_id", "=", env.company.id),
+        ], limit=1)
+        if not provider:
+            return _json_response({"error": "SSO provider not found"}, status=404)
+        if request.httprequest.method == "DELETE":
+            provider.write({"active": False, "enforce_for_company": False})
+            _audit(env, env.user.id, "semantic_api", "admin.sso_provider.disable", {"provider_id": provider.id}, success=True)
+            return _json_response({"status": "disabled"})
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        allowed = {
+            "name", "protocol", "issuer", "client_id", "client_secret_ref", "authorization_url",
+            "token_url", "jwks_url", "audience", "claim_user_id", "claim_email", "claim_groups",
+            "claim_group_mapping_json", "active", "enforce_for_company", "auto_provision",
+            "redirect_uri", "saml_metadata_url", "saml_entity_id",
+        }
+        if sorted(set(payload) - allowed):
+            return _json_response({"error": "unsupported SSO provider fields"}, status=400)
+        values = {key: payload[key] for key in allowed if key in payload}
+        if "protocol" in values and values["protocol"] not in ("oidc", "saml"):
+            return _json_response({"error": "invalid protocol"}, status=400)
+        try:
+            provider.write(values)
+        except (ValidationError, AccessError, UserError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.sso_provider.update", {"provider_id": provider.id}, success=True)
+        return _json_response({"provider": self._serialize_sso_provider(provider)})
+
+    @http.route("/api/admin/scim/tokens", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "OPTIONS"])
+    def admin_scim_tokens(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        Token = env["ai.customer.scim.token"].sudo()
+        if request.httprequest.method == "GET":
+            rows = Token.search([("company_id", "=", env.company.id)], order="id desc")
+            return _json_response({"tokens": [{
+                "id": row.id, "name": row.name, "active": row.active,
+                "expires_at": str(row.expires_at) if row.expires_at else None,
+                "last_used_at": str(row.last_used_at) if row.last_used_at else None,
+            } for row in rows]})
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        name = str(payload.get("name") or "").strip()
+        if not name or len(name) > 200:
+            return _json_response({"error": "token name is required"}, status=400)
+        expires_at = payload.get("expires_at") or False
+        if expires_at:
+            expires_at = str(expires_at).replace("T", " ")
+            if len(expires_at) == 16:
+                expires_at += ":00"
+        try:
+            token, raw = Token.issue(name, company=env.company, expires_at=expires_at)
+        except (ValidationError, AccessError, UserError, ValueError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.scim_token.create", {"token_id": token.id}, success=True)
+        return _json_response({
+            "token": {"id": token.id, "name": token.name, "active": token.active,
+                      "expires_at": str(token.expires_at) if token.expires_at else None},
+            "token_value": raw,
+            "warning": "The token value is shown once; store it in the IdP configuration.",
+        }, status=201)
+
+    @http.route("/api/admin/scim/tokens/<int:token_id>/revoke", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_scim_token_revoke(self, token_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        token = env["ai.customer.scim.token"].sudo().search([
+            ("id", "=", token_id), ("company_id", "=", env.company.id),
+        ], limit=1)
+        if not token:
+            return _json_response({"error": "SCIM token not found"}, status=404)
+        token.write({"active": False})
+        _audit(env, env.user.id, "semantic_api", "admin.scim_token.revoke", {"token_id": token.id}, success=True)
+        return _json_response({"status": "revoked"})
+
+    @http.route("/api/admin/scim/groups", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "OPTIONS"])
+    def admin_scim_groups(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        Mapping = env["ai.customer.scim.group"].sudo()
+        if request.httprequest.method == "GET":
+            rows = Mapping.search([("company_id", "=", env.company.id)], order="name,id")
+            return _json_response({"groups": [{
+                "id": row.id, "name": row.name, "group_id": row.group_id.id,
+                "group_name": row.group_id.name, "active": row.active,
+            } for row in rows]})
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        try:
+            group = env["res.groups"].sudo().browse(int(payload.get("group_id"))).exists()
+        except (TypeError, ValueError):
+            group = False
+        if not group:
+            return _json_response({"error": "valid group_id is required"}, status=400)
+        xmlids = set(group.get_external_id().values())
+        if not any(value.startswith("ai_business_tools.role_") for value in xmlids):
+            return _json_response({"error": "SCIM may manage only product roles"}, status=403)
+        try:
+            mapping = Mapping.create({
+                "name": str(payload.get("name") or group.name).strip(),
+                "company_id": env.company.id, "group_id": group.id,
+            })
+        except (ValidationError, AccessError, UserError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.scim_group.create", {"mapping_id": mapping.id}, success=True)
+        return _json_response({"group": {
+            "id": mapping.id, "name": mapping.name, "group_id": group.id,
+            "group_name": group.name, "active": mapping.active,
+        }}, status=201)
+
+    @http.route("/api/admin/departments", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "OPTIONS"])
+    def admin_departments(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        if "hr.department" not in env:
+            return _json_response({"error": "department model is not installed"}, status=503)
+        Department = env["hr.department"].sudo()
+        if request.httprequest.method == "GET":
+            rows = Department.search([("company_id", "=", env.company.id)], order="complete_name,id")
+            return _json_response({"departments": [{
+                "id": row.id, "name": row.name, "complete_name": row.complete_name,
+                "parent_id": row.parent_id.id if row.parent_id else None,
+                "manager_id": row.manager_id.id if row.manager_id else None,
+                "manager": row.manager_id.name if row.manager_id else None,
+            } for row in rows]})
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        name = str(payload.get("name") or "").strip()
+        if not name or len(name) > 200:
+            return _json_response({"error": "department name is required"}, status=400)
+        values = {"name": name, "company_id": env.company.id}
+        if payload.get("parent_id"):
+            try:
+                parent = Department.search([("id", "=", int(payload["parent_id"])), ("company_id", "=", env.company.id)], limit=1)
+            except (TypeError, ValueError):
+                parent = False
+            if not parent:
+                return _json_response({"error": "invalid parent department"}, status=400)
+            values["parent_id"] = parent.id
+        if payload.get("manager_id"):
+            try:
+                manager = env["res.users"].sudo().search([
+                    ("id", "=", int(payload["manager_id"])), ("company_ids", "in", env.company.id),
+                ], limit=1)
+            except (TypeError, ValueError):
+                manager = False
+            if not manager:
+                return _json_response({"error": "invalid department manager"}, status=400)
+            values["manager_id"] = manager.id
+        try:
+            row = Department.create(values)
+        except (ValidationError, AccessError, UserError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.department.create", {"department_id": row.id}, success=True)
+        return _json_response({"department": {"id": row.id, "name": row.name, "complete_name": row.complete_name}}, status=201)
+
+    @http.route("/api/admin/role-assignments", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "OPTIONS"])
+    def admin_role_assignments(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        Assignment = env["ai.customer.role.assignment"].sudo()
+        if request.httprequest.method == "GET":
+            rows = Assignment.search([("company_id", "=", env.company.id)], order="active desc,id desc")
+            return _json_response({"assignments": [{
+                "id": row.id, "user_id": row.user_id.id if row.user_id else None,
+                "user": row.user_id.name if row.user_id else None,
+                "role_group_id": row.role_group_id.id, "role": row.role_group_id.name,
+                "source": row.source, "department_id": row.department_id.id if row.department_id else None,
+                "active": row.active, "expires_at": str(row.expires_at) if row.expires_at else None,
+                "reason": row.reason or "",
+            } for row in rows]})
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        try:
+            user = env["res.users"].sudo().browse(int(payload.get("user_id"))).exists()
+            group = env["res.groups"].sudo().browse(int(payload.get("role_group_id"))).exists()
+        except (TypeError, ValueError):
+            user = group = False
+        if not user or not group or env.company not in user.company_ids:
+            return _json_response({"error": "user and company role are required"}, status=400)
+        xmlids = set(group.get_external_id().values())
+        if not any(value.startswith("ai_business_tools.role_") for value in xmlids):
+            return _json_response({"error": "only product roles may be assigned"}, status=403)
+        values = {
+            "user_id": user.id, "role_group_id": group.id, "source": "direct",
+            "company_id": env.company.id, "managed_by": "admin",
+            "reason": str(payload.get("reason") or "Admin console assignment")[:500],
+            "expires_at": payload.get("expires_at") or False,
+        }
+        try:
+            assignment = Assignment.create(values)
+        except (ValidationError, AccessError, UserError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.role_assignment.create", {"assignment_id": assignment.id}, success=True)
+        return _json_response({"assignment": {
+            "id": assignment.id, "user_id": user.id, "user": user.name,
+            "role_group_id": group.id, "role": group.name, "source": assignment.source,
+            "active": assignment.active,
+        }}, status=201)
+
+    @http.route("/api/admin/role-assignments/<int:assignment_id>/revoke", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_role_assignment_revoke(self, assignment_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        assignment = env["ai.customer.role.assignment"].sudo().search([
+            ("id", "=", assignment_id), ("company_id", "=", env.company.id),
+        ], limit=1)
+        if not assignment:
+            return _json_response({"error": "role assignment not found"}, status=404)
+        assignment.write({"active": False})
+        _audit(env, env.user.id, "semantic_api", "admin.role_assignment.revoke", {"assignment_id": assignment.id}, success=True)
+        return _json_response({"status": "revoked"})
 
     @staticmethod
     def _branding_record(env, create=False):

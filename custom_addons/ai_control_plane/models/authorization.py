@@ -38,9 +38,16 @@ class AiAuthorizationEngine(models.AbstractModel):
             policy = profile.runtime_config().get("sections", {}).get("capability_policy", {}) if profile else {}
             allowed = policy.get("allowed_capabilities", policy.get("allow", []))
             denied = policy.get("denied_capabilities", policy.get("deny", []))
+            features = profile.runtime_config().get("sections", {}).get("features", {}) if profile else {}
+            enabled_features = features.get("enabled_features", [])
+            disabled_features = features.get("disabled_features", [])
             if isinstance(allowed, list) and allowed and capability not in {str(item) for item in allowed}:
                 return False
             if isinstance(denied, list) and capability in {str(item) for item in denied}:
+                return False
+            if isinstance(enabled_features, list) and enabled_features and capability not in {str(item) for item in enabled_features}:
+                return False
+            if isinstance(disabled_features, list) and capability in {str(item) for item in disabled_features}:
                 return False
         Cap = self.env["ai.control.capability"].sudo()
         cap = Cap.search([("name", "=", capability), ("active", "=", True)], limit=1)

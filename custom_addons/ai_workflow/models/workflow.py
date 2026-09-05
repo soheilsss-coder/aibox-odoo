@@ -178,6 +178,15 @@ class AiWorkflowRun(models.Model):
             ("active", "=", True), ("state", "=", "active"),
             ("trigger_event", "=", event.event_type),
         ])
+        if "ai.customer.configuration.profile" in self.env:
+            profile = self.env["ai.customer.configuration.profile"].active_for_company(event.company_id)
+            policy = profile.runtime_config().get("sections", {}).get("workflow", {}) if profile else {}
+            allowed_codes = policy.get("allowed_workflows", policy.get("enabled_codes", []))
+            denied_codes = policy.get("denied_workflows", policy.get("disabled_codes", []))
+            if isinstance(allowed_codes, list) and allowed_codes:
+                flows = flows.filtered(lambda flow: flow.code in {str(item) for item in allowed_codes})
+            if isinstance(denied_codes, list) and denied_codes:
+                flows = flows.filtered(lambda flow: flow.code not in {str(item) for item in denied_codes})
         created = []
         for flow in flows:
             flow.validate_definition()

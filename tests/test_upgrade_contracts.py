@@ -469,7 +469,7 @@ class SourceContracts(unittest.TestCase):
             'company_ids',
         ):
             self.assertIn(marker, rules + access)
-        self.assertIn('"version": "18.0.8.0.0"', manifest)
+        self.assertIn('"version": "18.0.9.0.0"', manifest)
         self.assertIn('ai.customer.branding', migration)
         self.assertIn('ai.brand.name', migration)
         self.assertIn('ai.brand.domain', migration)
@@ -498,6 +498,7 @@ class SourceContracts(unittest.TestCase):
         profile = (ADDONS / "ai_customer_plane/models/customer_config.py").read_text()
         history = (ADDONS / "ai_customer_plane/models/profile_history.py").read_text()
         migration = (ADDONS / "ai_customer_plane/migrations/18.0.8.0.0/post-migrate.py").read_text()
+        lifecycle_migration = (ADDONS / "ai_customer_plane/migrations/18.0.9.0.0/post-migrate.py").read_text()
         manifest = (ADDONS / "ai_customer_plane/__manifest__.py").read_text()
         access = (ADDONS / "ai_customer_plane/security/ir.model.access.csv").read_text()
         rules = (ADDONS / "ai_customer_plane/security/customer_rules.xml").read_text()
@@ -510,6 +511,13 @@ class SourceContracts(unittest.TestCase):
             '"/api/admin/setup/checklist/run"',
             '"/api/admin/setup/runs"',
             '"/api/admin/setup/runs/<string:run_key>"',
+            '"/api/admin/setup/runs/<string:run_key>/evidence"',
+            '"/api/admin/configuration-profiles/<int:profile_id>/export"',
+            '"/api/admin/configuration-profiles/import"',
+            '"/api/admin/configuration-profiles/<int:profile_id>/rollback"',
+            '"/api/admin/sso/providers"', '"/api/admin/scim/tokens"',
+            '"/api/admin/scim/groups"', '"/api/admin/role-assignments"',
+            '"/api/admin/departments"',
             "_require_privileged()", '("company_id", "=", env.company.id)',
             "_audit(env, env.user.id", "ready_for_customer_handoff",
         ):
@@ -518,19 +526,25 @@ class SourceContracts(unittest.TestCase):
             self.assertIn(marker, profile + history)
         self.assertIn("Profile history snapshots are immutable", history)
         self.assertIn("Profile history snapshots cannot be deleted", history)
-        self.assertIn("18.0.8.0.0", manifest + migration)
+        self.assertIn("18.0.9.0.0", manifest + lifecycle_migration)
         authorization = (ADDONS / "ai_control_plane/models/authorization.py").read_text()
         gate = (ADDONS / "ai_gateway/models/execution_gate.py").read_text()
         for marker in (
             "active_for_company", "runtime_config", "allowed_capabilities", "denied_capabilities",
-            "_profile_allows_tool", "customer_profile_tool_policy",
+            "_profile_allows_tool", "_profile_requires_approval", "customer_profile_tool_policy",
+            "_apply_role_policy", "export_snapshot", "create_from_snapshot", "rollback_from_history",
+            "feature_config_json", "activated_by_id", "previous_profile_id", "deployment_result_json",
         ):
             self.assertIn(marker, profile + authorization + gate)
         self.assertIn("ai.customer.configuration.profile.history", migration)
+        self.assertIn("deployment_result_json", lifecycle_migration)
         self.assertIn("model_ai_customer_configuration_profile_history", access + rules)
         for marker in (
             "adminCloneConfigurationProfile", "adminGetConfigurationProfileHistory",
             "adminGetSetupChecklist", "adminRunSetupChecklist", "adminListSetupRuns",
+            "adminExportConfigurationProfile", "adminImportConfigurationProfile", "adminRollbackConfigurationProfile",
+            "adminRecordSetupEvidence", "adminCreateSsoProvider", "adminCreateScimToken",
+            "adminCreateRoleAssignment", "adminCreateDepartment", "IdentityAccessTab",
             "Clone به draft", "History:", "Deployment checklist", "اجرای checklist",
             "PROFILE_FIELD_SCHEMAS", "ProfileSectionEditor", "ویرایش پیشرفته JSON",
         ):

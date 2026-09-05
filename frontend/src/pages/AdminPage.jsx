@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   adminListRoles, adminListUsers, adminListAccessGrants, adminCreateAccessGrant,
   adminRevokeAccessGrant, adminListDocuments, adminListAgents, adminGetBranding,
@@ -6,10 +6,17 @@ import {
   adminGetSetup, adminUpdateCompany, adminListConfigurationProfiles,
   adminCreateConfigurationProfile, adminGetConfigurationProfile,
   adminCloneConfigurationProfile, adminGetConfigurationProfileHistory,
-  adminUpdateConfigurationProfile, adminValidateConfigurationProfile,
+  adminExportConfigurationProfile, adminImportConfigurationProfile,
+  adminRollbackConfigurationProfile, adminUpdateConfigurationProfile,
+  adminValidateConfigurationProfile,
   adminCompileConfigurationProfile, adminActivateConfigurationProfile,
   adminArchiveConfigurationProfile, adminDryRunConfigurationProfile,
   adminGetSetupChecklist, adminRunSetupChecklist, adminListSetupRuns,
+  adminRecordSetupEvidence, adminListSsoProviders, adminCreateSsoProvider,
+  adminDisableSsoProvider, adminListScimTokens, adminCreateScimToken,
+  adminRevokeScimToken, adminListScimGroups, adminCreateScimGroup,
+  adminListDepartments, adminCreateDepartment,
+  adminListRoleAssignments, adminCreateRoleAssignment, adminRevokeRoleAssignment,
   adminGetModuleReadiness, ApiError,
 } from "../api/client.js";
 import {
@@ -41,6 +48,7 @@ const TABS = [
   { key: "observability", label: "مانیتورینگ" },
   { key: "modules", label: "برنامه‌ها" },
   { key: "control", label: "Control Plane" },
+  { key: "identity", label: "هویت و دسترسی" },
 ];
 
 function useLoad(loader, deps = []) {
@@ -73,6 +81,7 @@ export default function AdminPage() {
       {tab === "observability" && <ObservabilityTab />}
       {tab === "modules" && <ModulesTab />}
       {tab === "control" && <ControlPlaneTab />}
+      {tab === "identity" && <IdentityAccessTab />}
     </div>
   );
 }
@@ -86,6 +95,7 @@ const PROFILE_SECTIONS = [
   ["agent_config", "Agent Configuration"],
   ["tool_config", "Tool Configuration"],
   ["workflow_config", "Workflow Configuration"],
+  ["feature_config", "Customer Feature Configuration"],
 ];
 
 const EMPTY_PROFILE_SECTIONS = Object.fromEntries(PROFILE_SECTIONS.map(([key]) => [key, {}]));
@@ -124,6 +134,10 @@ const PROFILE_FIELD_SCHEMAS = {
     ["default_workflow", "Workflow پیش‌فرض", "text"],
     ["notification_channel", "کانال اعلان", "text"],
     ["retry_limit", "حد retry", "number"],
+  ],
+  feature_config: [
+    ["enabled_features", "Featureهای فعال (comma-separated)", "list"],
+    ["disabled_features", "Featureهای غیرفعال (comma-separated)", "list"],
   ],
 };
 
@@ -172,6 +186,7 @@ function ProfilesTab() {
   const [historyError, setHistoryError] = useState("");
   const [busy, setBusy] = useState("");
   const [result, setResult] = useState(null);
+  const importInput = useRef(null);
 
   useEffect(() => {
     if (data?.profiles?.length && !selectedId) setSelectedId(data.profiles[0].id);
@@ -262,6 +277,74 @@ function ProfilesTab() {
     }
   }
 
+  async function exportProfile() {
+    if (!profile) return;
+    setBusy("export");
+    setResult(null);
+    try {
+      const value = await adminExportConfigurationProfile(profile.id);
+      const blob = new Blob([JSON.stringify(value.snapshot, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${profile.name.replace(/[^a-z0-9-_]+/gi, "-") || "profile"}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setResult({ status: "exported", schema_version: value.snapshot.schema_version });
+    } catch (err) {
+      setResult({ error: err instanceof ApiError ? err.message : "export profile ناموفق بود" });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function importProfile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const snapshot = JSON.parse(await file.text());
+      const name = window.prompt("نام profile واردشده", snapshot.name || "Imported profile");
+      if (!name?.trim()) return;
+      setBusy("import");
+      const value = await adminImportConfigurationProfile(snapshot, name.trim());
+      setSelectedId(value.profile.id);
+      refresh();
+      setResult({ status: "imported", profile: value.profile });
+    } catch (err) {
+      setResult({ error: err instanceof ApiError ? err.message : "فایل profile نامعتبر یا import ناموفق بود" });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function rollbackProfile() {
+    if (!profile || !history?.length) return;
+    const selected = window.prompt(
+      `شناسه snapshot را وارد کنید (${history.map((row) => `${row.id}:v${row.version}`).join(", ")})`,
+      String(history[0].id),
+    );
+    const row = history.find((item) => String(item.id) === String(selected));
+    if (!row) {
+      setResult({ error: "snapshot انتخاب‌شده در این profile وجود ندارد" });
+      return;
+    }
+    const name = window.prompt("نام draft حاصل از rollback", `${profile.name} — rollback v${row.version}`);
+    if (!name?.trim()) return;
+    setBusy("rollback");
+    setResult(null);
+    try {
+      const value = await adminRollbackConfigurationProfile(profile.id, row.id, name.trim());
+      setSelectedId(value.profile.id);
+      refresh();
+      setResult({ status: "rollback-draft-created", source_history_id: row.id, profile: value.profile });
+    } catch (err) {
+      setResult({ error: err instanceof ApiError ? err.message : "rollback ناموفق بود" });
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function action(name, handler) {
     if (!profile) return;
     setBusy(name);
@@ -300,6 +383,10 @@ function ProfilesTab() {
             <Badge tone={profile.state === "active" ? "success" : profile.state === "archived" ? "neutral" : "warning"}>{profile.state}</Badge>
             <span className="muted">نسخه {profile.version} · hash: {profile.compiled_hash || "ندارد"}</span>
             <Button size="sm" variant="ghost" onClick={cloneProfile} loading={busy === "clone"}>Clone به draft</Button>
+            <Button size="sm" variant="ghost" onClick={exportProfile} loading={busy === "export"}>Export snapshot</Button>
+            <Button size="sm" variant="ghost" onClick={() => importInput.current?.click()} loading={busy === "import"}>Import snapshot</Button>
+            <input ref={importInput} type="file" accept="application/json,.json" hidden onChange={importProfile} />
+            <Button size="sm" variant="ghost" onClick={rollbackProfile} loading={busy === "rollback"} disabled={!history?.length}>Rollback به draft</Button>
             <Button size="sm" variant="ghost" onClick={refreshHistory}>تازه‌سازی history</Button>
           </div>
           <Input label="نام profile" value={profile.name} disabled={profile.state === "active"} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
@@ -616,7 +703,9 @@ function SetupChecklistPanel() {
   const [runs, runsError, refreshRuns] = useLoad(adminListSetupRuns, []);
   const [latestRun, setLatestRun] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [runError, setRunError] = useState("");
+  const [evidence, setEvidence] = useState({ backup_reference: "", rollback_reference: "", runtime_certification_state: "required" });
 
   async function runChecklist() {
     setBusy(true);
@@ -637,6 +726,23 @@ function SetupChecklistPanel() {
   const summary = checklist?.summary || {};
   const stateTone = { pass: "success", fail: "danger", required: "warning" };
   const runTone = { passed: "success", failed: "danger", running: "info", queued: "warning" };
+
+  async function saveEvidence() {
+    if (!latestRun) return;
+    setEvidenceBusy(true);
+    setRunError("");
+    try {
+      const value = await adminRecordSetupEvidence(latestRun.run_key, evidence);
+      setLatestRun(value.run);
+      refreshChecklist();
+      refreshRuns();
+    } catch (err) {
+      setRunError(err instanceof ApiError ? err.message : "ثبت evidence ناموفق بود");
+    } finally {
+      setEvidenceBusy(false);
+    }
+  }
+
   return (
     <Card
       title="Deployment checklist و شواهد تحویل"
@@ -659,6 +765,12 @@ function SetupChecklistPanel() {
         ]} rows={checks} />}
       </>}
       {latestRun && <div className="profile-result"><strong>آخرین اجرای همین نشست:</strong> {latestRun.run_key} · <Badge tone={runTone[latestRun.state] || "neutral"}>{latestRun.state}</Badge><pre>{JSON.stringify(latestRun.result, null, 2)}</pre></div>}
+      <div className="admin-form-grid">
+        <Input label="Backup reference" value={evidence.backup_reference} onChange={(e) => setEvidence({ ...evidence, backup_reference: e.target.value })} />
+        <Input label="Rollback reference" value={evidence.rollback_reference} onChange={(e) => setEvidence({ ...evidence, rollback_reference: e.target.value })} />
+        <Select label="Runtime certification" value={evidence.runtime_certification_state} onChange={(e) => setEvidence({ ...evidence, runtime_certification_state: e.target.value })} options={[{ value: "required", label: "Required" }, { value: "passed", label: "Passed" }, { value: "failed", label: "Failed" }]} />
+      </div>
+      <Button size="sm" variant="ghost" onClick={saveEvidence} loading={evidenceBusy} disabled={!latestRun}>ثبت evidence برای آخرین run</Button>
       {runs && runs.runs?.length > 0 && <>
         <h4>اجرای ثبت‌شده</h4>
         <Table columns={[
@@ -961,6 +1073,141 @@ function ModulesTab() {
       </Card>
     </>
   );
+}
+
+function IdentityAccessTab() {
+  const [roles, rolesError] = useLoad(adminListRoles, []);
+  const [users, usersError] = useLoad(adminListUsers, []);
+  const [assignments, assignmentsError, refreshAssignments] = useLoad(adminListRoleAssignments, []);
+  const [departments, departmentsError, refreshDepartments] = useLoad(adminListDepartments, []);
+  const [providers, providersError, refreshProviders] = useLoad(adminListSsoProviders, []);
+  const [tokens, tokensError, refreshTokens] = useLoad(adminListScimTokens, []);
+  const [scimGroups, groupsError, refreshScimGroups] = useLoad(adminListScimGroups, []);
+  const [assignment, setAssignment] = useState({ user_id: "", role_group_id: "", reason: "" });
+  const [departmentName, setDepartmentName] = useState("");
+  const [provider, setProvider] = useState({ name: "", protocol: "oidc", issuer: "", client_id: "", client_secret_ref: "", active: false, enforce_for_company: false, auto_provision: false });
+  const [tokenName, setTokenName] = useState("");
+  const [tokenExpiry, setTokenExpiry] = useState("");
+  const [scimGroup, setScimGroup] = useState({ name: "", group_id: "" });
+  const [oneTimeToken, setOneTimeToken] = useState("");
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+
+  async function submitDepartment(event) {
+    event.preventDefault();
+    setBusy("department"); setError("");
+    try {
+      await adminCreateDepartment({ name: departmentName });
+      setDepartmentName(""); refreshDepartments();
+    } catch (err) { setError(err instanceof ApiError ? err.message : "ثبت دپارتمان ناموفق بود"); }
+    finally { setBusy(""); }
+  }
+
+  async function submitAssignment(event) {
+    event.preventDefault();
+    setBusy("assignment"); setError("");
+    try {
+      await adminCreateRoleAssignment({ ...assignment, user_id: Number(assignment.user_id), role_group_id: Number(assignment.role_group_id) });
+      setAssignment({ user_id: "", role_group_id: "", reason: "" });
+      refreshAssignments();
+    } catch (err) { setError(err instanceof ApiError ? err.message : "ثبت assignment ناموفق بود"); }
+    finally { setBusy(""); }
+  }
+
+  async function submitProvider(event) {
+    event.preventDefault();
+    setBusy("provider"); setError("");
+    try {
+      await adminCreateSsoProvider(provider);
+      setProvider({ name: "", protocol: "oidc", issuer: "", client_id: "", client_secret_ref: "", active: false, enforce_for_company: false, auto_provision: false });
+      refreshProviders();
+    } catch (err) { setError(err instanceof ApiError ? err.message : "ثبت provider ناموفق بود"); }
+    finally { setBusy(""); }
+  }
+
+  async function issueToken(event) {
+    event.preventDefault();
+    setBusy("token"); setError("");
+    try {
+      const expiry = tokenExpiry ? `${tokenExpiry.replace("T", " ")}:00` : undefined;
+      const value = await adminCreateScimToken(tokenName, expiry);
+      setOneTimeToken(value.token_value);
+      setTokenName(""); setTokenExpiry(""); refreshTokens();
+    } catch (err) { setError(err instanceof ApiError ? err.message : "ساخت SCIM token ناموفق بود"); }
+    finally { setBusy(""); }
+  }
+
+  async function submitScimGroup(event) {
+    event.preventDefault();
+    setBusy("group"); setError("");
+    try {
+      await adminCreateScimGroup({ name: scimGroup.name, group_id: Number(scimGroup.group_id) });
+      setScimGroup({ name: "", group_id: "" }); refreshScimGroups();
+    } catch (err) { setError(err instanceof ApiError ? err.message : "ثبت SCIM group ناموفق بود"); }
+    finally { setBusy(""); }
+  }
+
+  const roleOptions = (roles?.roles || []).map((role) => ({ value: role.id, label: role.name }));
+  return <>
+    <Card title="Role assignment و دسترسی کاربران">
+      <Alert>{rolesError || usersError || assignmentsError || departmentsError || error}</Alert>
+      <form className="admin-form-grid" onSubmit={submitDepartment}>
+        <Input label="نام دپارتمان جدید" required value={departmentName} onChange={(e) => setDepartmentName(e.target.value)} />
+        <div><Button type="submit" loading={busy === "department"} disabled={!departmentName.trim()}>ساخت دپارتمان</Button></div>
+      </form>
+      {departments?.departments?.length > 0 && <Table columns={[{ key: "complete_name", header: "دپارتمان" }, { key: "manager", header: "مدیر", render: (row) => row.manager || "—" }]} rows={departments.departments} />}
+      <form className="admin-form-grid" onSubmit={submitAssignment}>
+        <Select label="کاربر" value={assignment.user_id} onChange={(e) => setAssignment({ ...assignment, user_id: e.target.value })} options={(users?.users || []).map((user) => ({ value: user.id, label: `${user.name} (${user.login})` }))} />
+        <Select label="Role" value={assignment.role_group_id} onChange={(e) => setAssignment({ ...assignment, role_group_id: e.target.value })} options={roleOptions} />
+        <Input label="دلیل" value={assignment.reason} onChange={(e) => setAssignment({ ...assignment, reason: e.target.value })} />
+        <div><Button type="submit" loading={busy === "assignment"} disabled={!assignment.user_id || !assignment.role_group_id}>ثبت role assignment</Button></div>
+      </form>
+      {assignments?.assignments?.length > 0 && <Table columns={[
+        { key: "user", header: "کاربر" }, { key: "role", header: "Role" }, { key: "source", header: "Source" },
+        { key: "active", header: "وضعیت", render: (row) => <Badge tone={row.active ? "success" : "neutral"}>{row.active ? "active" : "revoked"}</Badge> },
+        { key: "actions", header: "", render: (row) => row.active && <Button size="sm" variant="danger" onClick={async () => { try { await adminRevokeRoleAssignment(row.id); refreshAssignments(); } catch (err) { setError(err instanceof ApiError ? err.message : "لغو ناموفق بود"); } }}>لغو</Button> },
+      ]} rows={assignments.assignments} />}
+    </Card>
+
+    <Card title="SSO / OIDC / SAML">
+      <form className="admin-form-grid" onSubmit={submitProvider}>
+        <Input label="نام provider" required value={provider.name} onChange={(e) => setProvider({ ...provider, name: e.target.value })} />
+        <Select label="Protocol" value={provider.protocol} onChange={(e) => setProvider({ ...provider, protocol: e.target.value })} options={[{ value: "oidc", label: "OIDC" }, { value: "saml", label: "SAML" }]} />
+        <Input label="Issuer" value={provider.issuer} onChange={(e) => setProvider({ ...provider, issuer: e.target.value })} />
+        <Input label="Client ID" value={provider.client_id} onChange={(e) => setProvider({ ...provider, client_id: e.target.value })} />
+        <Input label="Secret reference" placeholder="vault://... یا env://..." value={provider.client_secret_ref} onChange={(e) => setProvider({ ...provider, client_secret_ref: e.target.value })} />
+        <Input label="Authorization URL" value={provider.authorization_url || ""} onChange={(e) => setProvider({ ...provider, authorization_url: e.target.value })} />
+        <div className="admin-toggle"><label><input type="checkbox" checked={provider.active} onChange={(e) => setProvider({ ...provider, active: e.target.checked })} /> فعال</label><label><input type="checkbox" checked={provider.enforce_for_company} onChange={(e) => setProvider({ ...provider, enforce_for_company: e.target.checked })} /> اجباری برای شرکت</label><label><input type="checkbox" checked={provider.auto_provision} onChange={(e) => setProvider({ ...provider, auto_provision: e.target.checked })} /> auto-provision</label></div>
+        <div><Button type="submit" loading={busy === "provider"} disabled={!provider.name}>ثبت provider</Button></div>
+      </form>
+      {providers?.providers?.length > 0 && <Table columns={[
+        { key: "name", header: "Provider" }, { key: "protocol", header: "Protocol" }, { key: "issuer", header: "Issuer" },
+        { key: "active", header: "Active", render: (row) => <Badge tone={row.active ? "success" : "neutral"}>{row.active ? "بله" : "خیر"}</Badge> },
+        { key: "actions", header: "", render: (row) => row.active && <Button size="sm" variant="danger" onClick={async () => { try { await adminDisableSsoProvider(row.id); refreshProviders(); } catch (err) { setError(err instanceof ApiError ? err.message : "غیرفعال‌سازی ناموفق بود"); } }}>غیرفعال</Button> },
+      ]} rows={providers.providers} />}
+    </Card>
+
+    <Card title="SCIM token و role mapping">
+      <form className="admin-form-grid" onSubmit={issueToken}>
+        <Input label="نام token" required value={tokenName} onChange={(e) => setTokenName(e.target.value)} />
+        <Input label="انقضا" type="datetime-local" value={tokenExpiry} onChange={(e) => setTokenExpiry(e.target.value)} />
+        <div><Button type="submit" loading={busy === "token"} disabled={!tokenName}>ساخت token</Button></div>
+      </form>
+      {oneTimeToken && <Alert tone="success"><strong>Token فقط همین‌جا نمایش داده می‌شود:</strong><pre className="profile-result">{oneTimeToken}</pre></Alert>}
+      {tokens?.tokens?.length > 0 && <Table columns={[
+        { key: "name", header: "Token" }, { key: "expires_at", header: "انقضا", render: (row) => row.expires_at || "—" },
+        { key: "active", header: "وضعیت", render: (row) => <Badge tone={row.active ? "success" : "neutral"}>{row.active ? "active" : "revoked"}</Badge> },
+        { key: "actions", header: "", render: (row) => row.active && <Button size="sm" variant="danger" onClick={async () => { try { await adminRevokeScimToken(row.id); refreshTokens(); } catch (err) { setError(err instanceof ApiError ? err.message : "لغو token ناموفق بود"); } }}>لغو</Button> },
+      ]} rows={tokens.tokens} />}
+      <form className="admin-form-grid" onSubmit={submitScimGroup}>
+        <Input label="نام mapping" value={scimGroup.name} onChange={(e) => setScimGroup({ ...scimGroup, name: e.target.value })} />
+        <Select label="Product role" value={scimGroup.group_id} onChange={(e) => setScimGroup({ ...scimGroup, group_id: e.target.value })} options={roleOptions} />
+        <div><Button type="submit" variant="ghost" loading={busy === "group"} disabled={!scimGroup.group_id}>ثبت SCIM mapping</Button></div>
+      </form>
+      {groupsError && <Alert>{groupsError}</Alert>}
+      {scimGroups?.groups?.length > 0 && <Table columns={[{ key: "name", header: "Mapping" }, { key: "group_name", header: "Role" }, { key: "active", header: "Active" }]} rows={scimGroups.groups} />}
+    </Card>
+  </>;
 }
 
 function ControlPlaneTab() {

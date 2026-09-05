@@ -45,5 +45,15 @@
         <field name="model_id" ref="model_ai_customer_role_assignment"/>
         <field name="domain_force">[("company_id", "in", company_ids)]</field>
     </record>
+    <record id="rule_role_policy_company" model="ir.rule">
+        <field name="name">Role policy company isolation</field>
+        <field name="model_id" ref="model_ai_customer_role_policy"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
+    <record id="rule_customer_designer_company" model="ir.rule">
+        <field name="name">Customer designer company isolation</field>
+        <field name="model_id" ref="model_ai_customer_designer"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
     <record id="rule_external_identity_company" model="ir.rule"><field name="name">External identity company isolation</field><field name="model_id" ref="model_ai_customer_external_identity"/><field name="domain_force">[("company_id", "in", company_ids)]</field></record>
 </odoo>

@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class AiSsoProvider(models.Model):
@@ -38,4 +39,4 @@ class AiSsoProvider(models.Model):
     def _no_secret_literal(self):
         for rec in self:
             if rec.client_secret_ref and len(rec.client_secret_ref) > 0 and not rec.client_secret_ref.startswith(("vault://","secret://","env://")):
-                raise ValueError("client_secret_ref must reference external secret management.")
+                raise ValidationError("client_secret_ref must reference external secret management.")
