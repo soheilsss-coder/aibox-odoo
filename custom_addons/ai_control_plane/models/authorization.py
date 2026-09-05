@@ -29,6 +29,19 @@ class AiAuthorizationEngine(models.AbstractModel):
     @api.model
     def decide(self, capability, user=None, record=None, action="execute"):
         user = user or self.env.user
+        # An activated customer profile is a runtime policy, not just a
+        # deployment document. Keep this check inside the central
+        # authorization engine so API, chat, workflow and approval replay
+        # all observe the same company-scoped capability allow/deny list.
+        if "ai.customer.configuration.profile" in self.env:
+            profile = self.env["ai.customer.configuration.profile"].active_for_company(self.env.company)
+            policy = profile.runtime_config().get("sections", {}).get("capability_policy", {}) if profile else {}
+            allowed = policy.get("allowed_capabilities", policy.get("allow", []))
+            denied = policy.get("denied_capabilities", policy.get("deny", []))
+            if isinstance(allowed, list) and allowed and capability not in {str(item) for item in allowed}:
+                return False
+            if isinstance(denied, list) and capability in {str(item) for item in denied}:
+                return False
         Cap = self.env["ai.control.capability"].sudo()
         cap = Cap.search([("name", "=", capability), ("active", "=", True)], limit=1)
         if not cap:

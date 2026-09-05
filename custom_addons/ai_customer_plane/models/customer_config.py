@@ -82,6 +82,24 @@ class AiConfigurationProfile(models.Model):
         return result
 
     @api.model
+    def active_for_company(self, company=None):
+        company = company or self.env.company
+        return self.sudo().search([
+            ("company_id", "=", company.id), ("state", "=", "active"),
+            ("active", "=", True),
+        ], order="id desc", limit=1)
+
+    def runtime_config(self):
+        self.ensure_one()
+        if not self.compiled_hash:
+            return {}
+        try:
+            value = json.loads(self.compiled_config_json or "{}")
+        except (TypeError, ValueError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
+    @api.model
     def _parse_section(self, raw, label):
         try:
             value = json.loads(raw or "{}")
@@ -111,6 +129,22 @@ class AiConfigurationProfile(models.Model):
         configured_tools = sections["tools"].get("allowed_tools", sections["tools"].get("tools", []))
         if configured_tools and not isinstance(configured_tools, list):
             raise ValidationError("tool_config_json.allowed_tools must be a list.")
+        capability_policy = sections["capability_policy"]
+        configured_capabilities = []
+        for key in ("allowed_capabilities", "denied_capabilities", "allow", "deny"):
+            value = capability_policy.get(key, [])
+            if value and not isinstance(value, list):
+                raise ValidationError("capability_policy.%s must be a list." % key)
+            configured_capabilities.extend(value or [])
+        if configured_capabilities and "ai.control.capability" not in self.env:
+            raise ValidationError("The capability registry is not available.")
+        if configured_capabilities:
+            known = set(self.env["ai.control.capability"].sudo().search([
+                ("name", "in", [str(item) for item in configured_capabilities]),
+            ]).mapped("name"))
+            unknown = sorted({str(item) for item in configured_capabilities} - known)
+            if unknown:
+                raise ValidationError("Capability contract is incomplete: %s" % ", ".join(unknown))
         contracts = []
         if configured_tools:
             if "ai.integration.unified.registry" not in self.env:

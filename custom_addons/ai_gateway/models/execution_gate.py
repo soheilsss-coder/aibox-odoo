@@ -47,6 +47,23 @@ class AiGatewayExecutionGate(models.AbstractModel):
         return (None, risk, None)
 
     @api.model
+    def _profile_allows_tool(self, tool_name):
+        """Apply the active customer's compiled tool policy at execution time."""
+        if "ai.customer.configuration.profile" not in self.env:
+            return True
+        profile = self.env["ai.customer.configuration.profile"].active_for_company(self.env.company)
+        if not profile:
+            return True
+        policy = profile.runtime_config().get("sections", {}).get("tools", {})
+        allowed = policy.get("allowed_tools", policy.get("allow", []))
+        denied = policy.get("denied_tools", policy.get("deny", []))
+        if isinstance(allowed, list) and allowed and tool_name not in {str(item) for item in allowed}:
+            return False
+        if isinstance(denied, list) and tool_name in {str(item) for item in denied}:
+            return False
+        return True
+
+    @api.model
     def _audit(self, action, payload, success=True, error_message=None):
         if "ai.gateway.audit.log" in self.env:
             self.env["ai.gateway.audit.log"].sudo().log(
@@ -109,6 +126,9 @@ class AiGatewayExecutionGate(models.AbstractModel):
             raise AccessError("access_denied: AI tool is not registered in the central risk registry")
 
         operation, rec, cap = contract
+        if not self._profile_allows_tool(tool_name):
+            self._audit(tool_name, {"reason": "customer_profile_tool_policy"}, False, "customer_profile_tool_policy")
+            raise AccessError("access_denied: this tool is disabled by the active customer configuration profile")
         # Risk rows for optional tools are durable metadata, not proof that the
         # owning official addon is installed in this database. Reject stale
         # direct-tool calls here as well as in the assistant catalog.

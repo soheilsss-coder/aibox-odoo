@@ -519,6 +519,13 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("Profile history snapshots are immutable", history)
         self.assertIn("Profile history snapshots cannot be deleted", history)
         self.assertIn("18.0.8.0.0", manifest + migration)
+        authorization = (ADDONS / "ai_control_plane/models/authorization.py").read_text()
+        gate = (ADDONS / "ai_gateway/models/execution_gate.py").read_text()
+        for marker in (
+            "active_for_company", "runtime_config", "allowed_capabilities", "denied_capabilities",
+            "_profile_allows_tool", "customer_profile_tool_policy",
+        ):
+            self.assertIn(marker, profile + authorization + gate)
         self.assertIn("ai.customer.configuration.profile.history", migration)
         self.assertIn("model_ai_customer_configuration_profile_history", access + rules)
         for marker in (
