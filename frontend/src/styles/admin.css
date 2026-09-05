@@ -58,6 +58,27 @@
   padding: 0;
 }
 
+.profile-section-editor {
+  margin: 18px 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+}
+
+.profile-section-editor h4 {
+  margin-bottom: 10px;
+}
+
+.profile-advanced-editor {
+  margin-top: 8px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.profile-advanced-editor summary {
+  cursor: pointer;
+  color: var(--color-primary);
+}
+
 .profile-toolbar,
 .profile-actions {
   display: flex;

@@ -1394,6 +1394,289 @@ class AiSemanticApiController(http.Controller):
         }, success=True)
         return _json_response({"profile": _profile_json_values(profile), "dry_run": result})
 
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/clone", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_configuration_profile_clone(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        name = str(payload.get("name") or "").strip()
+        if not name:
+            return _json_response({"error": "clone name is required"}, status=400)
+        if env["ai.customer.configuration.profile"].search_count([
+            ("company_id", "=", env.company.id), ("name", "=", name),
+        ]):
+            return _json_response({"error": "a profile with this name already exists"}, status=409)
+        try:
+            clone = profile.clone(name)
+        except (ValidationError, AccessError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.clone", {
+            "source_profile_id": profile.id,
+            "profile_id": clone.id,
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(clone, include_sections=True)}, status=201)
+
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/history", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def admin_configuration_profile_history(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        history = env["ai.customer.configuration.profile.history"].search([
+            ("company_id", "=", env.company.id), ("profile_id", "=", profile.id),
+        ], order="changed_at desc,id desc", limit=100)
+        rows = []
+        for item in history:
+            try:
+                snapshot = _json.loads(item.snapshot_json or "{}")
+            except (TypeError, ValueError):
+                snapshot = {}
+            rows.append({
+                "id": item.id,
+                "version": item.profile_version,
+                "state": item.state,
+                "compiled_hash": item.compiled_hash or "",
+                "changed_by": item.changed_by_id.name,
+                "changed_at": str(item.changed_at) if item.changed_at else None,
+                "snapshot": snapshot,
+            })
+        return _json_response({"profile_id": profile.id, "history": rows})
+
+    @staticmethod
+    def _setup_checklist(env):
+        company = env.company.sudo()
+        checks = []
+
+        def add(key, label, state, severity, message, remediation=None):
+            checks.append({
+                "key": key,
+                "label": label,
+                "state": state,
+                "severity": severity,
+                "message": message,
+                "remediation": remediation,
+            })
+
+        add(
+            "company.identity", "مشخصات شرکت", "pass" if company.name else "fail",
+            "blocking", "نام شرکت ثبت شده است." if company.name else "نام شرکت لازم است.",
+            None if company.name else "/admin?tab=setup",
+        )
+        branding = env["ai.customer.branding"].search([
+            ("company_id", "=", company.id), ("active", "=", True),
+        ], limit=1)
+        add(
+            "branding.record", "پروفایل برند", "pass" if branding else "fail",
+            "blocking", "پروفایل برند موجود است." if branding else "پروفایل برند ایجاد نشده است.",
+            None if branding else "/admin?tab=branding",
+        )
+        add(
+            "branding.logo", "لوگو", "pass" if branding and branding.logo else "fail",
+            "blocking", "لوگو ثبت شده است." if branding and branding.logo else "لوگو ثبت نشده است.",
+            None if branding and branding.logo else "/admin?tab=branding",
+        )
+        add(
+            "branding.favicon", "Favicon", "pass" if branding and branding.favicon else "fail",
+            "blocking", "Favicon ثبت شده است." if branding and branding.favicon else "Favicon ثبت نشده است.",
+            None if branding and branding.favicon else "/admin?tab=branding",
+        )
+        theme_ok = bool(branding and branding.primary_color and branding.background_color)
+        add(
+            "branding.theme", "رنگ و ظاهر", "pass" if theme_ok else "fail",
+            "blocking", "Theme معتبر است." if theme_ok else "Theme کامل نیست.",
+            None if theme_ok else "/admin?tab=branding",
+        )
+
+        installed_apps = env["ir.module.module"].sudo().search([
+            ("state", "=", "installed"), ("application", "=", True),
+        ]) if "ir.module.module" in env else env["ir.module.module"].browse()
+        registry = env["ai.control.module"].sudo() if "ai.control.module" in env else None
+        module_rows = registry.search([
+            ("technical_name", "in", installed_apps.mapped("name")),
+            ("state", "=", "installed"),
+        ]) if registry is not None and installed_apps else []
+        all_registered = bool(installed_apps) and len(module_rows) == len(installed_apps)
+        add(
+            "modules.registry", "ثبت برنامه‌های نصب‌شده", "pass" if all_registered else "fail",
+            "blocking" if installed_apps else "warning",
+            "تمام Applicationهای نصب‌شده در registry ثبت شده‌اند." if all_registered else "برخی Applicationهای نصب‌شده هنوز sync نشده‌اند.",
+            None if all_registered else "/admin?tab=modules",
+        )
+        agent_ok = bool(module_rows) and all(
+            row.agent_connection_state in ("connected", "connected_no_tools") for row in module_rows
+        ) if module_rows else False
+        add(
+            "modules.agent", "اتصال برنامه‌ها به Agent", "pass" if agent_ok else "fail",
+            "blocking" if installed_apps else "warning",
+            "Agent برای برنامه‌های نصب‌شده متصل است." if agent_ok else "اتصال Agent همه برنامه‌ها کامل نیست.",
+            None if agent_ok else "/admin?tab=modules",
+        )
+
+        profiles = env["ai.customer.configuration.profile"].search([
+            ("company_id", "=", company.id),
+        ])
+        active_profile = profiles.filtered(lambda profile: profile.state == "active")[:1]
+        profile_ok = bool(active_profile and active_profile.compiled_hash and active_profile.compiled_at)
+        add(
+            "profile.active", "Configuration Profile فعال", "pass" if profile_ok else "fail",
+            "blocking", "Profile فعال و compile شده است." if profile_ok else "Profile فعال و compile شده لازم است.",
+            None if profile_ok else "/admin?tab=profiles",
+        )
+
+        deployment_ready = False
+        deployment_message = "Deployment dry-run هنوز اجرا نشده است."
+        if active_profile:
+            try:
+                wizard = env["ai.customer.deployment.wizard"].create({
+                    "profile_id": active_profile.id, "dry_run": True,
+                })
+                wizard.run()
+                result = _json.loads(wizard.result_json or "{}")
+                deployment_ready = bool(result.get("ready"))
+                deployment_message = "تمام prerequisiteهای profile PASS شد." if deployment_ready else "برخی prerequisiteهای profile fail شده است."
+                wizard.unlink()
+            except Exception as exc:  # noqa: BLE001
+                deployment_message = "Deployment dry-run قابل اجرا نبود: %s" % str(exc)
+        add(
+            "profile.deployment", "Deployment dry-run", "pass" if deployment_ready else "fail",
+            "blocking", deployment_message,
+            None if deployment_ready else "/admin?tab=profiles",
+        )
+        rag_ready = "ai.document.index.job" in env and "ai.rag.index.snapshot" in env
+        add(
+            "rag.models", "RAG runtime models", "pass" if rag_ready else "required",
+            "warning", "مدل‌های RAG در registry موجود هستند." if rag_ready else "Runtime RAG روی appliance باید certification شود.",
+            None if rag_ready else "runtime certification",
+        )
+        latest_run = env["ai.customer.setup.run"].search([
+            ("company_id", "=", company.id),
+        ], order="started_at desc,id desc", limit=1)
+        runtime_ok = bool(latest_run and latest_run.runtime_certification_state == "passed")
+        add(
+            "runtime.certification", "Runtime certification", "pass" if runtime_ok else "required",
+            "blocking", "Runtime certification PASS است." if runtime_ok else "Runtime certification روی target واقعی لازم است.",
+            None if runtime_ok else "48_auto_integration_certification.py و benchmark",
+        )
+        backup_ok = bool(latest_run and latest_run.backup_reference and latest_run.rollback_reference)
+        add(
+            "handoff.backup", "Backup و rollback evidence", "pass" if backup_ok else "required",
+            "blocking", "Backup و rollback reference ثبت شده است." if backup_ok else "Backup و rollback evidence ثبت نشده است.",
+            None if backup_ok else "appliance deployment runbook",
+        )
+        blocking = [check for check in checks if check["severity"] == "blocking"]
+        ready = bool(blocking) and all(check["state"] == "pass" for check in blocking)
+        return {
+            "checks": checks,
+            "summary": {
+                "ready_for_customer_handoff": ready,
+                "blocking_total": len(blocking),
+                "blocking_passed": sum(check["state"] == "pass" for check in blocking),
+                "warning_total": sum(check["severity"] == "warning" for check in checks),
+            },
+        }
+
+    @staticmethod
+    def _setup_run_values(run):
+        return {
+            "run_key": run.run_key,
+            "company_id": run.company_id.id,
+            "state": run.state,
+            "current_stage": run.current_stage,
+            "runtime_certification_state": run.runtime_certification_state,
+            "requested_by": run.requested_by_id.name,
+            "started_at": str(run.started_at) if run.started_at else None,
+            "completed_at": str(run.completed_at) if run.completed_at else None,
+            "error_summary": run.error_summary or "",
+            "result": _json.loads(run.result_json or "{}"),
+        }
+
+    @http.route("/api/admin/setup/checklist", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def admin_setup_checklist(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        return _json_response(self._setup_checklist(env))
+
+    @http.route("/api/admin/setup/checklist/run", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_setup_checklist_run(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        Run = env["ai.customer.setup.run"]
+        run = Run.create({
+            "company_id": env.company.id,
+            "requested_by_id": env.user.id,
+            "release_commit": os.environ.get("AI_RELEASE_COMMIT", "")[:64] or False,
+        })
+        run.action_start(stage="identity")
+        result = self._setup_checklist(env)
+        profile = env["ai.customer.configuration.profile"].search([
+            ("company_id", "=", env.company.id), ("state", "=", "active"),
+        ], limit=1)
+        branding = env["ai.customer.branding"].search([
+            ("company_id", "=", env.company.id), ("active", "=", True),
+        ], limit=1)
+        run.write({
+            "configuration_profile_id": profile.id if profile else False,
+            "branding_version": branding.version if branding else 0,
+            "runtime_certification_state": "passed" if result["summary"]["ready_for_customer_handoff"] else "required",
+        })
+        if result["summary"]["ready_for_customer_handoff"]:
+            run.action_pass(result=result)
+        else:
+            run.action_fail("customer handoff blockers remain", result=result)
+        _audit(env, env.user.id, "semantic_api", "admin.setup.checklist.run", {
+            "run_key": run.run_key,
+            "ready_for_customer_handoff": result["summary"]["ready_for_customer_handoff"],
+        }, success=True)
+        return _json_response({"run": self._setup_run_values(run)}, status=201)
+
+    @http.route("/api/admin/setup/runs", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def admin_setup_runs(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        runs = env["ai.customer.setup.run"].search([], limit=50)
+        return _json_response({"runs": [self._setup_run_values(run) for run in runs]})
+
+    @http.route("/api/admin/setup/runs/<string:run_key>", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def admin_setup_run_get(self, run_key, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        run = env["ai.customer.setup.run"].search([
+            ("run_key", "=", run_key), ("company_id", "=", env.company.id),
+        ], limit=1)
+        if not run:
+            return _json_response({"error": "setup run not found"}, status=404)
+        return _json_response({"run": self._setup_run_values(run)})
+
     @staticmethod
     def _branding_record(env, create=False):
         Branding = env["ai.customer.branding"]

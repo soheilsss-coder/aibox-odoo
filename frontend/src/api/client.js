@@ -63,11 +63,17 @@ export const adminListConfigurationProfiles = () => request("/api/admin/configur
 export const adminCreateConfigurationProfile = (payload) => request("/api/admin/configuration-profiles", { method: "POST", body: payload });
 export const adminGetConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}`);
 export const adminUpdateConfigurationProfile = (id, payload) => request(`/api/admin/configuration-profiles/${id}`, { method: "PATCH", body: payload });
+export const adminCloneConfigurationProfile = (id, name) => request(`/api/admin/configuration-profiles/${id}/clone`, { method: "POST", body: { name } });
+export const adminGetConfigurationProfileHistory = (id) => request(`/api/admin/configuration-profiles/${id}/history`);
 export const adminValidateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/validate`, { method: "POST" });
 export const adminCompileConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/compile`, { method: "POST" });
 export const adminActivateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/activate`, { method: "POST" });
 export const adminArchiveConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/archive`, { method: "POST" });
 export const adminDryRunConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/dry-run`, { method: "POST" });
+export const adminGetSetupChecklist = () => request("/api/admin/setup/checklist");
+export const adminRunSetupChecklist = () => request("/api/admin/setup/checklist/run", { method: "POST" });
+export const adminListSetupRuns = () => request("/api/admin/setup/runs");
+export const adminGetSetupRun = (runKey) => request(`/api/admin/setup/runs/${encodeURIComponent(runKey)}`);
 export const sendChatMessage = (message, threadId) => request("/api/chat", { method: "POST", body: { message, thread_id: threadId } });
 
 export function streamChat(payload, handlers) {

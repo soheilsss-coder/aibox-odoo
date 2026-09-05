@@ -5,9 +5,11 @@ import {
   adminUpdateBranding, adminGetMetrics, adminListModules, adminInstallModule,
   adminGetSetup, adminUpdateCompany, adminListConfigurationProfiles,
   adminCreateConfigurationProfile, adminGetConfigurationProfile,
+  adminCloneConfigurationProfile, adminGetConfigurationProfileHistory,
   adminUpdateConfigurationProfile, adminValidateConfigurationProfile,
   adminCompileConfigurationProfile, adminActivateConfigurationProfile,
   adminArchiveConfigurationProfile, adminDryRunConfigurationProfile,
+  adminGetSetupChecklist, adminRunSetupChecklist, adminListSetupRuns,
   adminGetModuleReadiness, ApiError,
 } from "../api/client.js";
 import {
@@ -88,11 +90,86 @@ const PROFILE_SECTIONS = [
 
 const EMPTY_PROFILE_SECTIONS = Object.fromEntries(PROFILE_SECTIONS.map(([key]) => [key, {}]));
 
+const PROFILE_FIELD_SCHEMAS = {
+  role_policy: [
+    ["department", "Department", "text"], ["position", "Position", "text"],
+    ["job_level", "Job level", "text"], ["location", "Location", "text"],
+    ["employment_type", "Employment type", "text"], ["manager_required", "مدیر باید باشد", "boolean"],
+  ],
+  capability_policy: [
+    ["allowed_capabilities", "قابلیت‌های مجاز (comma-separated)", "list"],
+    ["denied_capabilities", "قابلیت‌های مسدود (comma-separated)", "list"],
+  ],
+  approval_matrix: [
+    ["risk_threshold", "حد ریسک نیازمند تایید", "number"],
+    ["approver_group", "گروه تاییدکننده", "text"],
+    ["high_risk_requires_approval", "ریسک بالا نیازمند تایید است", "boolean"],
+  ],
+  document_policy: [
+    ["default_access_level", "سطح دسترسی پیش‌فرض", "text"],
+    ["ingestion_mode", "حالت ingestion", "text"],
+    ["citation_required", "Citation اجباری است", "boolean"],
+    ["retry_limit", "حد retry", "number"],
+  ],
+  agent_config: [
+    ["agent_name", "نام Agent", "text"], ["provider", "Provider label", "text"],
+    ["model", "Model label", "text"], ["risk_level", "سطح ریسک پیش‌فرض", "number"],
+  ],
+  tool_config: [
+    ["allowed_tools", "ابزارهای مجاز (comma-separated)", "list"],
+    ["denied_tools", "ابزارهای مسدود (comma-separated)", "list"],
+    ["approval_required", "تایید برای ابزار لازم است", "boolean"],
+  ],
+  workflow_config: [
+    ["default_workflow", "Workflow پیش‌فرض", "text"],
+    ["notification_channel", "کانال اعلان", "text"],
+    ["retry_limit", "حد retry", "number"],
+  ],
+};
+
+function profileSectionObject(value) {
+  if (value && typeof value === "object") return value;
+  try {
+    const parsed = JSON.parse(value || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function ProfileSectionEditor({ sectionKey, label, value, disabled, onChange }) {
+  const section = profileSectionObject(value);
+  const schema = PROFILE_FIELD_SCHEMAS[sectionKey] || [];
+  function update(field, raw, kind) {
+    const next = { ...section };
+    if (kind === "list") next[field] = String(raw).split(",").map((item) => item.trim()).filter(Boolean);
+    else if (kind === "boolean") next[field] = Boolean(raw);
+    else if (kind === "number") next[field] = raw === "" ? undefined : Number(raw);
+    else next[field] = raw;
+    if (next[field] === undefined) delete next[field];
+    onChange(next);
+  }
+  return <div className="profile-section-editor">
+    <h4>{label}</h4>
+    {schema.length > 0 && <div className="admin-form-grid">
+      {schema.map(([field, fieldLabel, kind]) => kind === "boolean"
+        ? <label className="admin-toggle" key={field}><input type="checkbox" checked={Boolean(section[field])} disabled={disabled} onChange={(e) => update(field, e.target.checked, kind)} /><span>{fieldLabel}</span></label>
+        : <Input key={field} label={fieldLabel} type={kind === "number" ? "number" : "text"} value={kind === "list" ? (Array.isArray(section[field]) ? section[field].join(", ") : "") : (section[field] ?? "")} disabled={disabled} onChange={(e) => update(field, e.target.value, kind)} />)}
+    </div>}
+    <details className="profile-advanced-editor">
+      <summary>ویرایش پیشرفته JSON برای فیلدهای تخصصی</summary>
+      <TextArea label={`${label} — JSON object`} rows={4} value={typeof value === "string" ? value : JSON.stringify(section, null, 2)} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
+    </details>
+  </div>;
+}
+
 function ProfilesTab() {
   const [data, error, refresh] = useLoad(adminListConfigurationProfiles, []);
   const [selectedId, setSelectedId] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loadError, setLoadError] = useState("");
+  const [history, setHistory] = useState(null);
+  const [historyError, setHistoryError] = useState("");
   const [busy, setBusy] = useState("");
   const [result, setResult] = useState(null);
 
@@ -103,11 +180,23 @@ function ProfilesTab() {
   useEffect(() => {
     if (!selectedId) return;
     setProfile(null);
+    setHistory(null);
     setLoadError("");
+    setHistoryError("");
     adminGetConfigurationProfile(selectedId)
       .then((value) => setProfile(value.profile))
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "خطا در بارگذاری profile"));
+    adminGetConfigurationProfileHistory(selectedId)
+      .then((value) => setHistory(value.history))
+      .catch((err) => setHistoryError(err instanceof ApiError ? err.message : "خطا در بارگذاری history"));
   }, [selectedId]);
+
+  function refreshHistory() {
+    if (!selectedId) return;
+    adminGetConfigurationProfileHistory(selectedId)
+      .then((value) => { setHistory(value.history); setHistoryError(""); })
+      .catch((err) => setHistoryError(err instanceof ApiError ? err.message : "خطا در بارگذاری history"));
+  }
 
   async function createProfile() {
     const name = window.prompt("نام profile را وارد کنید", "پروفایل اولیه مشتری");
@@ -133,7 +222,10 @@ function ProfilesTab() {
     if (!profile || profile.state === "active") return;
     const payload = { name: profile.name };
     try {
-      PROFILE_SECTIONS.forEach(([key]) => { payload[key] = JSON.parse(profile.sections[key] || "{}"); });
+      PROFILE_SECTIONS.forEach(([key]) => {
+        const section = profile.sections[key];
+        payload[key] = typeof section === "string" ? JSON.parse(section || "{}") : (section || {});
+      });
     } catch (err) {
       setResult({ error: `JSON بخش ${err.message || "نامعتبر"}` });
       return;
@@ -144,8 +236,27 @@ function ProfilesTab() {
       const value = await adminUpdateConfigurationProfile(profile.id, payload);
       setProfile(value.profile);
       refresh();
+      refreshHistory();
     } catch (err) {
       setResult({ error: err instanceof ApiError ? err.message : "ذخیره profile ناموفق بود" });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function cloneProfile() {
+    if (!profile) return;
+    const name = window.prompt("نام profile جدید را وارد کنید", `${profile.name} — draft`);
+    if (!name?.trim()) return;
+    setBusy("clone");
+    setResult(null);
+    try {
+      const value = await adminCloneConfigurationProfile(profile.id, name.trim());
+      setSelectedId(value.profile.id);
+      setResult({ status: "cloned", source_profile_id: profile.id, profile: value.profile });
+      refresh();
+    } catch (err) {
+      setResult({ error: err instanceof ApiError ? err.message : "clone profile ناموفق بود" });
     } finally {
       setBusy("");
     }
@@ -160,6 +271,7 @@ function ProfilesTab() {
       setResult(value);
       if (value.profile) setProfile(value.profile);
       refresh();
+      refreshHistory();
     } catch (err) {
       setResult({ error: err instanceof ApiError ? err.message : "عملیات profile ناموفق بود" });
     } finally {
@@ -187,9 +299,11 @@ function ProfilesTab() {
           <div className="profile-toolbar">
             <Badge tone={profile.state === "active" ? "success" : profile.state === "archived" ? "neutral" : "warning"}>{profile.state}</Badge>
             <span className="muted">نسخه {profile.version} · hash: {profile.compiled_hash || "ندارد"}</span>
+            <Button size="sm" variant="ghost" onClick={cloneProfile} loading={busy === "clone"}>Clone به draft</Button>
+            <Button size="sm" variant="ghost" onClick={refreshHistory}>تازه‌سازی history</Button>
           </div>
           <Input label="نام profile" value={profile.name} disabled={profile.state === "active"} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
-          {PROFILE_SECTIONS.map(([key, label]) => <TextArea key={key} label={`${label} — JSON object`} rows={4} value={typeof profile.sections[key] === "string" ? profile.sections[key] : JSON.stringify(profile.sections[key] || {}, null, 2)} disabled={profile.state === "active"} onChange={(e) => updateSection(key, e.target.value)} />)}
+          {PROFILE_SECTIONS.map(([key, label]) => <ProfileSectionEditor key={key} sectionKey={key} label={label} value={profile.sections[key]} disabled={profile.state === "active"} onChange={(value) => updateSection(key, value)} />)}
           <div className="profile-actions">
             <Button onClick={saveProfile} loading={busy === "save"} disabled={profile.state === "active"}>ذخیره draft</Button>
             <Button variant="ghost" onClick={() => action("validate", adminValidateConfigurationProfile)} loading={busy === "validate"}>اعتبارسنجی</Button>
@@ -201,6 +315,19 @@ function ProfilesTab() {
           {result && <pre className="profile-result">{JSON.stringify(result, null, 2)}</pre>}
         </Card>
       )}
+      {profile && <Card title={`History: ${profile.name}`}>
+        {historyError && <Alert>{historyError}</Alert>}
+        {!history && !historyError && <Spinner />}
+        {history && !history.length && <EmptyState text="برای این profile هنوز snapshot ثبت نشده است." />}
+        {history && history.length > 0 && <Table columns={[
+          { key: "version", header: "نسخه" },
+          { key: "state", header: "وضعیت", render: (row) => <Badge tone={row.state === "active" ? "success" : row.state === "archived" ? "neutral" : "warning"}>{row.state}</Badge> },
+          { key: "changed_by", header: "تغییردهنده" },
+          { key: "changed_at", header: "زمان", render: (row) => row.changed_at || "—" },
+          { key: "compiled_hash", header: "Compile", render: (row) => row.compiled_hash ? <Badge tone="success">compiled</Badge> : <Badge tone="neutral">—</Badge> },
+          { key: "snapshot", header: "Snapshot", render: (row) => <details><summary>مشاهده</summary><pre className="profile-result">{JSON.stringify(row.snapshot, null, 2)}</pre></details> },
+        ]} rows={history} />}
+      </Card>}
     </>
   );
 }
@@ -475,12 +602,76 @@ function SetupTab() {
         </div>
         <p className="muted">برای تنظیم لوگو، رنگ‌ها و ظاهر کامل، تب «برندینگ» را باز کنید.</p>
       </Card>
+      <SetupChecklistPanel />
     </>
   );
 }
 
 function SetupCheck({ label, ok }) {
   return <div className="setup-check"><Badge tone={ok ? "success" : "warning"}>{ok ? "PASS" : "TODO"}</Badge><span>{label}</span></div>;
+}
+
+function SetupChecklistPanel() {
+  const [checklist, checklistError, refreshChecklist] = useLoad(adminGetSetupChecklist, []);
+  const [runs, runsError, refreshRuns] = useLoad(adminListSetupRuns, []);
+  const [latestRun, setLatestRun] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [runError, setRunError] = useState("");
+
+  async function runChecklist() {
+    setBusy(true);
+    setRunError("");
+    try {
+      const result = await adminRunSetupChecklist();
+      setLatestRun(result.run);
+      refreshChecklist();
+      refreshRuns();
+    } catch (err) {
+      setRunError(err instanceof ApiError ? err.message : "اجرای checklist ناموفق بود");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const checks = checklist?.checks || [];
+  const summary = checklist?.summary || {};
+  const stateTone = { pass: "success", fail: "danger", required: "warning" };
+  const runTone = { passed: "success", failed: "danger", running: "info", queued: "warning" };
+  return (
+    <Card
+      title="Deployment checklist و شواهد تحویل"
+      actions={<Button size="sm" onClick={runChecklist} loading={busy}>اجرای checklist و ثبت run</Button>}
+    >
+      <p className="muted">این بررسی server-side و company-scoped است؛ نتیجه در یک setup run durable ذخیره می‌شود و با refresh صفحه از بین نمی‌رود.</p>
+      <Alert>{checklistError || runsError || runError}</Alert>
+      {checklist && <>
+        <div className="setup-check-grid">
+          <SetupCheck label="آماده تحویل مشتری" ok={Boolean(summary.ready_for_customer_handoff)} />
+          <SetupCheck label={`موارد blocking: ${summary.blocking_passed || 0}/${summary.blocking_total || 0}`} ok={summary.blocking_total > 0 && summary.blocking_passed === summary.blocking_total} />
+          <SetupCheck label={`هشدارها: ${summary.warning_total || 0}`} ok={summary.warning_total === 0} />
+        </div>
+        {checks.length > 0 && <Table columns={[
+          { key: "label", header: "بررسی" },
+          { key: "state", header: "نتیجه", render: (row) => <Badge tone={stateTone[row.state] || "neutral"}>{row.state.toUpperCase()}</Badge> },
+          { key: "severity", header: "اثر", render: (row) => row.severity === "blocking" ? <Badge tone="danger">BLOCKING</Badge> : <Badge tone="warning">WARNING</Badge> },
+          { key: "message", header: "شرح" },
+          { key: "remediation", header: "اقدام اصلاحی", render: (row) => row.remediation || "—" },
+        ]} rows={checks} />}
+      </>}
+      {latestRun && <div className="profile-result"><strong>آخرین اجرای همین نشست:</strong> {latestRun.run_key} · <Badge tone={runTone[latestRun.state] || "neutral"}>{latestRun.state}</Badge><pre>{JSON.stringify(latestRun.result, null, 2)}</pre></div>}
+      {runs && runs.runs?.length > 0 && <>
+        <h4>اجرای ثبت‌شده</h4>
+        <Table columns={[
+          { key: "run_key", header: "Run key" },
+          { key: "state", header: "وضعیت", render: (row) => <Badge tone={runTone[row.state] || "neutral"}>{row.state}</Badge> },
+          { key: "current_stage", header: "مرحله" },
+          { key: "requested_by", header: "درخواست‌دهنده" },
+          { key: "started_at", header: "شروع" },
+          { key: "error_summary", header: "خطا", render: (row) => row.error_summary || "—" },
+        ]} rows={runs.runs} />
+      </>}
+    </Card>
+  );
 }
 
 // --- Branding (#55) --------------------------------------------------------

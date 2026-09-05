@@ -469,7 +469,7 @@ class SourceContracts(unittest.TestCase):
             'company_ids',
         ):
             self.assertIn(marker, rules + access)
-        self.assertIn('"version": "18.0.7.0.0"', manifest)
+        self.assertIn('"version": "18.0.8.0.0"', manifest)
         self.assertIn('ai.customer.branding', migration)
         self.assertIn('ai.brand.name', migration)
         self.assertIn('ai.brand.domain', migration)
@@ -492,6 +492,42 @@ class SourceContracts(unittest.TestCase):
             'Configuration Profiles', 'Deployment dry-run', 'adminGetModuleReadiness',
         ):
             self.assertIn(marker, admin + app)
+
+    def test_configuration_profile_history_clone_and_setup_checklist_contract(self):
+        semantic = (ADDONS / "ai_semantic_api/controllers/semantic_api.py").read_text()
+        profile = (ADDONS / "ai_customer_plane/models/customer_config.py").read_text()
+        history = (ADDONS / "ai_customer_plane/models/profile_history.py").read_text()
+        migration = (ADDONS / "ai_customer_plane/migrations/18.0.8.0.0/post-migrate.py").read_text()
+        manifest = (ADDONS / "ai_customer_plane/__manifest__.py").read_text()
+        access = (ADDONS / "ai_customer_plane/security/ir.model.access.csv").read_text()
+        rules = (ADDONS / "ai_customer_plane/security/customer_rules.xml").read_text()
+        frontend_api = (ROOT / "frontend/src/api/client.js").read_text()
+        admin = (ROOT / "frontend/src/pages/AdminPage.jsx").read_text()
+        for marker in (
+            '"/api/admin/configuration-profiles/<int:profile_id>/clone"',
+            '"/api/admin/configuration-profiles/<int:profile_id>/history"',
+            '"/api/admin/setup/checklist"',
+            '"/api/admin/setup/checklist/run"',
+            '"/api/admin/setup/runs"',
+            '"/api/admin/setup/runs/<string:run_key>"',
+            "_require_privileged()", '("company_id", "=", env.company.id)',
+            "_audit(env, env.user.id", "ready_for_customer_handoff",
+        ):
+            self.assertIn(marker, semantic)
+        for marker in ("create_snapshot", "def clone", "_record_history", "state changed", "compiled_hash"):
+            self.assertIn(marker, profile + history)
+        self.assertIn("Profile history snapshots are immutable", history)
+        self.assertIn("Profile history snapshots cannot be deleted", history)
+        self.assertIn("18.0.8.0.0", manifest + migration)
+        self.assertIn("ai.customer.configuration.profile.history", migration)
+        self.assertIn("model_ai_customer_configuration_profile_history", access + rules)
+        for marker in (
+            "adminCloneConfigurationProfile", "adminGetConfigurationProfileHistory",
+            "adminGetSetupChecklist", "adminRunSetupChecklist", "adminListSetupRuns",
+            "Clone به draft", "History:", "Deployment checklist", "اجرای checklist",
+            "PROFILE_FIELD_SCHEMAS", "ProfileSectionEditor", "ویرایش پیشرفته JSON",
+        ):
+            self.assertIn(marker, frontend_api + admin)
 
     def test_all_python_sources_compile(self):
         for path in ADDONS.rglob("*.py"):

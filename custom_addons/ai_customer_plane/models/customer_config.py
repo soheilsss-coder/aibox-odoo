@@ -36,8 +36,37 @@ class AiConfigurationProfile(models.Model):
         ("name_company_unique", "unique(name,company_id)", "Profile name must be unique per company.")
     ]
 
+    def _record_history(self, reason=""):
+        History = self.env["ai.customer.configuration.profile.history"]
+        for profile in self:
+            History.create_snapshot(profile, reason=reason)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records._record_history(reason="created")
+        return records
+
+    def clone(self, name):
+        self.ensure_one()
+        name = (name or "").strip()
+        if not name:
+            raise ValidationError("A cloned profile requires a name.")
+        values = {
+            "name": name,
+            "company_id": self.company_id.id,
+            "active": True,
+            "state": "draft",
+        }
+        for field_name in self._CONFIG_FIELDS:
+            values[field_name] = getattr(self, field_name) or "{}"
+        return self.create(values)
+
     def write(self, vals):
-        if self._CONFIG_FIELDS.intersection(vals):
+        config_changed = bool(self._CONFIG_FIELDS.intersection(vals))
+        name_changed = "name" in vals
+        state_changed = "state" in vals or "active" in vals
+        if config_changed:
             vals = dict(vals)
             vals.update({
                 "version": max(self.mapped("version") or [1]) + 1,
@@ -46,7 +75,11 @@ class AiConfigurationProfile(models.Model):
                 "compiled_hash": False,
                 "compiled_at": False,
             })
-        return super().write(vals)
+        result = super().write(vals)
+        if config_changed or name_changed or state_changed:
+            reason = "configuration changed" if config_changed else "name changed" if name_changed else "state changed"
+            self._record_history(reason=reason)
+        return result
 
     @api.model
     def _parse_section(self, raw, label):
@@ -109,6 +142,7 @@ class AiConfigurationProfile(models.Model):
             "compiled_hash": hashlib.sha256(serialized.encode()).hexdigest(),
             "compiled_at": fields.Datetime.now(),
         })
+        self._record_history(reason="compiled")
         return snapshot
 
     def activate(self):

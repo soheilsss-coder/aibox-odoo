@@ -1,6 +1,7 @@
 from . import branding
 from . import customer_config
 from . import setup_run
+from . import profile_history
 from . import delegation
 from . import access_review
 from . import sso
