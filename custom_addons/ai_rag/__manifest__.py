@@ -1,6 +1,6 @@
 {
     "name": "AI Document RAG",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.3.0",
     "summary": "Real semantic search over company.document (roadmap #27) - "
                 "chunking + local embeddings (Qwen3-Embedding via vLLM) + "
                 "pgvector, with access filtering applied BEFORE vector "
@@ -15,6 +15,7 @@
     "data": [
         "security/ir.model.access.csv",
         "security/chunk_rules.xml",
+        "security/rag_index_rules.xml",
         "data/tool_risk_data.xml",
         "data/cron_data.xml",
         "data/event_subscriptions.xml",

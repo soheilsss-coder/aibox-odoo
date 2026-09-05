@@ -43,6 +43,10 @@ class AiWorkflow(models.Model):
             steps = definition.get("steps")
             if not isinstance(steps, list) or not steps:
                 raise ValueError("Workflow must contain a non-empty steps list.")
+            if len(steps) > 100:
+                raise ValueError("Workflow cannot contain more than 100 steps.")
+            if definition.get("schema_version", 1) not in (1,):
+                raise ValueError("Unsupported workflow schema version.")
             allowed = {
                 "audit", "activity", "event", "wait", "wait_until", "condition",
                 "approval", "human_task", "notify", "branch", "tool", "escalate", "noop",
@@ -53,10 +57,28 @@ class AiWorkflow(models.Model):
                 action = step.get("action")
                 if action not in allowed:
                     raise ValueError(f"Unsupported workflow action: {action}")
-                if action == "wait" and int(step.get("seconds", step.get("wait", 0)) or 0) < 0:
-                    raise ValueError(f"Invalid wait at step {index}")
-                if action == "condition" and not isinstance(step.get("if"), dict):
-                    raise ValueError(f"Condition step {index} requires an 'if' object.")
+                if action == "wait":
+                    seconds = int(step.get("seconds", step.get("wait", 0)) or 0)
+                    if seconds < 0 or seconds > 31_536_000:
+                        raise ValueError(f"Invalid wait at step {index}")
+                if action == "wait_until" and not step.get("datetime"):
+                    raise ValueError(f"wait_until step {index} requires datetime.")
+                if action in {"condition", "branch"} and not isinstance(step.get("if"), dict):
+                    raise ValueError(f"{action} step {index} requires an 'if' object.")
+                if action == "branch":
+                    for key in ("then", "else"):
+                        if key in step:
+                            try:
+                                jump = int(step[key])
+                            except (TypeError, ValueError):
+                                raise ValueError(f"branch {key} at step {index} must be an integer")
+                            if jump <= index or jump >= len(steps):
+                                raise ValueError(f"branch {key} at step {index} must jump forward within the workflow")
+                if action == "tool":
+                    if not isinstance(step.get("tool") or step.get("tool_name"), str):
+                        raise ValueError(f"tool step {index} requires a tool name")
+                    if not isinstance(step.get("args", {}), dict) or len(step.get("args", {})) > 32:
+                        raise ValueError(f"tool args at step {index} must be an object with at most 32 keys")
                 if action == "approval" and not (step.get("approval_code") or step.get("name")):
                     raise ValueError(f"Approval step {index} requires approval_code.")
         return True
@@ -156,6 +178,15 @@ class AiWorkflowRun(models.Model):
             ("active", "=", True), ("state", "=", "active"),
             ("trigger_event", "=", event.event_type),
         ])
+        if "ai.customer.configuration.profile" in self.env:
+            profile = self.env["ai.customer.configuration.profile"].active_for_company(event.company_id)
+            policy = profile.runtime_config().get("sections", {}).get("workflow", {}) if profile else {}
+            allowed_codes = policy.get("allowed_workflows", policy.get("enabled_codes", []))
+            denied_codes = policy.get("denied_workflows", policy.get("disabled_codes", []))
+            if isinstance(allowed_codes, list) and allowed_codes:
+                flows = flows.filtered(lambda flow: flow.code in {str(item) for item in allowed_codes})
+            if isinstance(denied_codes, list) and denied_codes:
+                flows = flows.filtered(lambda flow: flow.code not in {str(item) for item in denied_codes})
         created = []
         for flow in flows:
             flow.validate_definition()
@@ -335,7 +366,18 @@ class AiWorkflowRun(models.Model):
             # ERP adapter directly. Approval/Risk/Authorization therefore stay
             # mandatory at execution time.
             result = self.env["ai.gateway.execution.gate"].with_user(actor).execute(tool_name, args=args)
-            context.setdefault("tool_results", {})[tool_name] = result
+            # Tool output is untrusted document/business data. Scrub it
+            # before it reaches durable workflow state or a later model/tool
+            # decision; the execution gate remains authoritative for the
+            # current call and the firewall prevents context poisoning/secrets
+            # from surviving into the next call.
+            from odoo.addons.ai_business_tools.models.context_firewall import scrub_value
+            safe_result = scrub_value(result)
+            # Keep the most recent result in the durable context for a
+            # following condition/branch step, while retaining a keyed audit
+            # trail for later steps and operators.
+            context["last_tool_result"] = safe_result if isinstance(safe_result, dict) else {"value": safe_result}
+            context.setdefault("tool_results", {})[tool_name] = safe_result
             return {"status": "tool_executed", "tool": tool_name}
 
         if action == "escalate":

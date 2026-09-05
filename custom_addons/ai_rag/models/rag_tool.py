@@ -1,6 +1,10 @@
+import logging
+
 from odoo import models
 from odoo.addons.llm_tool.decorators import llm_tool
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class LLMToolRagSearch(models.Model):
@@ -31,7 +35,10 @@ class LLMToolRagSearch(models.Model):
         """
         if not query:
             return {"error": "missing_required_field", "missing_fields": ["query"]}
-        top_k = max(1, min(int(top_k or 5), 10))
+        try:
+            top_k = max(1, min(int(top_k or 5), 10))
+        except (TypeError, ValueError):
+            return {"error": "top_k must be a bounded integer"}
 
         try:
             results = self.env["ai.document.chunk"].search_similar(query, top_k=top_k)
@@ -41,8 +48,24 @@ class LLMToolRagSearch(models.Model):
                 payload={"query": query}, success=False, error_message=str(exc),
             )
             return {"error": "semantic search failed, check server logs for details"}
+        except Exception as exc:  # noqa: BLE001
+            _logger.exception("Semantic document search failed: %s", exc)
+            self.env["ai.gateway.audit.log"].sudo().log(
+                user_id=self.env.user.id, source="tool", action="search_documents_semantic",
+                payload={"query": query}, success=False, error_message="unexpected_search_failure",
+            )
+            return {"error": "semantic search failed, check server logs for details"}
 
-        result = {"count": len(results), "results": results}
+        result = {
+            "count": len(results),
+            "results": results,
+            "answerability": "supported_context" if results else "insufficient_context",
+            "instruction": (
+                "Use only these excerpts and cite their document names."
+                if results else
+                "No sufficiently relevant authorized excerpt was found; do not invent an answer and say that the documents do not establish it."
+            ),
+        }
         if hasattr(self, "_context_firewall"):
             result = self._context_firewall(result)
 

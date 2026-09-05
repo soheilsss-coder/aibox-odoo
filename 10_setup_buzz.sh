@@ -23,7 +23,7 @@
 # Odoo host directly and skip the Risk Engine / Approval Object / gateway
 # allowlist entirely (roadmap #20, #21, #13/#8). hermes_gateway_mcp_server.py
 # gives the agent exactly THREE tools instead - one per gateway endpoint
-# (/api/bootstrap, /api/rpc, /api/chat) - and nothing else. See that
+# (/api/bootstrap, /api/me/capabilities, /api/chat) - and nothing else. See that
 # file's own docstring for the full reasoning.
 #
 # ALSO WORTH KNOWING (found while wiring this up, not in the original
@@ -132,7 +132,7 @@ echo "     loop inside buzz-agent, it is a SEPARATE credential from the"
 echo "     Odoo gateway key above and never touches Odoo directly.)"
 echo ""
 echo "  5. Invite this agent identity to exactly ONE private channel and"
-echo "     confirm every gateway_bootstrap/gateway_rpc/gateway_chat call"
+echo "     confirm every gateway_bootstrap/gateway_capabilities/gateway_chat call"
 echo "     shows up in Settings > Administration > AI Gateway Audit Log,"
 echo "     same as any other gateway caller, before considering this for"
 echo "     anything beyond a single pilot channel."

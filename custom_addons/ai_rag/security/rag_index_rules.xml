@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="ai_rag_index_snapshot_rule_admin" model="ir.rule">
+        <field name="name">RAG Index Snapshot: current companies only</field>
+        <field name="model_id" ref="model_ai_rag_index_snapshot"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>

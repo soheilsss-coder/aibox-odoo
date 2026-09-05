@@ -34,8 +34,9 @@
 # =============================================================================
 set -e
 
-ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
-ODOO_CONF="${ODOO_CONF:-/opt/odoo.conf}"
+ODOO_BIN="${ODOO_BIN:-/opt/odoo/src/odoo/odoo-bin}"
+ODOO_PYTHON="${ODOO_PYTHON:-/opt/odoo/venv/bin/python}"
+ODOO_CONF="${ODOO_CONF:-/etc/odoo/odoo.conf}"
 ODOO_DB="${ODOO_DB:-company_ai}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -92,7 +93,7 @@ else
   # that manual review, run onboard_from_excel.py by itself once,
   # THEN rerun this script with MAINTENANCE_MODE=1 and no EXCEL_PATH.
   ONBOARD_FILE="$EXCEL_PATH" ONBOARD_YES=1 \
-    "$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" < "${SCRIPT_DIR}/onboarding/onboard_from_excel.py"
+    "$ODOO_PYTHON" "$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" < "${SCRIPT_DIR}/onboarding/onboard_from_excel.py"
   echo "Import complete - a non-secret audit manifest may be produced only at the explicit ONBOARD_OUTPUT path."
 fi
 
@@ -145,7 +146,7 @@ fi
 
 # ---------------------------------------------------------------------
 step "4/6 - Acceptance tests (05_acceptance_tests.py, ORM-level + security scenarios)"
-"$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" < "${SCRIPT_DIR}/05_acceptance_tests.py"
+"$ODOO_PYTHON" "$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" < "${SCRIPT_DIR}/05_acceptance_tests.py"
 
 step "4b/6 - Evaluation suite (11_evaluation_suite.sh, real HTTP with per-role API keys)"
 bash "${SCRIPT_DIR}/11_evaluation_suite.sh"

@@ -7,8 +7,9 @@
 # and nothing outside the database can know them in advance.
 set -euo pipefail
 
-ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
-ODOO_CONF="${ODOO_CONF:-/opt/odoo.conf}"
+ODOO_BIN="${ODOO_BIN:-/opt/odoo/src/odoo/odoo-bin}"
+ODOO_PYTHON="${ODOO_PYTHON:-/opt/odoo/venv/bin/python}"
+ODOO_CONF="${ODOO_CONF:-/etc/odoo/odoo.conf}"
 ODOO_DB="${ODOO_DB:-company_ai}"
 BASE_URL="${AI_GATEWAY_BASE_URL:-http://localhost:8069}"
 
@@ -17,7 +18,7 @@ TMP_KEYS=$(mktemp)
 trap 'rm -f "$TMP_RAW" "$TMP_KEYS"' EXIT
 
 echo "Fetching demo users' real API keys..."
-"$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" > "$TMP_RAW" 2>&1 <<'PYEOF'
+"$ODOO_PYTHON" "$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" > "$TMP_RAW" 2>&1 <<'PYEOF'
 import json
 Key = env["ai.gateway.api.key"].sudo()
 
@@ -26,8 +27,9 @@ def key_for(login):
     user = env["res.users"].search([("login", "=", login)], limit=1)
     if not user:
         return None
-    rec = Key.search([("user_id", "=", user.id)], limit=1)
-    return rec.key if rec else None
+    # Keys are write-only. Rotate a test credential in the database and
+    # receive the plaintext only in this process; the trap removes the file.
+    return Key.create_key(user, scope="security-test")
 
 
 print("SECURITY_KEYS_JSON=" + json.dumps({

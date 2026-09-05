@@ -1,6 +1,10 @@
 import json
+import logging
+
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class AiUnifiedOperation(models.Model):
@@ -33,10 +37,25 @@ class AiUnifiedOperation(models.Model):
         ('documents_create', 'Create Document'),
         ('helpdesk_ticket_create', 'Create Helpdesk Ticket'),
         ('pos_order_create', 'Create POS Order'),
+        ('pos_restaurant_table_status', 'Read Restaurant Table Status'),
+        ('pos_restaurant_order_note_update', 'Update Restaurant Order Note'),
+        ('module_read_summary', 'Read Reviewed Module Summary'),
+        ('discovered_model_read', 'Read Automatically Discovered Model Summary'),
     ], required=True)
     active = fields.Boolean(default=True)
     description = fields.Text()
     contract_version = fields.Integer(default=1, required=True)
+    source = fields.Selection([
+        ("reviewed", "Source-reviewed operation"),
+        ("discovered", "Automatically discovered read operation"),
+    ], default="reviewed", required=True, index=True)
+    coverage = fields.Selection([
+        ("reviewed_read", "Reviewed read adapter"),
+        ("reviewed_operational", "Reviewed operational adapter"),
+        ("discovered_read", "Discovered read-only fallback"),
+    ], default="reviewed_operational", required=True, index=True)
+    model_name = fields.Char(index=True)
+    field_names_json = fields.Text(default="[]")
 
     _sql_constraints = [
         ('tool_unique', 'unique(tool_name)', 'Each tool must have exactly one unified operation registry entry.'),
@@ -50,7 +69,8 @@ class AiUnifiedAdapterService(models.AbstractModel):
     @api.model
     def _model(self, name):
         if name not in self.env:
-            raise UserError('required ERP module/model is not installed: %s' % name)
+            _logger.warning("reviewed operation unavailable because its optional model is not installed: %s", name)
+            raise UserError('reviewed operation is unavailable')
         # Defense in depth: reviewed adapters must still run under the real
         # user's Odoo ACL/record-rule context. The central gateway decides
         # AI authorization first; Odoo remains the second enforcement layer.
@@ -68,7 +88,8 @@ class AiUnifiedAdapterService(models.AbstractModel):
             self.env['ai.gateway.execution.gate'].authorize(
                 operation.tool_name, args=args, context_label='adapter:%s' % operation.handler_key,
             )
-        handler = getattr(self, '_handle_%s' % operation.handler_key, None)
+        handler = getattr(self.with_context(ai_adapter_operation=operation.tool_name),
+                           '_handle_%s' % operation.handler_key, None)
         if not handler:
             raise UserError('unimplemented reviewed adapter handler: %s' % operation.handler_key)
         return handler(args, user)
@@ -159,7 +180,7 @@ class AiUnifiedAdapterService(models.AbstractModel):
 
     def _handle_hr_attendance_checkin(self, args, user):
         Attendance = self._model('hr.attendance')
-        employee = self.env['hr.employee'].sudo().search([('user_id','=',user.id)], limit=1)
+        employee = self.env['hr.employee'].search([('user_id','=',user.id)], limit=1)
         if not employee:
             raise UserError('no employee is linked to the current user')
         vals = {'employee_id': employee.id}
@@ -171,7 +192,7 @@ class AiUnifiedAdapterService(models.AbstractModel):
 
     def _handle_hr_expense_create(self, args, user):
         Expense = self._model('hr.expense')
-        employee = self.env['hr.employee'].sudo().search([('user_id','=',user.id)], limit=1)
+        employee = self.env['hr.employee'].search([('user_id','=',user.id)], limit=1)
         if not employee:
             raise UserError('no employee is linked to the current user')
         vals = {'name': args.get('name') or 'AI expense', 'employee_id': employee.id}
@@ -234,6 +255,129 @@ class AiUnifiedAdapterService(models.AbstractModel):
         self._emit_business_event('pos.order.created', {'record_id': rec.id}, user)
         return {'record_id': rec.id, 'model': 'pos.order', 'status': 'created'}
 
+    def _handle_pos_restaurant_table_status(self, args, user):
+        """Read restaurant tables only through the user's native ACL scope."""
+        Table = self._model('restaurant.table')
+        domain = []
+        if args.get('floor_id') and 'floor_id' in Table._fields:
+            domain.append(('floor_id', '=', int(args['floor_id'])))
+        try:
+            limit = min(max(int(args.get('limit', 100)), 1), 100)
+        except (TypeError, ValueError):
+            limit = 100
+        rows = Table.search(domain, limit=limit)
+        result = []
+        for table in rows:
+            result.append({
+                'record_id': table.id,
+                'name': getattr(table, 'name', False) or getattr(table, 'table_number', False) or str(table.id),
+                'floor_id': table.floor_id.id if 'floor_id' in table._fields and table.floor_id else False,
+                'seats': getattr(table, 'seats', False) if 'seats' in table._fields else False,
+            })
+        return {'model': 'restaurant.table', 'tables': result, 'status': 'ok'}
+
+    def _handle_pos_restaurant_order_note_update(self, args, user):
+        Order = self._model('pos.order')
+        if 'note' not in Order._fields:
+            raise UserError('restaurant order notes are not available in this installation')
+        order = Order.browse(int(args.get('order_id', 0))).exists()
+        if not order:
+            raise UserError('restaurant order not found')
+        if 'session_id' in order._fields and order.session_id and order.session_id.state == 'closed':
+            raise UserError('a closed restaurant order cannot be changed')
+        order.write({'note': str(args.get('note') or '')[:2000]})
+        self._emit_business_event('pos.restaurant.order_note.updated', {'record_id': order.id}, user)
+        return {'record_id': order.id, 'model': 'pos.order', 'status': 'updated'}
+
+    def _handle_discovered_model_read(self, args, user):
+        """Execute only the model/field contract created by discovery.
+
+        The caller can request a bounded row count, but cannot choose a model,
+        field, method, domain, or ORM operation. Odoo ACLs and record rules
+        still run in the authenticated user's environment.
+        """
+        operation_name = self.env.context.get('ai_adapter_operation', '')
+        operation = self.env['ai.integration.operation'].sudo().search([
+            ('tool_name', '=', operation_name), ('active', '=', True),
+            ('source', '=', 'discovered'), ('coverage', '=', 'discovered_read'),
+        ], limit=1)
+        if not operation or not operation.model_name or operation.model_name not in self.env:
+            raise UserError('discovered read operation is unavailable')
+        try:
+            limit = min(max(int(args.get('limit', 20)), 1), 100)
+        except (TypeError, ValueError):
+            limit = 20
+        try:
+            fields_json = json.loads(operation.field_names_json or '[]')
+        except (TypeError, ValueError):
+            raise UserError('discovered read field contract is invalid')
+        if not isinstance(fields_json, list) or not fields_json:
+            raise UserError('discovered read field contract is empty')
+        Model = self._model(operation.model_name)
+        safe_fields = [
+            name for name in fields_json
+            if isinstance(name, str)
+            and name in {'display_name', 'name', 'ref', 'code', 'state', 'active',
+                         'date', 'date_start', 'date_end', 'write_date'}
+            and name in Model._fields
+            and Model._fields[name].type not in (
+                'binary', 'html', 'one2many', 'many2many', 'many2one',
+            )
+        ]
+        if not safe_fields:
+            raise UserError('no safe discovered fields are available')
+        records = Model.search([], order='id desc', limit=limit)
+        raw_rows = records.read(safe_fields)
+        rows = [{key: value for key, value in row.items() if key != 'id'} for row in raw_rows]
+        # Model names, ORM field names and internal integration metadata are
+        # control-plane data, never an AI/customer response.
+        return {
+            'status': 'ok', 'count': len(rows), 'records': rows,
+        }
+
+    _MODULE_READ_MODELS = {
+        'event': 'event.event',
+        'lunch': 'lunch.order',
+        'maintenance': 'maintenance.request',
+        'quality': 'quality.alert',
+        'repair': 'repair.order',
+        'sale_management': 'sale.order',
+        'sale_renting': 'sale.order',
+        'sale_subscription': 'sale.order',
+        'website': 'website.page',
+        'mass_mailing': 'mailing.mailing',
+    }
+
+    def _handle_module_read_summary(self, args, user):
+        """Read a reviewed module's safe display fields under native ACLs.
+
+        The module-to-model map is source-reviewed and immutable; callers
+        cannot supply an arbitrary model or field list. Missing optional
+        dependencies fail closed rather than becoming generic discovery.
+        """
+        operation = self.env.context.get('ai_adapter_operation', '')
+        module_name = operation.removesuffix('.read_summary')
+        model_name = self._MODULE_READ_MODELS.get(module_name)
+        if not model_name:
+            raise UserError('reviewed module operation is unavailable')
+        Model = self._model(model_name)
+        try:
+            limit = min(max(int(args.get('limit', 20)), 1), 100)
+        except (TypeError, ValueError):
+            limit = 20
+        try:
+            records = Model.search([], order='id desc', limit=limit)
+        except AccessError as exc:
+            raise UserError('access_denied: this operation is not available for your role') from exc
+        rows = []
+        for record in records:
+            rows.append({
+                'record_id': record.id,
+                'name': getattr(record, 'name', False) or getattr(record, 'display_name', str(record.id)),
+                'state': getattr(record, 'state', False) or getattr(record, 'stage_id', False) and record.stage_id.name or False,
+            })
+        return {'status': 'ok', 'items': rows}
+
     def _handle_account_move_post(self, args, user):
         Move = self._model('account.move')
         rec = Move.browse(int(args['move_id'])).exists()
@@ -259,10 +403,23 @@ class AiUnifiedRegistry(models.AbstractModel):
         op = self.resolve(tool_name)
         if not op:
             raise AccessError('unregistered integration operation: %s' % tool_name)
+        # Registry rows are loaded with the integration addon and may outlive
+        # an optional business addon. The official module must be installed in
+        # this database before its operation can be exposed to the agent or
+        # executed through the direct gateway.
+        installed = self.env['ir.module.module'].sudo().search([
+            ('name', '=', op.module_name), ('state', '=', 'installed'),
+        ], limit=1)
+        if not installed:
+            raise AccessError('module is not installed for operation: %s' % op.tool_name)
         risk = self.env['ai.gateway.tool.risk'].sudo().search([('tool_name', '=', tool_name)], limit=1)
         cap = self.env['ai.control.capability'].sudo().search([('name', '=', op.capability_name), ('active', '=', True)], limit=1)
         if not risk or not cap:
             raise AccessError('incomplete execution contract: %s' % tool_name)
+        if op.adapter_id.state == 'blocked' or (
+            op.coverage != 'discovered_read' and op.adapter_id.state != 'ready'
+        ):
+            raise AccessError('adapter is not certified for this operation: %s' % tool_name)
         if risk.capability_name != op.capability_name or int(risk.risk_level or 0) != int(op.risk_level or 0):
             raise AccessError('execution contract mismatch: %s' % tool_name)
         if cap.module_name != op.module_name:
@@ -284,4 +441,5 @@ class AiUnifiedRegistry(models.AbstractModel):
         return [{
             'tool': r.tool_name, 'module': r.module_name, 'capability': r.capability_name,
             'operation': r.operation, 'risk_level': r.risk_level, 'handler': r.handler_key,
+            'source': r.source, 'coverage': r.coverage,
         } for r in rows]

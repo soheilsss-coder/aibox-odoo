@@ -1,4 +1,19 @@
 <odoo>
+    <record id="rule_customer_branding_company" model="ir.rule">
+        <field name="name">Customer branding company isolation</field>
+        <field name="model_id" ref="model_ai_customer_branding"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
+    <record id="rule_customer_setup_run_company" model="ir.rule">
+        <field name="name">Customer setup run company isolation</field>
+        <field name="model_id" ref="model_ai_customer_setup_run"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
+    <record id="rule_customer_profile_history_company" model="ir.rule">
+        <field name="name">Customer profile history company isolation</field>
+        <field name="model_id" ref="model_ai_customer_configuration_profile_history"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
     <record id="rule_customer_profile_company" model="ir.rule">
         <field name="name">Customer profile company isolation</field>
         <field name="model_id" ref="model_ai_customer_configuration_profile"/>
@@ -7,7 +22,7 @@
     <record id="rule_delegation_company" model="ir.rule">
         <field name="name">Delegation company isolation</field>
         <field name="model_id" ref="model_ai_customer_delegation"/>
-        <field name="domain_force">["|",("delegator_id.company_ids","in",company_ids),("delegatee_id.company_ids","in",company_ids)]</field>
+        <field name="domain_force">[("delegator_id.company_ids","in",company_ids),("delegatee_id.company_ids","in",company_ids)]</field>
     </record>
     <record id="rule_sso_company" model="ir.rule">
         <field name="name">SSO provider company isolation</field>
@@ -28,6 +43,16 @@
     <record id="rule_role_assignment_company" model="ir.rule">
         <field name="name">Role assignment company isolation</field>
         <field name="model_id" ref="model_ai_customer_role_assignment"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
+    <record id="rule_role_policy_company" model="ir.rule">
+        <field name="name">Role policy company isolation</field>
+        <field name="model_id" ref="model_ai_customer_role_policy"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
+    <record id="rule_customer_designer_company" model="ir.rule">
+        <field name="name">Customer designer company isolation</field>
+        <field name="model_id" ref="model_ai_customer_designer"/>
         <field name="domain_force">[("company_id", "in", company_ids)]</field>
     </record>
     <record id="rule_external_identity_company" model="ir.rule"><field name="name">External identity company isolation</field><field name="model_id" ref="model_ai_customer_external_identity"/><field name="domain_force">[("company_id", "in", company_ids)]</field></record>

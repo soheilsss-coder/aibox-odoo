@@ -12,3 +12,4 @@ access_ai_data_classification_admin,access.ai.data.classification,model_ai_contr
 access_ai_tool_binding_admin,ai.control.tool.binding.admin,model_ai_control_tool_binding,base.group_system,1,1,1,1
 access_ai_control_policy_admin,ai.control.policy.admin,model_ai_control_policy,base.group_system,1,1,1,1
 access_ai_control_policy_user,ai.control.policy.user,model_ai_control_policy,base.group_user,1,0,0,0
+access_ai_module_install_request_admin,ai.module.install.request.admin,model_ai_module_install_request,base.group_system,1,1,1,0

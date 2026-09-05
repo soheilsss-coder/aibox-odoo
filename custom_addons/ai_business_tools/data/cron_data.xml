@@ -46,4 +46,15 @@
         <field name="active">True</field>
     </record>
 
+    <record id="cron_expire_ai_approvals" model="ir.cron">
+        <field name="name">AI: Expire pending approvals</field>
+        <field name="model_id" ref="model_ai_gateway_approval"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_expire_pending()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="user_id" ref="ai_automation_service_user"/>
+        <field name="active">True</field>
+    </record>
+
 </odoo>

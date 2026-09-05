@@ -32,9 +32,17 @@ for p in ROOT.rglob('__manifest__.py'):
     try: ast.literal_eval(p.read_text())
     except Exception as exc: errors.append(f"MANIFEST {p}: {exc}")
 
-# 1 P0 Generic tools cannot enter the Assistant catalog.
-install=text('02_install_modules.sh')
-require('P0-1 generic-tool-deny', 'all_tools = env[\'llm.tool\'].search([])' not in install and 'registered_tool_ids()' in install and 'llm_tool_odoo_record_' in install, '02_install_modules.sh')
+# 1 P0 Generic tools cannot enter the Assistant catalog. The historical
+# module installer is absent; validate the live source contracts instead of
+# checking a nonexistent file.
+install=text('deploy.sh')
+gateway=text('custom_addons/ai_gateway/controllers/gateway.py')
+tool_policy=text('custom_addons/ai_business_tools/models/tool_risk.py')
+require('P0-1 generic-tool-deny',
+        "all_tools = env['llm.tool'].search([])" not in install
+        and 'registered_tool_ids' in tool_policy
+        and 'status=410' in gateway,
+        'deploy.sh + central tool policy + hard-disabled generic RPC')
 
 # 2 gateway-level risk/authz/approval/commit gate
 exec_gate=text('custom_addons/ai_gateway/models/execution_gate.py')
@@ -142,7 +150,7 @@ require('P2-5 no-direct-hermes-erp', 'ai.gateway.execution.gate' in exec_gate an
 for addon in [p for p in (ROOT/'custom_addons').iterdir() if p.is_dir()]:
     require(f'DEPLOY-{addon.name}', addon.name in install or 'find "$ROOT/custom_addons"' in text('deploy.sh'), 'deployment copies all custom_addons')
 lock=text('DEPENDENCY_LOCK.md')
-require('P2-6 immutable-dependency-contract', all(x in lock for x in ['ODOO_COMMIT_SHA','ODOO_LLM_COMMIT_SHA','VLLM_IMAGE_DIGEST','MODEL_REVISION_QWEN','PGVECTOR_IMAGE_DIGEST']), 'DEPENDENCY_LOCK.md')
+require('P2-6 immutable-dependency-contract', all(x in lock for x in ['ODOO_COMMIT_SHA','ODOO_LLM_COMMIT_SHA','VLLM_VERSION','MODEL_REVISION_QWEN','PGVECTOR_PACKAGE']), 'DEPENDENCY_LOCK.md')
 white=text('custom_addons/ai_debrand/views/debrand_templates.xml')
 require('P2-7 qweb-white-label', 'inherit_id="web.login_layout"' in white and 'inherit_id="web.layout"' in white, 'debrand_templates.xml')
 require('P2-8 cors-fail-closed', 'AI_GATEWAY_ALLOWED_ORIGIN' in rpc and 'required in production' in rpc and '== "*"' in rpc, 'gateway.py')
@@ -191,7 +199,7 @@ if v52_root.exists():
 else:
     checks['PRESERVATION-v52']={"pass":True,"evidence":"v52 source preserved by build procedure"}
 
-out={"release":"v57-source-complete","errors":errors,"checks":checks,"runtime_certification":"REQUIRED_ON_REAL_STACK","runtime_note":"No source audit may fabricate Odoo/PostgreSQL/Redis/vLLM/IdP/Telegram/Buzz/DGX E2E PASS."}
+out={"release":"v58-source-verified","errors":errors,"checks":checks,"runtime_certification":"REQUIRED_ON_REAL_STACK","runtime_note":"No source audit may fabricate Odoo/PostgreSQL/Redis/vLLM/IdP/Telegram/Buzz/DGX E2E PASS."}
 (ROOT/'FINAL_EXHAUSTIVE_SOURCE_AUDIT.json').write_text(json.dumps(out,ensure_ascii=False,indent=2))
 print(json.dumps({"release":out["release"],"errors":len(errors),"checks":len(checks),"runtime_certification":out["runtime_certification"]},ensure_ascii=False))
 if errors:

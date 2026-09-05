@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from odoo import models
+from odoo import fields, models
 from odoo.addons.llm_tool.decorators import llm_tool
 
 try:
@@ -20,14 +18,16 @@ class LLMToolCurrentDateTime(models.Model):
         for any question about today's date - never calculate or guess
         the Jalali date yourself from memory, use the values returned
         here exactly, they are computed by a reliable library."""
-        now = datetime.now()
+        # Odoo stores UTC; return the viewer's configured timezone rather
+        # than the host timezone, which may differ on a customer appliance.
+        now = fields.Datetime.context_timestamp(self, fields.Datetime.now())
         result = {
             "gregorian_date": now.strftime("%Y-%m-%d"),
             "day_of_week": now.strftime("%A"),
             "time": now.strftime("%H:%M:%S"),
         }
         if HAS_JDATETIME:
-            jnow = jdatetime.datetime.fromgregorian(datetime=now)
+            jnow = jdatetime.datetime.fromgregorian(datetime=now.replace(tzinfo=None))
             result["jalali_date"] = jnow.strftime("%Y-%m-%d")
             result["jalali_date_fa"] = jnow.strftime("%d %B %Y")
         else:

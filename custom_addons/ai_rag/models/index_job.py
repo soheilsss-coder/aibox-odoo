@@ -26,14 +26,64 @@ class AiDocumentIndexJob(models.Model):
 
     @api.model
     def process(self, limit=5):
-        jobs = self.sudo().search([("state", "=", "pending")], order="priority desc, id", limit=limit)
+        now = fields.Datetime.now()
+        # A worker crash must not strand a job in running forever.  Requeue
+        # only leases older than 15 minutes; after the normal retry budget the
+        # job is left failed for operator review instead of hot-looping.
+        stale = self.sudo().search([
+            ("state", "=", "running"),
+            ("started_at", "<", fields.Datetime.subtract(now, minutes=15)),
+        ])
+        for job in stale:
+            job.write({
+                "state": "failed" if job.attempts >= 3 else "pending",
+                "error": "RAG worker lease expired; operator review required" if job.attempts >= 3 else "RAG worker lease expired; queued for retry",
+                "finished_at": now if job.attempts >= 3 else False,
+            })
+
+        # Claim with PostgreSQL row locking so two native worker processes
+        # cannot index the same document and emit duplicate side effects.
+        try:
+            bounded_limit = max(1, min(int(limit or 5), 50))
+        except (TypeError, ValueError):
+            bounded_limit = 5
+        self.env.cr.execute("""
+            SELECT id
+              FROM ai_document_index_job
+             WHERE state = 'pending'
+             ORDER BY priority DESC, id
+             FOR UPDATE SKIP LOCKED
+             LIMIT %s
+        """, (bounded_limit,))
+        ids = [row[0] for row in self.env.cr.fetchall()]
+        jobs = self.sudo().browse(ids)
         for job in jobs:
-            job.write({"state": "running", "started_at": fields.Datetime.now(), "attempts": job.attempts + 1})
+            job.write({"state": "running", "started_at": now, "attempts": job.attempts + 1})
             try:
-                if job.document_id.exists():
-                    job.document_id._rag_reindex()
+                # A failed parser/embedding call must not poison the whole
+                # worker transaction. The savepoint rolls back partial chunk
+                # writes; the explicit status writes below happen after the
+                # rollback and therefore remain durable for the UI/operator.
+                with self.env.cr.savepoint():
+                    if job.document_id.exists():
+                        job.document_id._rag_reindex()
                 job.write({"state": "done", "finished_at": fields.Datetime.now(), "error": False})
             except Exception as exc:
                 _logger.exception("RAG index job %s failed", job.id)
+                document = job.document_id.exists()
+                if document:
+                    document.write({
+                        "rag_ingestion_state": "failed",
+                        "rag_ingestion_error": str(exc)[:2000],
+                        "rag_ingestion_finished_at": fields.Datetime.now(),
+                    })
+                if "ai.rag.index.snapshot" in self.env:
+                    self.env["ai.rag.index.snapshot"].sudo().search(
+                        [
+                            ("version", "=", __import__("os").environ.get("AI_RAG_INDEX_VERSION", "rag-v1")),
+                            ("company_id", "=", self.env.company.id),
+                        ],
+                        limit=1,
+                    ).write({"status": "failed", "note": str(exc)[:2000]})
                 job.write({"state": "failed" if job.attempts >= 3 else "pending", "error": str(exc), "finished_at": fields.Datetime.now()})
         return len(jobs)

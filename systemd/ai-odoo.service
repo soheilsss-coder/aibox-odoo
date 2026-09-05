@@ -1,0 +1,21 @@
+[Unit]
+Description=AI Company Assistant application server
+After=network-online.target postgresql.service redis-server.service ai-vllm-chat.service
+Wants=network-online.target ai-vllm-chat.service
+
+[Service]
+Type=simple
+User=odoo
+Group=odoo
+EnvironmentFile=-/etc/ai-box/runtime.env
+ExecStart=/opt/odoo/venv/bin/python /opt/odoo/src/odoo/odoo-bin -c /etc/odoo/odoo.conf
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/odoo /var/log/odoo
+
+[Install]
+WantedBy=multi-user.target
