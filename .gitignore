@@ -3,6 +3,7 @@
 **/node_modules/
 
 # Ignore generated files
+/artifacts/
 /*.pid
 /*.pid.lock
 *.pyc
