@@ -30,6 +30,8 @@ import base64
 import json as _json
 import logging
 import os
+import re
+from urllib.parse import urlparse
 
 from odoo import fields as odoo_fields
 from odoo import http
@@ -55,6 +57,67 @@ from werkzeug.wrappers import Response
 from urllib.parse import quote as _quote_filename
 
 _logger = logging.getLogger(__name__)
+
+
+_BRAND_ASSET_MAX_BYTES = 4 * 1024 * 1024
+_BRAND_IMAGE_EXTENSIONS = frozenset({
+    ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff",
+})
+_BRAND_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+_BRAND_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_BRAND_TEXT_FIELDS = {
+    "brand_name", "legal_name", "tagline", "product_title", "brand_domain",
+    "support_email", "support_url", "footer_text", "login_message",
+    "primary_color", "secondary_color", "accent_color", "background_color",
+    "surface_color", "surface_alt_color", "text_color", "text_muted_color",
+    "danger_color", "warning_color", "font_family", "border_radius",
+}
+_BRAND_BOOL_FIELDS = {
+    "show_ai_brand", "show_powered_by", "show_module_navigation",
+    "support_contact_visible",
+}
+_BRAND_COLOR_FIELDS = {
+    "primary_color", "secondary_color", "accent_color", "background_color",
+    "surface_color", "surface_alt_color", "text_color", "text_muted_color",
+    "danger_color", "warning_color",
+}
+_BRAND_DEFAULTS = {
+    "primary_color": "#4f8cff",
+    "secondary_color": "#8b5cf6",
+    "accent_color": "#3dd68c",
+    "background_color": "#0f1115",
+    "surface_color": "#171a21",
+    "surface_alt_color": "#1e222b",
+    "text_color": "#e8eaed",
+    "text_muted_color": "#9aa1ac",
+    "danger_color": "#e5484d",
+    "warning_color": "#caa23d",
+    "font_family": "system",
+    "border_radius": "comfortable",
+}
+
+
+def _strict_bool(value, field_name):
+    if isinstance(value, bool):
+        return value
+    if value in (0, 1):
+        return bool(value)
+    raise ValidationError("%s must be a boolean." % field_name)
+
+
+def _decode_brand_asset(payload, base_field, filename_field):
+    encoded = payload.get(base_field)
+    filename = str(payload.get(filename_field) or "").strip()
+    if not encoded or not filename:
+        raise ValidationError("%s and %s are required together." % (base_field, filename_field))
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("%s is not valid base64." % base_field) from exc
+    upload = validate_upload(filename, raw, max_bytes=_BRAND_ASSET_MAX_BYTES)
+    if upload["extension"] not in _BRAND_IMAGE_EXTENSIONS:
+        raise ValidationError("Brand assets must be image files.")
+    return base64.b64encode(raw).decode("ascii"), upload
 
 
 def _require_auth():
@@ -809,13 +872,11 @@ class AiSemanticApiController(http.Controller):
         }
 
     # ------------------------------------------------------------------
-    # Admin Console (roadmap #46). Every route below is gated by
-    # _require_privileged() - see that function's docstring. This is
-    # deliberately a THIN read/write layer over models that already
-    # exist (res.groups, ai.gateway.access.grant, ai.gateway.tool.risk,
-    # res.company/ir.config_parameter) - no new admin-only model was
-    # created, matching how #4/#6's Role Permissions Overview already
-    # reused res.groups directly instead of inventing one.
+    # Admin Console (roadmap #46) and Customer Setup Center. Every
+    # route below is gated by _require_privileged() - see that function's
+    # docstring. Product settings use explicit company-scoped models;
+    # only legacy compatibility values remain in ir.config_parameter.
+    # The browser never receives a generic ORM/RPC door.
     # ------------------------------------------------------------------
 
     @http.route("/api/admin/roles", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
@@ -1070,60 +1131,264 @@ class AiSemanticApiController(http.Controller):
             "vision_configured": vision_configured,
         })
 
-    @http.route("/api/admin/branding", type="http", auth="none", csrf=False, methods=["GET", "POST", "OPTIONS"])
+    @staticmethod
+    def _branding_record(env, create=False):
+        Branding = env["ai.customer.branding"]
+        record = Branding.search([
+            ("company_id", "=", env.company.id),
+            ("active", "=", True),
+        ], limit=1)
+        if not record and create:
+            record = Branding.create({
+                "company_id": env.company.id,
+                "brand_name": env.company.name or "Company AI",
+                "legal_name": env.company.name or False,
+            })
+        return record
+
+    @staticmethod
+    def _branding_values(env, admin=False):
+        record = AiSemanticApiController._branding_record(env)
+        if record:
+            return record.admin_values() if admin else record.public_values()
+        values = dict(_BRAND_DEFAULTS)
+        values.update({
+            "brand_name": env.company.name or "Company AI",
+            "product_title": env.company.name or "Company AI",
+            "tagline": "",
+            "brand_domain": "",
+            "footer_text": "",
+            "login_message": "",
+            "support_email": "",
+            "support_url": "",
+            "show_ai_brand": True,
+            "show_powered_by": False,
+            "show_module_navigation": True,
+            "support_contact_visible": True,
+            "version": 0,
+            "logo_url": None,
+            "favicon_url": None,
+            "has_logo": False,
+            "has_favicon": False,
+        })
+        if admin:
+            values.update({
+                "company_id": env.company.id,
+                "company_name": env.company.name or "",
+                "legal_name": env.company.name or "",
+                "logo_filename": "",
+                "favicon_filename": "",
+                "updated_by": None,
+                "updated_at": None,
+            })
+        return values
+
+    @http.route("/api/branding", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
+    def branding(self, **kwargs):
+        """Return safe company-scoped branding to any authenticated user."""
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_auth()
+        if err:
+            return err
+        return _json_response(self._branding_values(env))
+
+    def _branding_asset(self, env, asset_name):
+        record = self._branding_record(env)
+        if not record:
+            return _json_response({"error": "brand asset is not configured"}, status=404)
+        content = getattr(record, asset_name, False)
+        if not content:
+            return _json_response({"error": "brand asset is not configured"}, status=404)
+        try:
+            raw = base64.b64decode(content, validate=True)
+        except (TypeError, ValueError):
+            return _json_response({"error": "stored brand asset is invalid"}, status=415)
+        mimetype = getattr(record, "%s_mimetype" % asset_name, False) or "application/octet-stream"
+        return Response(
+            raw,
+            headers=[
+                ("Content-Type", mimetype),
+                ("Content-Disposition", "inline"),
+                ("Cache-Control", "private, max-age=0, must-revalidate"),
+            ] + _CORS_HEADERS,
+            status=200,
+        )
+
+    @http.route("/api/branding/logo", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
+    def branding_logo(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_auth()
+        if err:
+            return err
+        return self._branding_asset(env, "logo")
+
+    @http.route("/api/branding/favicon", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
+    def branding_favicon(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_auth()
+        if err:
+            return err
+        return self._branding_asset(env, "favicon")
+
+    @http.route("/api/admin/setup", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
+    def admin_setup(self, **kwargs):
+        """Return the company/setup identity needed by the first wizard step."""
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        company = env.company.sudo()
+        return _json_response({
+            "company": {
+                "id": company.id,
+                "name": company.name or "",
+                "email": company.email or "",
+                "phone": company.phone or "",
+                "website": company.website or "",
+                "street": company.street or "",
+                "street2": company.street2 or "",
+                "city": company.city or "",
+                "zip": company.zip or "",
+                "country_id": company.country_id.id if company.country_id else None,
+                "country_name": company.country_id.name if company.country_id else "",
+                "currency_id": company.currency_id.id if company.currency_id else None,
+                "currency_name": company.currency_id.name if company.currency_id else "",
+            },
+            "branding": self._branding_values(env, admin=True),
+        })
+
+    @http.route("/api/admin/setup/company", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_setup_company(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        allowed = {
+            "name", "email", "phone", "website", "street", "street2", "city", "zip",
+            "country_id", "currency_id",
+        }
+        unknown = sorted(set(payload) - allowed)
+        if unknown:
+            return _json_response({"error": "unsupported company fields"}, status=400)
+        values = {key: str(payload[key] or "").strip() for key in allowed if key in payload}
+        if "name" in values and not values["name"]:
+            return _json_response({"error": "company name is required"}, status=400)
+        if "email" in values and values["email"] and not _BRAND_EMAIL_RE.fullmatch(values["email"]):
+            return _json_response({"error": "company email is invalid"}, status=400)
+        if "website" in values and values["website"]:
+            parsed = urlparse(values["website"])
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                return _json_response({"error": "website must be an http or https URL"}, status=400)
+        for field_name in ("country_id", "currency_id"):
+            if field_name not in payload:
+                continue
+            try:
+                model_name = "res.country" if field_name == "country_id" else "res.currency"
+                record = env[model_name].sudo().browse(int(payload[field_name])).exists()
+            except (TypeError, ValueError):
+                record = False
+            if not record:
+                return _json_response({"error": "%s is invalid" % field_name}, status=400)
+            values[field_name] = record.id
+        env.company.sudo().write(values)
+        _audit(env, env.user.id, "semantic_api", "admin.company.update", {
+            "fields": sorted(values),
+        }, success=True)
+        return self.admin_setup()
+
+    @http.route("/api/admin/branding", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "OPTIONS"])
     def admin_branding(self, **kwargs):
-        """White-label settings (#55) - reads/writes exactly the two
-        things ai_debrand's data file sets as placeholders
-        (res.company.report_footer, the ai.brand.name/ai.brand.domain config
-        parameters), nothing more. HONEST NOTE: this does not touch the
-        actual logo image or the login-page template text (those stay
-        a manual step for now, same as item #55 already said) - only
-        the two text values that are otherwise easy to forget to
-        change per customer."""
+        """Manage explicit, versioned, company-scoped white-label settings."""
         if request.httprequest.method == "OPTIONS":
             return _cors_preflight_response()
         env, err = _require_privileged()
         if err:
             return err
         if request.httprequest.method == "GET":
-            company = env.company.sudo()
-            params = env["ir.config_parameter"].sudo()
-            # ir.config_parameter is global, so customer overrides use a
-            # company-qualified key. Keep the unqualified value only as a
-            # one-tenant/bootstrap fallback; an admin in company A must not
-            # overwrite the brand shown to company B.
-            report_url = params.get_param(
-                "ai.brand.domain.%s" % company.id,
-                params.get_param("ai.brand.domain", ""),
-            )
-            brand_name = params.get_param(
-                "ai.brand.name.%s" % company.id,
-                params.get_param("ai.brand.name", ""),
-            ) or company.report_footer or ""
-            return _json_response({
-                "brand_name": brand_name,
-                "company_name": company.name or "",
-                "brand_domain": report_url,
-                "has_logo": bool(company.logo),
-            })
+            return _json_response(self._branding_values(env, admin=True))
 
         payload, body_err = _read_json_body()
         if body_err:
             return body_err
-        company = env.company.sudo()
-        params = env["ir.config_parameter"].sudo()
+        allowed = _BRAND_TEXT_FIELDS | _BRAND_BOOL_FIELDS | {
+            "logo_base64", "logo_filename", "favicon_base64", "favicon_filename",
+            "clear_logo", "clear_favicon",
+        }
+        unknown = sorted(set(payload) - allowed)
+        if unknown:
+            return _json_response({"error": "unsupported branding fields"}, status=400)
+
         values = {}
-        if "brand_name" in payload:
-            brand_name = str(payload["brand_name"] or "").strip()[:200]
-            values["report_footer"] = brand_name
-            params.set_param("ai.brand.name.%s" % company.id, brand_name)
-        if values:
-            company.write(values)
-        if "brand_domain" in payload:
-            brand_domain = str(payload["brand_domain"] or "").strip()[:500]
-            params.set_param("ai.brand.domain.%s" % company.id, brand_domain)
-        _audit(env, env.user.id, "semantic_api", "admin.branding.update", payload, success=True)
-        return _json_response({"status": "updated"})
+        for field_name in _BRAND_TEXT_FIELDS:
+            if field_name not in payload:
+                continue
+            value = str(payload[field_name] or "").strip()
+            if field_name in _BRAND_COLOR_FIELDS and not _BRAND_COLOR_RE.fullmatch(value):
+                return _json_response({"error": "%s must be a six-digit hexadecimal color" % field_name}, status=400)
+            values[field_name] = value
+        for field_name in _BRAND_BOOL_FIELDS:
+            if field_name in payload:
+                try:
+                    values[field_name] = _strict_bool(payload[field_name], field_name)
+                except ValidationError as exc:
+                    return _json_response({"error": str(exc)}, status=400)
+        if "support_email" in values and values["support_email"] and not _BRAND_EMAIL_RE.fullmatch(values["support_email"]):
+            return _json_response({"error": "support_email is invalid"}, status=400)
+        for field_name in ("brand_domain", "support_url"):
+            if field_name in values and values[field_name]:
+                parsed = urlparse(values[field_name])
+                if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                    return _json_response({"error": "%s must be an http or https URL" % field_name}, status=400)
+
+        asset_audit = []
+        for asset_name, base_field, filename_field in (
+            ("logo", "logo_base64", "logo_filename"),
+            ("favicon", "favicon_base64", "favicon_filename"),
+        ):
+            clear_field = "clear_%s" % asset_name
+            if clear_field in payload:
+                try:
+                    clear = _strict_bool(payload[clear_field], clear_field)
+                except ValidationError as exc:
+                    return _json_response({"error": str(exc)}, status=400)
+                if clear and (base_field in payload or filename_field in payload):
+                    return _json_response({"error": "cannot upload and clear the same asset"}, status=400)
+                if clear:
+                    values[asset_name] = False
+                    values["%s_filename" % asset_name] = False
+                    values["%s_mimetype" % asset_name] = False
+                    asset_audit.append("%s.cleared" % asset_name)
+            if base_field in payload or filename_field in payload:
+                try:
+                    encoded, upload = _decode_brand_asset(payload, base_field, filename_field)
+                except (TypeError, ValueError, ValidationError) as exc:
+                    return _json_response({"error": str(exc)}, status=400)
+                values[asset_name] = encoded
+                values["%s_filename" % asset_name] = upload["filename"]
+                values["%s_mimetype" % asset_name] = upload["mimetype"]
+                asset_audit.append("%s.updated" % asset_name)
+
+        try:
+            branding = self._branding_record(env, create=True)
+            branding.write(values)
+        except (AccessError, UserError, ValidationError) as exc:
+            return _json_response({"error": str(exc)}, status=400)
+        _audit(env, env.user.id, "semantic_api", "admin.branding.update", {
+            "fields": sorted(set(values) - {"logo", "favicon"}),
+            "assets": asset_audit,
+            "version": branding.version,
+        }, success=True)
+        return _json_response({"status": "updated", "branding": branding.admin_values()})
 
     # ------------------------------------------------------------
     # Integrations - Telegram. Until now, linking a Telegram chat to

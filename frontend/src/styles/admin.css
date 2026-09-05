@@ -1,0 +1,78 @@
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-color-field {
+  display: grid;
+  grid-template-columns: 1fr 42px minmax(90px, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.admin-color-field input[type="color"] {
+  width: 42px;
+  height: 32px;
+  padding: 2px;
+  margin: 0;
+}
+
+.admin-color-field .ds-field {
+  margin: 0;
+}
+
+.admin-color-field .ds-input {
+  width: 100%;
+}
+
+.admin-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--color-text-muted);
+}
+
+.admin-toggle input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.setup-check-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.setup-check {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 70px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+@media (max-width: 800px) {
+  .admin-form-grid,
+  .admin-color-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-check-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,4 +1,12 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_customer_branding_admin,customer branding admin,model_ai_customer_branding,base.group_system,1,1,1,1
+access_customer_branding_executive,customer branding executive,model_ai_customer_branding,ai_business_tools.role_executive,1,1,1,0
+access_customer_branding_system_admin,customer branding system admin,model_ai_customer_branding,ai_business_tools.role_system_admin,1,1,1,1
+access_customer_branding_security,customer branding security,model_ai_customer_branding,ai_business_tools.role_security,1,1,1,0
+access_customer_setup_run_admin,customer setup run admin,model_ai_customer_setup_run,base.group_system,1,1,1,1
+access_customer_setup_run_executive,customer setup run executive,model_ai_customer_setup_run,ai_business_tools.role_executive,1,1,1,0
+access_customer_setup_run_system_admin,customer setup run system admin,model_ai_customer_setup_run,ai_business_tools.role_system_admin,1,1,1,1
+access_customer_setup_run_security,customer setup run security,model_ai_customer_setup_run,ai_business_tools.role_security,1,1,1,0
 access_customer_profile_admin,customer profile admin,model_ai_customer_configuration_profile,base.group_system,1,1,1,1
 access_customer_profile_executive,customer profile executive,model_ai_customer_configuration_profile,ai_business_tools.role_executive,1,1,1,0
 access_customer_profile_system_admin,customer profile system admin,model_ai_customer_configuration_profile,ai_business_tools.role_system_admin,1,1,1,1

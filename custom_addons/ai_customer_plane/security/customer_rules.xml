@@ -1,4 +1,14 @@
 <odoo>
+    <record id="rule_customer_branding_company" model="ir.rule">
+        <field name="name">Customer branding company isolation</field>
+        <field name="model_id" ref="model_ai_customer_branding"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
+    <record id="rule_customer_setup_run_company" model="ir.rule">
+        <field name="name">Customer setup run company isolation</field>
+        <field name="model_id" ref="model_ai_customer_setup_run"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+    </record>
     <record id="rule_customer_profile_company" model="ir.rule">
         <field name="name">Customer profile company isolation</field>
         <field name="model_id" ref="model_ai_customer_configuration_profile"/>

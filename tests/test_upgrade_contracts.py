@@ -428,6 +428,68 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("ttft_ms", benchmark)
         self.assertIn("p95", benchmark)
 
+    def test_customer_setup_center_phase_one_contract(self):
+        branding = (ADDONS / "ai_customer_plane/models/branding.py").read_text()
+        setup_run = (ADDONS / "ai_customer_plane/models/setup_run.py").read_text()
+        rules = (ADDONS / "ai_customer_plane/security/customer_rules.xml").read_text()
+        access = (ADDONS / "ai_customer_plane/security/ir.model.access.csv").read_text()
+        manifest = (ADDONS / "ai_customer_plane/__manifest__.py").read_text()
+        migration = (ADDONS / "ai_customer_plane/migrations/18.0.7.0.0/post-migrate.py").read_text()
+        debrand_manifest = (ADDONS / "ai_debrand/__manifest__.py").read_text()
+        debrand_templates = (ADDONS / "ai_debrand/views/debrand_templates.xml").read_text()
+        semantic = (ADDONS / "ai_semantic_api/controllers/semantic_api.py").read_text()
+        admin = (ROOT / "frontend/src/pages/AdminPage.jsx").read_text()
+        app = (ROOT / "frontend/src/App.jsx").read_text()
+        for marker in (
+            '_name = "ai.customer.branding"',
+            'unique(company_id)',
+            "company_id = fields.Many2one",
+            "attachment=True",
+            "_COLOR_FIELDS",
+            "_validate_hex",
+            "_validate_asset",
+            "public_values",
+            "export_snapshot",
+        ):
+            self.assertIn(marker, branding)
+        for marker in (
+            '_name = "ai.customer.setup.run"',
+            'unique(run_key)',
+            'action_start',
+            'action_advance',
+            'action_pass',
+            'action_fail',
+            'action_cancel',
+            'runtime_certification_state',
+        ):
+            self.assertIn(marker, setup_run)
+        for marker in (
+            'model_ai_customer_branding',
+            'model_ai_customer_setup_run',
+            'company_ids',
+        ):
+            self.assertIn(marker, rules + access)
+        self.assertIn('"version": "18.0.7.0.0"', manifest)
+        self.assertIn('ai.customer.branding', migration)
+        self.assertIn('ai.brand.name', migration)
+        self.assertIn('ai.brand.domain', migration)
+        self.assertNotIn('custom_css', branding)
+        self.assertIn('"ai_customer_plane"', debrand_manifest)
+        self.assertIn('ai.customer.branding', debrand_templates)
+        for marker in (
+            '"/api/branding"', '"/api/branding/logo"', '"/api/branding/favicon"',
+            '"/api/admin/setup"', '"/api/admin/setup/company"',
+            '"/api/admin/branding"', '_decode_brand_asset',
+            '_BRAND_COLOR_FIELDS', 'unsupported branding fields',
+        ):
+            self.assertIn(marker, semantic)
+        for marker in (
+            'adminGetSetup', 'adminUpdateCompany', 'راه‌اندازی مشتری',
+            'logo_base64', 'favicon_base64', 'branding:changed',
+            'show_module_navigation',
+        ):
+            self.assertIn(marker, admin + app)
+
     def test_all_python_sources_compile(self):
         for path in ADDONS.rglob("*.py"):
             try:

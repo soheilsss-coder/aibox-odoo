@@ -17,9 +17,48 @@ const NAV = [
   ["/notifications", "اعلان‌ها", "●"], ["/integrations", "اتصالات", "↔"],
 ];
 
+function applyBranding(branding) {
+  if (!branding || typeof document === "undefined") return;
+  const root = document.documentElement;
+  const variables = {
+    "--color-primary": branding.primary_color,
+    "--color-primary-hover": branding.primary_color,
+    "--color-bg": branding.background_color,
+    "--color-surface": branding.surface_color,
+    "--color-surface-alt": branding.surface_alt_color,
+    "--color-text": branding.text_color,
+    "--color-text-muted": branding.text_muted_color,
+    "--color-danger": branding.danger_color,
+    "--color-warning": branding.warning_color,
+    "--color-success": branding.accent_color,
+    "--color-info": branding.primary_color,
+    "--radius": branding.border_radius === "compact" ? "6px" : branding.border_radius === "rounded" ? "16px" : "10px",
+  };
+  Object.entries(variables).forEach(([name, value]) => {
+    if (value) root.style.setProperty(name, value);
+  });
+  const fonts = {
+    system: '"Segoe UI", system-ui, sans-serif',
+    vazirmatn: '"Vazirmatn", "Segoe UI", system-ui, sans-serif',
+    inter: '"Inter", system-ui, sans-serif',
+  };
+  if (fonts[branding.font_family]) root.style.setProperty("--font-sans", fonts[branding.font_family]);
+  if (branding.product_title) document.title = branding.product_title;
+  if (branding.favicon_url) {
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = `${branding.favicon_url}?v=${encodeURIComponent(branding.version || 0)}`;
+  }
+}
+
 function Shell({ user, onLogout }) {
   const [notifCount, setNotifCount] = useState(0);
   const [moduleNav, setModuleNav] = useState([]);
+  const [branding, setBranding] = useState(null);
   const [shellError, setShellError] = useState("");
   const loadModuleNav = () => api.getModuleNavigation()
     .then(x => setModuleNav(x.modules || []))
@@ -28,15 +67,26 @@ function Shell({ user, onLogout }) {
     api.getNotifications()
       .then(x => setNotifCount((x.notifications || []).filter(n => !n.is_read).length))
       .catch(e => setShellError(e instanceof api.ApiError ? e.message : "خطا در بارگذاری اعلان‌ها"));
+    api.getBranding()
+      .then(value => { setBranding(value); applyBranding(value); })
+      .catch(e => setShellError(e instanceof api.ApiError ? e.message : "خطا در بارگذاری برند"));
     loadModuleNav();
     const refresh = () => loadModuleNav();
+    const refreshBranding = (event) => {
+      const value = event.detail;
+      if (value) { setBranding(value); applyBranding(value); }
+    };
     window.addEventListener("modules:changed", refresh);
-    return () => window.removeEventListener("modules:changed", refresh);
+    window.addEventListener("branding:changed", refreshBranding);
+    return () => {
+      window.removeEventListener("modules:changed", refresh);
+      window.removeEventListener("branding:changed", refreshBranding);
+    };
   }, []);
   const canOpenAdmin = Boolean(user.is_admin);
   return <div className="product-shell">
     <aside className="product-sidebar">
-      <div className="brand"><div className="brand-mark">✦</div><div><strong>Nova Enterprise</strong><span>AI Operating System</span></div></div>
+      <div className="brand"><div className="brand-mark">{branding?.logo_url ? <img src={branding.logo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "inherit" }} /> : "✦"}</div><div><strong>{branding?.brand_name || "Nova Enterprise"}</strong><span>{branding?.tagline || "AI Operating System"}</span></div></div>
       <div className="user-card"><div className="avatar">{(user.name || "U").slice(0,1)}</div><div><strong>{user.name}</strong><span>{user.company || "سازمان"}</span></div></div>
       <nav className="product-nav">{NAV.map(([to,label,icon]) => <NavLink key={to} to={to} end={to === "/"} className={({isActive}) => `nav-item ${isActive ? "active" : ""}`}><i>{icon}</i><span>{label}</span>{label === "اعلان‌ها" && notifCount > 0 && <b>{notifCount}</b>}</NavLink>)}{moduleNav.length > 0 && <div className="module-nav-group"><div className="module-nav-title">برنامه‌های سازمانی</div>{moduleNav.map(module => <NavLink key={module.id} to={`/modules/${module.id}`} className={({isActive}) => `nav-item module-nav-item ${isActive ? "active" : ""}`}><i>▣</i><span>{module.label}</span></NavLink>)}</div>}</nav>
       <div className="sidebar-bottom"><NavLink to="/admin" className="nav-item"><i>⚙</i><span>مدیریت</span></NavLink><button className="nav-item logout" onClick={() => { api.logout().catch(()=>{}); onLogout(); }}><i>↪</i><span>خروج</span></button></div>
@@ -44,7 +94,7 @@ function Shell({ user, onLogout }) {
     <main className="product-main">
       {shellError && <div className="error-text" role="alert" aria-live="polite">{shellError}</div>}
       <Routes>
-      <Route path="/" element={<Dashboard user={user} />} />
+      <Route path="/" element={<Dashboard user={user} branding={branding} />} />
       <Route path="/chat" element={<ChatPage user={user} />} />
       <Route path="/tasks" element={<TasksPage />} /><Route path="/calendar" element={<CalendarPage />} />
       <Route path="/departments" element={<DepartmentsPage />} /><Route path="/documents" element={<DocumentCenterPage user={user} />} />
@@ -61,7 +111,7 @@ const Card = ({children, className=""}) => <section className={`x-card ${classNa
 const Pill = ({children, tone="neutral"}) => <span className={`pill pill-${tone}`}>{children}</span>;
 function PageHead({eyebrow,title,subtitle,action}) { return <header className="page-head"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{action}</header>; }
 
-function Dashboard({user}) { const [data,setData]=useState({}); const [error,setError]=useState(""); useEffect(()=>{api.getWorkspace().then(setData).catch(e=>setError(e.message||"خطا در بارگذاری فضای کاری"))},[]); return <><PageHead eyebrow="CONTROL CENTER" title={`سلام ${user.name.split(" ")[0]} 👋`} subtitle="تمام عملیات سازمان، AI و اتوماسیون از یک فضای واحد مدیریت می‌شوند." action={<NavLink className="primary-btn" to="/chat">✦ شروع گفتگو</NavLink>} />{error&&<p className="error-text">{error}</p>}<div className="hero-grid"><Card className="hero-card"><div className="hero-glow"/><Pill tone="success">AI Online</Pill><h2>دستیار سازمانی شما آماده است.</h2><p>درخواست را طبیعی بنویسید؛ سیستم هویت، نقش، دسترسی، ریسک و Workflow را قبل از اجرا بررسی می‌کند.</p><NavLink className="primary-btn" to="/chat">گفتگو با Agent من →</NavLink></Card><Card><div className="metric"><span>Role</span><strong>{data.department?.name || "سازمان"}</strong><small>Effective access</small></div><div className="metric"><span>AI</span><strong>Active</strong><small>Model Router ready</small></div><div className="metric"><span>Security</span><strong>Protected</strong><small>Policy + ACL + FGA</small></div></Card></div><div className="section-title">دسترسی سریع</div><div className="quick-grid">{[["/chat","AI Workspace","هر کاری را با زبان طبیعی انجام بده"],["/documents","Documents","فایل‌ها و Knowledge با ACL"],["/approvals","Approvals","تأییدهای در انتظار شما"],["/agents","Role Agents","Agent متناسب با نقش شما"]].map(x=><NavLink className="quick-card" to={x[0]} key={x[0]}><strong>{x[1]}</strong><span>{x[2]}</span><b>→</b></NavLink>)}</div></>; }
+function Dashboard({user, branding}) { const [data,setData]=useState({}); const [error,setError]=useState(""); useEffect(()=>{api.getWorkspace().then(setData).catch(e=>setError(e.message||"خطا در بارگذاری فضای کاری"))},[]); return <><PageHead eyebrow="CONTROL CENTER" title={`سلام ${user.name.split(" ")[0]} 👋`} subtitle={`${branding?.brand_name || "سازمان"}: تمام عملیات سازمان، AI و اتوماسیون از یک فضای واحد مدیریت می‌شوند.`} action={<NavLink className="primary-btn" to="/chat">✦ شروع گفتگو</NavLink>} />{error&&<p className="error-text">{error}</p>}<div className="hero-grid"><Card className="hero-card"><div className="hero-glow"/><Pill tone="success">AI Online</Pill><h2>دستیار سازمانی شما آماده است.</h2><p>درخواست را طبیعی بنویسید؛ سیستم هویت، نقش، دسترسی، ریسک و Workflow را قبل از اجرا بررسی می‌کند.</p><NavLink className="primary-btn" to="/chat">گفتگو با Agent من →</NavLink></Card><Card><div className="metric"><span>Role</span><strong>{data.department?.name || "سازمان"}</strong><small>Effective access</small></div><div className="metric"><span>AI</span><strong>Active</strong><small>Model Router ready</small></div><div className="metric"><span>Security</span><strong>Protected</strong><small>Policy + ACL + FGA</small></div></Card></div><div className="section-title">دسترسی سریع</div><div className="quick-grid">{[["/chat","AI Workspace","هر کاری را با زبان طبیعی انجام بده"],["/documents","Documents","فایل‌ها و Knowledge با ACL"],["/approvals","Approvals","تأییدهای در انتظار شما"],["/agents","Role Agents","Agent متناسب با نقش شما"]].map(x=><NavLink className="quick-card" to={x[0]} key={x[0]}><strong>{x[1]}</strong><span>{x[2]}</span><b>→</b></NavLink>)}</div></>; }
 
 function TasksPage(){const [tasks,setTasks]=useState([]);const [name,setName]=useState("");const [error,setError]=useState("");const load=()=>api.getTasks().then(x=>setTasks(x.tasks||[])).catch(e=>setError(e.message||"خطا در بارگذاری کارها"));useEffect(load,[]);const create=async()=>{if(!name)return;setError("");try{await api.createTask({name});setName("");load();}catch(e){setError(e.message||"کار ایجاد نشد");}};return <><PageHead eyebrow="WORK MANAGEMENT" title="کارها" subtitle="Task، مسئول، موعد و اتوماسیون در یک جا." action={<button className="primary-btn" onClick={create}>+ کار جدید</button>}/>{error&&<p className="error-text">{error}</p>}<Card><div className="inline-form"><input value={name} onChange={e=>setName(e.target.value)} placeholder="عنوان تسک را بنویسید…"/><button className="primary-btn" onClick={create}>ایجاد</button></div></Card><Card><Table headers={["تسک","وضعیت","عملیات"]} rows={tasks.map(t=>[<strong key={t.id}>{t.name}</strong>,<Pill tone="info">{t.state||"Open"}</Pill>,<button className="ghost-btn" key={`view-${t.id}`}>مشاهده</button>])}/></Card></>;}
 function CalendarPage(){

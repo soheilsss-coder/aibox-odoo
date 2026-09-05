@@ -56,6 +56,9 @@ export const rejectApproval = (id, note = "") => request(`/api/approvals/${id}/r
 export const getNotifications = () => request("/api/notifications");
 export const getModels = () => request("/api/models");
 export const getIntegrations = () => request("/api/integrations");
+export const getBranding = () => request("/api/branding");
+export const adminGetSetup = () => request("/api/admin/setup");
+export const adminUpdateCompany = (payload) => request("/api/admin/setup/company", { method: "POST", body: payload });
 export const sendChatMessage = (message, threadId) => request("/api/chat", { method: "POST", body: { message, thread_id: threadId } });
 
 export function streamChat(payload, handlers) {

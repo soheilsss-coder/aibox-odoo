@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import {
   adminListRoles, adminListUsers, adminListAccessGrants, adminCreateAccessGrant,
   adminRevokeAccessGrant, adminListDocuments, adminListAgents, adminGetBranding,
-  adminUpdateBranding, adminGetMetrics, adminListModules, adminInstallModule, ApiError,
+  adminUpdateBranding, adminGetMetrics, adminListModules, adminInstallModule,
+  adminGetSetup, adminUpdateCompany, ApiError,
 } from "../api/client.js";
 import {
   Card, Table, Badge, Button, Tabs, Alert, Spinner, EmptyState, Modal, Select, Input,
@@ -23,6 +24,7 @@ import {
 // actually see anything a real privilege check would refuse.
 
 const TABS = [
+  { key: "setup", label: "راه‌اندازی مشتری" },
   { key: "roles", label: "نقش‌ها" },
   { key: "grants", label: "دسترسی موقت / تفویض" },
   { key: "documents", label: "اسناد" },
@@ -53,6 +55,7 @@ export default function AdminPage() {
     <div>
       <h2>کنسول مدیریت</h2>
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      {tab === "setup" && <SetupTab />}
       {tab === "roles" && <RolesTab />}
       {tab === "grants" && <GrantsTab />}
       {tab === "documents" && <DocumentsTab />}
@@ -270,17 +273,17 @@ function AgentsTab() {
   );
 }
 
-// --- Branding (#55) --------------------------------------------------------
-function BrandingTab() {
-  const [data, error, refresh] = useLoad(adminGetBranding, []);
+// --- Customer Setup --------------------------------------------------------
+function SetupTab() {
+  const [data, error, refresh] = useLoad(adminGetSetup, []);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (data && !form) setForm({ brand_name: data.brand_name, brand_domain: data.brand_domain });
-  }, [data]);
+    if (data && !form) setForm(data.company);
+  }, [data, form]);
 
   async function handleSave(e) {
     e.preventDefault();
@@ -288,11 +291,12 @@ function BrandingTab() {
     setSaveError("");
     setSaved(false);
     try {
-      await adminUpdateBranding(form);
+      await adminUpdateCompany(form);
       setSaved(true);
+      setForm(null);
       refresh();
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : "ذخیره ناموفق بود");
+      setSaveError(err instanceof ApiError ? err.message : "ذخیره مشخصات شرکت ناموفق بود");
     } finally {
       setSaving(false);
     }
@@ -300,29 +304,164 @@ function BrandingTab() {
 
   if (error) return <Alert>{error}</Alert>;
   if (!data || !form) return <Spinner />;
-
   return (
-    <Card title="تنظیمات برند (White-label، مورد #55)">
-      <p className="muted">
-        شرکت فعلی: {data.company_name} — لوگو: {data.has_logo ? "تنظیم شده" : "تنظیم نشده"}
-      </p>
+    <>
+      <Card title="راه‌اندازی مشتری">
+        <p className="muted">این اطلاعات هویت appliance فعلی است و قبل از تحویل مشتری باید تکمیل شود.</p>
+        <form onSubmit={handleSave}>
+          <Input label="نام سازمان" required value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <div className="admin-form-grid">
+            <Input label="ایمیل سازمان" type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <Input label="تلفن" value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <Input label="وب‌سایت" type="url" value={form.website || ""} onChange={(e) => setForm({ ...form, website: e.target.value })} />
+            <Input label="کشور" value={form.country_name || "—"} disabled />
+            <Input label="واحد پول" value={form.currency_name || "—"} disabled />
+          </div>
+          <Input label="آدرس" value={form.street || ""} onChange={(e) => setForm({ ...form, street: e.target.value })} />
+          <div className="admin-form-grid">
+            <Input label="آدرس تکمیلی" value={form.street2 || ""} onChange={(e) => setForm({ ...form, street2: e.target.value })} />
+            <Input label="شهر" value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+            <Input label="کد پستی" value={form.zip || ""} onChange={(e) => setForm({ ...form, zip: e.target.value })} />
+          </div>
+          {saved && <Alert tone="success">مشخصات سازمان ذخیره شد.</Alert>}
+          <Alert>{saveError}</Alert>
+          <Button type="submit" loading={saving}>ذخیره مشخصات سازمان</Button>
+        </form>
+      </Card>
+      <Card title="وضعیت اولیه راه‌اندازی">
+        <div className="setup-check-grid">
+          <SetupCheck label="نام سازمان" ok={Boolean(form.name)} />
+          <SetupCheck label="Brand name" ok={Boolean(data.branding?.brand_name)} />
+          <SetupCheck label="Logo" ok={Boolean(data.branding?.has_logo)} />
+          <SetupCheck label="Favicon" ok={Boolean(data.branding?.has_favicon)} />
+          <SetupCheck label="Theme colors" ok={Boolean(data.branding?.primary_color)} />
+        </div>
+        <p className="muted">برای تنظیم لوگو، رنگ‌ها و ظاهر کامل، تب «برندینگ» را باز کنید.</p>
+      </Card>
+    </>
+  );
+}
+
+function SetupCheck({ label, ok }) {
+  return <div className="setup-check"><Badge tone={ok ? "success" : "warning"}>{ok ? "PASS" : "TODO"}</Badge><span>{label}</span></div>;
+}
+
+// --- Branding (#55) --------------------------------------------------------
+function BrandingTab() {
+  const [data, error, refresh] = useLoad(adminGetBranding, []);
+  const [form, setForm] = useState(null);
+  const [logo, setLogo] = useState(null);
+  const [favicon, setFavicon] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (data && !form) {
+      setForm({
+        brand_name: data.brand_name || "",
+        legal_name: data.legal_name || "",
+        tagline: data.tagline || "",
+        product_title: data.product_title || "",
+        brand_domain: data.brand_domain || "",
+        support_email: data.support_email || "",
+        support_url: data.support_url || "",
+        footer_text: data.footer_text || "",
+        login_message: data.login_message || "",
+        primary_color: data.primary_color,
+        secondary_color: data.secondary_color,
+        accent_color: data.accent_color,
+        background_color: data.background_color,
+        surface_color: data.surface_color,
+        surface_alt_color: data.surface_alt_color,
+        text_color: data.text_color,
+        text_muted_color: data.text_muted_color,
+        danger_color: data.danger_color,
+        warning_color: data.warning_color,
+        font_family: data.font_family || "system",
+        border_radius: data.border_radius || "comfortable",
+        show_ai_brand: data.show_ai_brand,
+        show_powered_by: data.show_powered_by,
+        show_module_navigation: data.show_module_navigation,
+        support_contact_visible: data.support_contact_visible,
+      });
+    }
+  }, [data, form]);
+
+  function readFile(file, setter) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setter({ name: file.name, data: String(reader.result).split(",")[1] || "" });
+    reader.onerror = () => setSaveError("خواندن فایل ناموفق بود");
+    reader.readAsDataURL(file);
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    setSaveError("");
+    setSaved(false);
+    try {
+      const payload = { ...form };
+      if (logo) { payload.logo_base64 = logo.data; payload.logo_filename = logo.name; }
+      if (favicon) { payload.favicon_base64 = favicon.data; payload.favicon_filename = favicon.name; }
+      const result = await adminUpdateBranding(payload);
+      setSaved(true);
+      setLogo(null);
+      setFavicon(null);
+      setForm(null);
+      refresh();
+      window.dispatchEvent(new CustomEvent("branding:changed", { detail: result.branding }));
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "ذخیره برند ناموفق بود");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (error) return <Alert>{error}</Alert>;
+  if (!data || !form) return <Spinner />;
+  const colors = [
+    ["primary_color", "رنگ اصلی"], ["secondary_color", "رنگ ثانویه"], ["accent_color", "رنگ موفقیت"],
+    ["background_color", "پس‌زمینه"], ["surface_color", "سطح کارت"], ["surface_alt_color", "سطح دوم"],
+    ["text_color", "متن"], ["text_muted_color", "متن کم‌رنگ"], ["danger_color", "خطا"], ["warning_color", "هشدار"],
+  ];
+  return (
+    <Card title="تنظیمات کامل برند و White-label">
+      <p className="muted">شرکت فعلی: {data.company_name} — نسخه برند: {data.version} — آخرین تغییر: {data.updated_at || "—"}</p>
       <form onSubmit={handleSave}>
-        <Input
-          label="نام برند" value={form.brand_name}
-          onChange={(e) => setForm({ ...form, brand_name: e.target.value })}
-        />
-        <Input
-          label="دامنه‌ی برند" value={form.brand_domain}
-          onChange={(e) => setForm({ ...form, brand_domain: e.target.value })}
-        />
-        {saved && <Alert tone="success">تنظیمات ذخیره شد.</Alert>}
+        <h4>هویت و متن‌های مشتری</h4>
+        <div className="admin-form-grid">
+          <Input label="نام برند" required value={form.brand_name} onChange={(e) => setForm({ ...form, brand_name: e.target.value })} />
+          <Input label="نام حقوقی" value={form.legal_name} onChange={(e) => setForm({ ...form, legal_name: e.target.value })} />
+          <Input label="عنوان مرورگر" value={form.product_title} onChange={(e) => setForm({ ...form, product_title: e.target.value })} />
+          <Input label="Tagline" value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} />
+          <Input label="دامنه برند" type="url" value={form.brand_domain} onChange={(e) => setForm({ ...form, brand_domain: e.target.value })} />
+          <Input label="ایمیل پشتیبانی" type="email" value={form.support_email} onChange={(e) => setForm({ ...form, support_email: e.target.value })} />
+          <Input label="لینک پشتیبانی" type="url" value={form.support_url} onChange={(e) => setForm({ ...form, support_url: e.target.value })} />
+          <Input label="Footer" value={form.footer_text} onChange={(e) => setForm({ ...form, footer_text: e.target.value })} />
+        </div>
+        <Input label="پیام صفحه ورود" value={form.login_message} onChange={(e) => setForm({ ...form, login_message: e.target.value })} />
+        <h4>دارایی‌های بصری</h4>
+        <div className="admin-form-grid">
+          <Input label={`لوگو ${data.has_logo ? "(ثبت شده)" : ""}`} type="file" accept=".png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" onChange={(e) => readFile(e.target.files?.[0], setLogo)} />
+          <Input label={`Favicon ${data.has_favicon ? "(ثبت شده)" : ""}`} type="file" accept="image/png,image/jpeg,image/webp,image/x-icon" onChange={(e) => readFile(e.target.files?.[0], setFavicon)} />
+        </div>
+        <p className="muted">فایل جدید جایگزین فایل قبلی می‌شود. حذف asset از مرحله بعدی reset امن انجام می‌شود.</p>
+        <h4>رنگ و ظاهر</h4>
+        <div className="admin-color-grid">
+          {colors.map(([key, label]) => <label className="admin-color-field" key={key}><span>{label}</span><input type="color" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} /><Input value={form[key]} aria-label={label} onChange={(e) => setForm({ ...form, [key]: e.target.value })} /></label>)}
+        </div>
+        <div className="admin-form-grid">
+          <Select label="فونت" value={form.font_family} onChange={(e) => setForm({ ...form, font_family: e.target.value })} options={[{ value: "system", label: "System" }, { value: "vazirmatn", label: "Vazirmatn" }, { value: "inter", label: "Inter" }]} />
+          <Select label="گردی کارت‌ها" value={form.border_radius} onChange={(e) => setForm({ ...form, border_radius: e.target.value })} options={[{ value: "compact", label: "Compact" }, { value: "comfortable", label: "Comfortable" }, { value: "rounded", label: "Rounded" }]} />
+        </div>
+        <h4>تجربه کاربری</h4>
+        {[["show_ai_brand", "نمایش برند AI"], ["show_powered_by", "نمایش Powered by"], ["show_module_navigation", "نمایش منوی ماژول‌ها"], ["support_contact_visible", "نمایش اطلاعات پشتیبانی"]].map(([key, label]) => <label key={key} className="admin-toggle"><input type="checkbox" checked={Boolean(form[key])} onChange={(e) => setForm({ ...form, [key]: e.target.checked })} /><span>{label}</span></label>)}
+        {saved && <Alert tone="success">برند با موفقیت ذخیره و برای frontend اعمال شد.</Alert>}
         <Alert>{saveError}</Alert>
-        <Button type="submit" loading={saving}>ذخیره</Button>
+        <Button type="submit" loading={saving}>ذخیره و اعمال برند</Button>
       </form>
-      <p className="muted" style={{ marginTop: 12 }}>
-        نام برند از Configuration و QWeb template inheritance اعمال می‌شود؛ JS فقط fallback برای
-        محتوای پویاست و منبع اصلی white-label نیست.
-      </p>
     </Card>
   );
 }

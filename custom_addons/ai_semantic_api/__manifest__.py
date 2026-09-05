@@ -1,6 +1,6 @@
 {
     "name": "AI Semantic API",
-    "version": "18.0.1.6.0",
+    "version": "18.0.1.7.0",
     "summary": "Semantic REST endpoints (/api/hr/leaves, /api/documents, "
                 "/api/admin/*, /api/integrations/*, ...) so a frontend never has to know an Odoo "
                 "model name (roadmap #43-44). /api/rpc (the old generic ORM/RPC "
@@ -25,7 +25,7 @@
                 "elsewhere in this file), these routes report "
                 "'not available' rather than erroring when it isn't installed.",
     "category": "Technical",
-    "depends": ["base", "hr", "hr_holidays", "ai_gateway", "ai_business_tools", "ai_rag"],
+    "depends": ["base", "hr", "hr_holidays", "ai_gateway", "ai_business_tools", "ai_rag", "ai_customer_plane"],
     "data": [],
     "installable": True,
     "application": False,
