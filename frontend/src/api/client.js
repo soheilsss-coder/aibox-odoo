@@ -59,6 +59,15 @@ export const getIntegrations = () => request("/api/integrations");
 export const getBranding = () => request("/api/branding");
 export const adminGetSetup = () => request("/api/admin/setup");
 export const adminUpdateCompany = (payload) => request("/api/admin/setup/company", { method: "POST", body: payload });
+export const adminListConfigurationProfiles = () => request("/api/admin/configuration-profiles");
+export const adminCreateConfigurationProfile = (payload) => request("/api/admin/configuration-profiles", { method: "POST", body: payload });
+export const adminGetConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}`);
+export const adminUpdateConfigurationProfile = (id, payload) => request(`/api/admin/configuration-profiles/${id}`, { method: "PATCH", body: payload });
+export const adminValidateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/validate`, { method: "POST" });
+export const adminCompileConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/compile`, { method: "POST" });
+export const adminActivateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/activate`, { method: "POST" });
+export const adminArchiveConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/archive`, { method: "POST" });
+export const adminDryRunConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/dry-run`, { method: "POST" });
 export const sendChatMessage = (message, threadId) => request("/api/chat", { method: "POST", body: { message, thread_id: threadId } });
 
 export function streamChat(payload, handlers) {
@@ -125,6 +134,7 @@ export const adminUpdateBranding = (payload) => request("/api/admin/branding", {
 export const adminGetMetrics = () => request("/api/metrics");
 export const adminListModules = () => request("/api/admin/modules");
 export const adminInstallModule = (moduleId) => request("/api/admin/modules/install", { method: "POST", body: { module_id: moduleId } });
+export const adminGetModuleReadiness = (moduleId) => request(`/api/admin/modules/${moduleId}/readiness`);
 export const getModuleNavigation = () => request("/api/modules/navigation");
 export const getModuleMenu = (menuId) => request(`/api/modules/menus/${menuId}`);
 export const getTelegramStatus = () => request("/api/integrations/telegram");

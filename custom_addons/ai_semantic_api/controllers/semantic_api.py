@@ -81,6 +81,10 @@ _BRAND_COLOR_FIELDS = {
     "surface_color", "surface_alt_color", "text_color", "text_muted_color",
     "danger_color", "warning_color",
 }
+_PROFILE_SECTIONS = (
+    "role_policy", "capability_policy", "approval_matrix", "document_policy",
+    "agent_config", "tool_config", "workflow_config",
+)
 _BRAND_DEFAULTS = {
     "primary_color": "#4f8cff",
     "secondary_color": "#8b5cf6",
@@ -118,6 +122,55 @@ def _decode_brand_asset(payload, base_field, filename_field):
     if upload["extension"] not in _BRAND_IMAGE_EXTENSIONS:
         raise ValidationError("Brand assets must be image files.")
     return base64.b64encode(raw).decode("ascii"), upload
+
+
+def _profile_json_values(profile, include_sections=False):
+    values = {
+        "id": profile.id,
+        "name": profile.name,
+        "company_id": profile.company_id.id,
+        "state": profile.state,
+        "active": profile.active,
+        "version": profile.version,
+        "compiled_hash": profile.compiled_hash or "",
+        "compiled_at": str(profile.compiled_at) if profile.compiled_at else None,
+    }
+    if include_sections:
+        sections = {}
+        for section in _PROFILE_SECTIONS:
+            field_name = "%s_json" % section
+            try:
+                parsed = _json.loads(getattr(profile, field_name) or "{}")
+            except (TypeError, ValueError):
+                parsed = {}
+            sections[section] = parsed
+        values["sections"] = sections
+    return values
+
+
+def _profile_values_from_payload(payload, require_name=False):
+    allowed = {"name"} | set(_PROFILE_SECTIONS)
+    unknown = sorted(set(payload) - allowed)
+    if unknown:
+        raise ValidationError("unsupported configuration profile fields")
+    values = {}
+    if require_name and not str(payload.get("name") or "").strip():
+        raise ValidationError("profile name is required")
+    if "name" in payload:
+        name = str(payload["name"] or "").strip()
+        if not name or len(name) > 200:
+            raise ValidationError("profile name is invalid")
+        values["name"] = name
+    for section in _PROFILE_SECTIONS:
+        if section not in payload:
+            continue
+        value = payload[section]
+        if not isinstance(value, dict):
+            raise ValidationError("%s must be a JSON object" % section)
+        values["%s_json" % section] = _json.dumps(
+            value, sort_keys=True, ensure_ascii=False,
+        )
+    return values
 
 
 def _require_auth():
@@ -1130,6 +1183,216 @@ class AiSemanticApiController(http.Controller):
             "assistants": assistants,
             "vision_configured": vision_configured,
         })
+
+    # ------------------------------------------------------------
+    # Customer configuration profiles. These routes expose the existing
+    # versioned/compiled profile model through a structured contract; the
+    # browser cannot write arbitrary ORM fields or activate an uncompiled
+    # snapshot.
+    # ------------------------------------------------------------
+    @http.route("/api/admin/configuration-profiles", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "OPTIONS"])
+    def admin_configuration_profiles(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        Profile = env["ai.customer.configuration.profile"]
+        if request.httprequest.method == "GET":
+            profiles = Profile.search([], order="state, name, id")
+            return _json_response({
+                "profiles": [_profile_json_values(profile) for profile in profiles],
+            })
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        try:
+            values = _profile_values_from_payload(payload, require_name=True)
+            profile = Profile.create(values)
+        except (ValidationError, AccessError) as exc:
+            return _json_response({"error": str(exc)}, status=400)
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.create", {
+            "profile_id": profile.id,
+            "name": profile.name,
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(profile, include_sections=True)}, status=201)
+
+    @staticmethod
+    def _configuration_profile(env, profile_id):
+        return env["ai.customer.configuration.profile"].search([
+            ("id", "=", profile_id), ("company_id", "=", env.company.id),
+        ], limit=1)
+
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>", type="http", auth="none", csrf=False,
+                methods=["GET", "PATCH", "OPTIONS"])
+    def admin_configuration_profile(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        if request.httprequest.method == "GET":
+            return _json_response({"profile": _profile_json_values(profile, include_sections=True)})
+        if profile.state == "active":
+            return _json_response({"error": "active profile must be cloned before editing"}, status=409)
+        payload, body_err = _read_json_body()
+        if body_err:
+            return body_err
+        try:
+            values = _profile_values_from_payload(payload)
+            if not values:
+                return _json_response({"error": "no profile changes supplied"}, status=400)
+            profile.write(values)
+        except (ValidationError, AccessError) as exc:
+            return _json_response({"error": str(exc)}, status=400)
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.update", {
+            "profile_id": profile.id,
+            "fields": sorted(values),
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(profile, include_sections=True)})
+
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/validate", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_configuration_profile_validate(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        try:
+            sections = {
+                section: profile._parse_section(
+                    getattr(profile, "%s_json" % section), section,
+                )
+                for section in _PROFILE_SECTIONS
+            }
+            tools = sections["tool_config"].get(
+                "allowed_tools", sections["tool_config"].get("tools", []),
+            )
+            if tools and not isinstance(tools, list):
+                raise ValidationError("tool_config.allowed_tools must be a list")
+            result = {
+                "valid": True,
+                "sections": sorted(sections),
+                "configured_tool_count": len(tools or []),
+                "requires_compile": not bool(profile.compiled_hash),
+            }
+        except (TypeError, ValueError, ValidationError) as exc:
+            result = {"valid": False, "error": str(exc)}
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.validate", {
+            "profile_id": profile.id,
+            "valid": result["valid"],
+        }, success=result["valid"], error_message=result.get("error"))
+        return _json_response({"profile": _profile_json_values(profile), "validation": result},
+                              status=200 if result["valid"] else 409)
+
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/compile", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_configuration_profile_compile(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        try:
+            snapshot = profile.compile_runtime()
+        except (ValidationError, AccessError, UserError) as exc:
+            _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.compile", {
+                "profile_id": profile.id,
+            }, success=False, error_message=str(exc))
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.compile", {
+            "profile_id": profile.id,
+            "compiled_hash": profile.compiled_hash,
+        }, success=True)
+        return _json_response({
+            "profile": _profile_json_values(profile),
+            "compile": {
+                "valid": True,
+                "compiled_hash": profile.compiled_hash,
+                "tool_contract_count": len(snapshot.get("tool_contracts", [])),
+            },
+        })
+
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/activate", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_configuration_profile_activate(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        try:
+            profile.activate()
+        except (ValidationError, AccessError, UserError) as exc:
+            _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.activate", {
+                "profile_id": profile.id,
+            }, success=False, error_message=str(exc))
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.activate", {
+            "profile_id": profile.id,
+            "compiled_hash": profile.compiled_hash,
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(profile, include_sections=True)})
+
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/archive", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_configuration_profile_archive(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        if profile.state == "active":
+            return _json_response({"error": "active profile cannot be archived"}, status=409)
+        profile.write({"state": "archived", "active": False})
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.archive", {
+            "profile_id": profile.id,
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(profile)})
+
+    @http.route("/api/admin/configuration-profiles/<int:profile_id>/dry-run", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_configuration_profile_dry_run(self, profile_id, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        profile = self._configuration_profile(env, profile_id)
+        if not profile:
+            return _json_response({"error": "configuration profile not found"}, status=404)
+        try:
+            wizard = env["ai.customer.deployment.wizard"].create({
+                "profile_id": profile.id,
+                "dry_run": True,
+            })
+            wizard.run()
+            result = _json.loads(wizard.result_json or "{}")
+            wizard.unlink()
+        except (ValidationError, AccessError, UserError, ValueError) as exc:
+            return _json_response({"error": str(exc)}, status=409)
+        _audit(env, env.user.id, "semantic_api", "admin.configuration_profile.dry_run", {
+            "profile_id": profile.id,
+            "ready": bool(result.get("ready")),
+        }, success=True)
+        return _json_response({"profile": _profile_json_values(profile), "dry_run": result})
 
     @staticmethod
     def _branding_record(env, create=False):

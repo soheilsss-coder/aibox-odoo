@@ -3,10 +3,15 @@ import {
   adminListRoles, adminListUsers, adminListAccessGrants, adminCreateAccessGrant,
   adminRevokeAccessGrant, adminListDocuments, adminListAgents, adminGetBranding,
   adminUpdateBranding, adminGetMetrics, adminListModules, adminInstallModule,
-  adminGetSetup, adminUpdateCompany, ApiError,
+  adminGetSetup, adminUpdateCompany, adminListConfigurationProfiles,
+  adminCreateConfigurationProfile, adminGetConfigurationProfile,
+  adminUpdateConfigurationProfile, adminValidateConfigurationProfile,
+  adminCompileConfigurationProfile, adminActivateConfigurationProfile,
+  adminArchiveConfigurationProfile, adminDryRunConfigurationProfile,
+  adminGetModuleReadiness, ApiError,
 } from "../api/client.js";
 import {
-  Card, Table, Badge, Button, Tabs, Alert, Spinner, EmptyState, Modal, Select, Input,
+  Card, Table, Badge, Button, Tabs, Alert, Spinner, EmptyState, Modal, Select, Input, TextArea,
 } from "../components";
 
 // Admin Console (roadmap #46) — "a separate admin section (not the
@@ -25,6 +30,7 @@ import {
 
 const TABS = [
   { key: "setup", label: "راه‌اندازی مشتری" },
+  { key: "profiles", label: "Configuration Profiles" },
   { key: "roles", label: "نقش‌ها" },
   { key: "grants", label: "دسترسی موقت / تفویض" },
   { key: "documents", label: "اسناد" },
@@ -56,6 +62,7 @@ export default function AdminPage() {
       <h2>کنسول مدیریت</h2>
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "setup" && <SetupTab />}
+      {tab === "profiles" && <ProfilesTab />}
       {tab === "roles" && <RolesTab />}
       {tab === "grants" && <GrantsTab />}
       {tab === "documents" && <DocumentsTab />}
@@ -65,6 +72,136 @@ export default function AdminPage() {
       {tab === "modules" && <ModulesTab />}
       {tab === "control" && <ControlPlaneTab />}
     </div>
+  );
+}
+
+// --- Configuration Profiles -----------------------------------------------
+const PROFILE_SECTIONS = [
+  ["role_policy", "Role Policy"],
+  ["capability_policy", "Capability Policy"],
+  ["approval_matrix", "Approval Matrix"],
+  ["document_policy", "Document Policy"],
+  ["agent_config", "Agent Configuration"],
+  ["tool_config", "Tool Configuration"],
+  ["workflow_config", "Workflow Configuration"],
+];
+
+const EMPTY_PROFILE_SECTIONS = Object.fromEntries(PROFILE_SECTIONS.map(([key]) => [key, {}]));
+
+function ProfilesTab() {
+  const [data, error, refresh] = useLoad(adminListConfigurationProfiles, []);
+  const [selectedId, setSelectedId] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loadError, setLoadError] = useState("");
+  const [busy, setBusy] = useState("");
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    if (data?.profiles?.length && !selectedId) setSelectedId(data.profiles[0].id);
+  }, [data, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setProfile(null);
+    setLoadError("");
+    adminGetConfigurationProfile(selectedId)
+      .then((value) => setProfile(value.profile))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "خطا در بارگذاری profile"));
+  }, [selectedId]);
+
+  async function createProfile() {
+    const name = window.prompt("نام profile را وارد کنید", "پروفایل اولیه مشتری");
+    if (!name?.trim()) return;
+    setBusy("create");
+    setResult(null);
+    try {
+      const value = await adminCreateConfigurationProfile({ name: name.trim(), ...EMPTY_PROFILE_SECTIONS });
+      setSelectedId(value.profile.id);
+      refresh();
+    } catch (err) {
+      setResult({ error: err instanceof ApiError ? err.message : "ساخت profile ناموفق بود" });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function updateSection(key, raw) {
+    setProfile((current) => ({ ...current, sections: { ...current.sections, [key]: raw } }));
+  }
+
+  async function saveProfile() {
+    if (!profile || profile.state === "active") return;
+    const payload = { name: profile.name };
+    try {
+      PROFILE_SECTIONS.forEach(([key]) => { payload[key] = JSON.parse(profile.sections[key] || "{}"); });
+    } catch (err) {
+      setResult({ error: `JSON بخش ${err.message || "نامعتبر"}` });
+      return;
+    }
+    setBusy("save");
+    setResult(null);
+    try {
+      const value = await adminUpdateConfigurationProfile(profile.id, payload);
+      setProfile(value.profile);
+      refresh();
+    } catch (err) {
+      setResult({ error: err instanceof ApiError ? err.message : "ذخیره profile ناموفق بود" });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function action(name, handler) {
+    if (!profile) return;
+    setBusy(name);
+    setResult(null);
+    try {
+      const value = await handler(profile.id);
+      setResult(value);
+      if (value.profile) setProfile(value.profile);
+      refresh();
+    } catch (err) {
+      setResult({ error: err instanceof ApiError ? err.message : "عملیات profile ناموفق بود" });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  if (error) return <Alert>{error}</Alert>;
+  if (!data) return <Spinner />;
+  return (
+    <>
+      <Card title="Configuration Profiles" actions={<Button size="sm" onClick={createProfile} loading={busy === "create"}>+ profile جدید</Button>}>
+        <p className="muted">هر profile نسخه‌ای از role، capability، approval، document، agent، tool و workflow policy مشتری است. profile فعال مستقیماً ویرایش نمی‌شود.</p>
+        {!data.profiles.length && <EmptyState text="Configuration profileای وجود ندارد." />}
+        {data.profiles.length > 0 && <Table columns={[
+          { key: "name", header: "نام", render: (row) => <button className="profile-list-button" onClick={() => setSelectedId(row.id)}>{row.name}</button> },
+          { key: "state", header: "وضعیت", render: (row) => <Badge tone={row.state === "active" ? "success" : row.state === "archived" ? "neutral" : "warning"}>{row.state}</Badge> },
+          { key: "version", header: "نسخه" },
+          { key: "compiled_hash", header: "Compile", render: (row) => row.compiled_hash ? <Badge tone="success">compiled</Badge> : <Badge tone="warning">نیازمند compile</Badge> },
+        ]} rows={data.profiles} />}
+      </Card>
+      {loadError && <Alert>{loadError}</Alert>}
+      {profile && (
+        <Card title={`ویرایش profile: ${profile.name}`}>
+          <div className="profile-toolbar">
+            <Badge tone={profile.state === "active" ? "success" : profile.state === "archived" ? "neutral" : "warning"}>{profile.state}</Badge>
+            <span className="muted">نسخه {profile.version} · hash: {profile.compiled_hash || "ندارد"}</span>
+          </div>
+          <Input label="نام profile" value={profile.name} disabled={profile.state === "active"} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+          {PROFILE_SECTIONS.map(([key, label]) => <TextArea key={key} label={`${label} — JSON object`} rows={4} value={typeof profile.sections[key] === "string" ? profile.sections[key] : JSON.stringify(profile.sections[key] || {}, null, 2)} disabled={profile.state === "active"} onChange={(e) => updateSection(key, e.target.value)} />)}
+          <div className="profile-actions">
+            <Button onClick={saveProfile} loading={busy === "save"} disabled={profile.state === "active"}>ذخیره draft</Button>
+            <Button variant="ghost" onClick={() => action("validate", adminValidateConfigurationProfile)} loading={busy === "validate"}>اعتبارسنجی</Button>
+            <Button variant="ghost" onClick={() => action("compile", adminCompileConfigurationProfile)} loading={busy === "compile"}>Compile</Button>
+            <Button onClick={() => action("activate", adminActivateConfigurationProfile)} loading={busy === "activate"} disabled={profile.state === "active"}>فعال‌سازی</Button>
+            <Button variant="ghost" onClick={() => action("dry-run", adminDryRunConfigurationProfile)} loading={busy === "dry-run"}>Deployment dry-run</Button>
+            <Button variant="danger" onClick={() => action("archive", adminArchiveConfigurationProfile)} loading={busy === "archive"} disabled={profile.state === "active"}>Archive</Button>
+          </div>
+          {result && <pre className="profile-result">{JSON.stringify(result, null, 2)}</pre>}
+        </Card>
+      )}
+    </>
   );
 }
 
@@ -508,6 +645,8 @@ function ModulesTab() {
   const [busy, setBusy] = useState(null);
   const [actionError, setActionError] = useState("");
   const [completed, setCompleted] = useState("");
+  const [readiness, setReadiness] = useState(null);
+  const [readinessBusy, setReadinessBusy] = useState(null);
 
   function toggle(moduleId) {
     setSelected((current) => current.includes(moduleId)
@@ -536,6 +675,18 @@ function ModulesTab() {
     setBusy(null);
     refresh();
     window.dispatchEvent(new Event("modules:changed"));
+  }
+
+  async function showReadiness(module) {
+    setReadinessBusy(module.id);
+    setActionError("");
+    try {
+      setReadiness(await adminGetModuleReadiness(module.id));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "خطا در بررسی آمادگی برنامه");
+    } finally {
+      setReadinessBusy(null);
+    }
   }
 
   const stateLabel = {
@@ -595,11 +746,23 @@ function ModulesTab() {
                 </span>;
               } },
               { key: "menu_count", header: "منو", render: (module) => module.state === "installed" ? `${module.menu_count}` : "پس از نصب" },
+              { key: "readiness", header: "آمادگی", render: (module) => <Button size="sm" variant="ghost" loading={readinessBusy === module.id} onClick={() => showReadiness(module)}>بررسی</Button> },
             ]}
             rows={data.modules}
           />
         )}
       </Card>
+      <Modal open={Boolean(readiness)} title={readiness?.module?.label ? `آمادگی: ${readiness.module.label}` : "آمادگی برنامه"} onClose={() => setReadiness(null)}>
+        {readiness && <>
+          <div className="setup-check-grid">
+            {Object.entries(readiness.checks || {}).map(([key, ok]) => <SetupCheck key={key} label={key} ok={ok} />)}
+          </div>
+          <p className="muted">آماده برای تست داخلی: {readiness.ready_for_internal_test ? "بله" : "خیر"}</p>
+          <p className="muted">آماده برای تحویل مشتری: {readiness.ready_for_customer_handoff ? "بله" : "خیر"}</p>
+          <h4>پیش‌نیازها</h4>
+          {(readiness.dependencies || []).map((dependency) => <p key={dependency.label}><Badge tone={dependency.state === "installed" ? "success" : "danger"}>{dependency.state}</Badge> {dependency.label}</p>)}
+        </>}
+      </Modal>
       <Card title="مرز امنیتی">
         <p className="muted">
           نصب یک برنامه، به‌معنی فعال‌شدن خودکار همهٔ عملیات AI آن نیست. خواندن، audit و event پایه خودکار است؛ عملیات مالی، حذف، تأیید و تغییرات حساس فقط با capability و adapter بررسی‌شده فعال می‌شوند.

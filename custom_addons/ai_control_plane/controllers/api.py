@@ -202,6 +202,57 @@ class AiControlPlaneController(http.Controller):
         )]
         return _json_response({"modules": rows})
 
+    @http.route("/api/admin/modules/<int:module_id>/readiness", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def admin_module_readiness(self, module_id, **kwargs):
+        """Return a bounded readiness explanation for one customer app.
+
+        This is a report, not an authorization bypass: installation and all
+        business operations still use their existing privileged or reviewed
+        paths. Technical model names are intentionally omitted from the
+        customer-facing response.
+        """
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = self._auth_response()
+        if err:
+            return err
+        if not _is_privileged(env, env.user):
+            return _json_response({"error": "access denied"}, status=403)
+        module = env["ir.module.module"].sudo().browse(module_id).exists()
+        if not module:
+            return _json_response({"error": "module not found"}, status=404)
+        module = module[0]
+        if not bool(getattr(module, "application", False)):
+            return _json_response({"error": "only selectable business applications have readiness"}, status=403)
+        registry = env["ai.control.module"].sudo().search([
+            ("technical_name", "=", module.name),
+        ], limit=1)
+        dependencies = []
+        dependency_ok = True
+        for dependency in getattr(module, "dependencies_id", False):
+            installed = dependency.state == "installed"
+            dependency_ok = dependency_ok and installed
+            dependencies.append({
+                "label": dependency.shortdesc or "پیش‌نیاز فنی",
+                "state": "installed" if installed else "not_installed",
+            })
+        checks = {
+            "module_installed": module.state == "installed",
+            "dependencies_installed": dependency_ok,
+            "registry_synced": bool(registry and registry.state == "installed"),
+            "agent_connected": bool(registry and registry.agent_connection_state in ("connected", "connected_no_tools")),
+            "not_blocked": bool(registry and registry.integration_level != "blocked"),
+            "runtime_certified": bool(registry and registry.certification_state == "runtime_certified"),
+        }
+        return _json_response({
+            "module": self._catalog_row(env, module),
+            "dependencies": dependencies,
+            "checks": checks,
+            "ready_for_internal_test": bool(all(checks[key] for key in ("module_installed", "dependencies_installed", "registry_synced"))),
+            "ready_for_customer_handoff": bool(all(checks.values())),
+        })
+
     @http.route("/api/admin/modules/install", type="http", auth="none", csrf=False,
                 methods=["POST", "OPTIONS"])
     def admin_module_install(self, **kwargs):

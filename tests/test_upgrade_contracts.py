@@ -119,7 +119,7 @@ class SourceContracts(unittest.TestCase):
         workspace = (ROOT / "frontend/src/pages/ModuleWorkspacePage.jsx").read_text()
         docs = (ROOT / "CUSTOMER_APPLIANCE_MODULES.md").read_text()
         for marker in (
-            "/api/admin/modules", "/api/admin/modules/install", "button_immediate_install",
+            "/api/admin/modules", "/api/admin/modules/install", "/api/admin/modules/<int:module_id>/readiness", "button_immediate_install",
             "dependencies_id", "automatic_pending", "request_key", "_is_privileged",
             "/api/modules/navigation", "/api/modules/menus/", "groups_id",
             "adminInstallModule", "_safe_action_fields", "read_only",
@@ -481,12 +481,15 @@ class SourceContracts(unittest.TestCase):
             '"/api/admin/setup"', '"/api/admin/setup/company"',
             '"/api/admin/branding"', '_decode_brand_asset',
             '_BRAND_COLOR_FIELDS', 'unsupported branding fields',
+            '"/api/admin/configuration-profiles"', '/validate', '/compile',
+            '/activate', '/dry-run', 'active profile must be cloned',
         ):
             self.assertIn(marker, semantic)
         for marker in (
             'adminGetSetup', 'adminUpdateCompany', 'راه‌اندازی مشتری',
             'logo_base64', 'favicon_base64', 'branding:changed',
-            'show_module_navigation',
+            'show_module_navigation', 'adminListConfigurationProfiles',
+            'Configuration Profiles', 'Deployment dry-run', 'adminGetModuleReadiness',
         ):
             self.assertIn(marker, admin + app)
 
