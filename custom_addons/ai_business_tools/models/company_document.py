@@ -21,6 +21,11 @@ class CompanyDocument(models.Model):
     _order = "create_date desc"
 
     name = fields.Char(required=True)
+    company_id = fields.Many2one(
+        "res.company", required=True, index=True, ondelete="restrict",
+        default=lambda self: self.env.company,
+        help="Tenant boundary for every document and its derived chunks.",
+    )
     file = fields.Binary(attachment=True)
     file_name = fields.Char()
     description = fields.Text()

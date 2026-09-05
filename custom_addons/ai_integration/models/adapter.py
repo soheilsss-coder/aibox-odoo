@@ -13,7 +13,11 @@ class AiIntegrationAdapter(models.Model):
     capability_prefix = fields.Char()
     event_prefix = fields.Char()
     notes = fields.Text()
-    state = fields.Selection([( "ready", "Ready"), ("blocked", "Blocked")], default="ready")
+    state = fields.Selection([
+        ("discovered", "Discovered / read-only fallback"),
+        ("ready", "Ready"),
+        ("blocked", "Blocked"),
+    ], default="ready", required=True)
 
     _sql_constraints = [("module_unique", "unique(module_name)", "An integration adapter already exists for this module.")]
 

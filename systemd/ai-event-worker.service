@@ -1,8 +1,10 @@
 [Unit]
 Description=AI durable Event Bus worker
-After=postgresql.service
+After=postgresql.service redis-server.service
 [Service]
 Type=simple
+User=odoo
+Group=odoo
 EnvironmentFile=-/etc/ai-box/runtime.env
 ExecStart=/opt/odoo-custom-addons/ai-runtime-workers/run_event_worker.sh
 Restart=always

@@ -2,6 +2,7 @@ from . import capability
 from . import integration
 from . import event
 from . import module_sync
+from . import module_install
 
 from . import authorization
 

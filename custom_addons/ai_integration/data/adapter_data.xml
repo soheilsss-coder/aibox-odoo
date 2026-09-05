@@ -87,4 +87,17 @@
     <field name="subscriber_method">_handle_event</field>
     <field name="priority">20</field>
   </record>
+  <!-- Optional Restaurant extension; requires point_of_sale at runtime. -->
+  <record id="adapter_pos_restaurant" model="ai.integration.adapter"><field name="module_name">pos_restaurant</field><field name="label">Restaurant Operations</field><field name="capability_prefix">pos.restaurant</field><field name="event_prefix">pos.restaurant</field><field name="notes">Requires Point of Sale plus the Restaurant extension at runtime.</field></record>
+  <!-- Operational read adapters for the additional installed business apps. -->
+  <record id="adapter_event" model="ai.integration.adapter"><field name="module_name">event</field><field name="label">Events</field><field name="capability_prefix">event</field><field name="event_prefix">event</field></record>
+  <record id="adapter_lunch" model="ai.integration.adapter"><field name="module_name">lunch</field><field name="label">Lunch</field><field name="capability_prefix">lunch</field><field name="event_prefix">lunch</field></record>
+  <record id="adapter_maintenance" model="ai.integration.adapter"><field name="module_name">maintenance</field><field name="label">Maintenance</field><field name="capability_prefix">maintenance</field><field name="event_prefix">maintenance</field></record>
+  <record id="adapter_quality" model="ai.integration.adapter"><field name="module_name">quality</field><field name="label">Quality</field><field name="capability_prefix">quality</field><field name="event_prefix">quality</field></record>
+  <record id="adapter_repair" model="ai.integration.adapter"><field name="module_name">repair</field><field name="label">Repair</field><field name="capability_prefix">repair</field><field name="event_prefix">repair</field></record>
+  <record id="adapter_sale_management" model="ai.integration.adapter"><field name="module_name">sale_management</field><field name="label">Sales Management</field><field name="capability_prefix">sale.management</field><field name="event_prefix">sale.management</field></record>
+  <record id="adapter_sale_renting" model="ai.integration.adapter"><field name="module_name">sale_renting</field><field name="label">Rental</field><field name="capability_prefix">sale.renting</field><field name="event_prefix">sale.renting</field></record>
+  <record id="adapter_sale_subscription" model="ai.integration.adapter"><field name="module_name">sale_subscription</field><field name="label">Subscriptions</field><field name="capability_prefix">sale.subscription</field><field name="event_prefix">sale.subscription</field></record>
+  <record id="adapter_website" model="ai.integration.adapter"><field name="module_name">website</field><field name="label">Website</field><field name="capability_prefix">website</field><field name="event_prefix">website</field></record>
+  <record id="adapter_mass_mailing" model="ai.integration.adapter"><field name="module_name">mass_mailing</field><field name="label">Marketing</field><field name="capability_prefix">mass.mailing</field><field name="event_prefix">mass.mailing</field></record>
 </odoo>

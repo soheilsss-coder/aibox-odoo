@@ -1,6 +1,6 @@
 {
     "name": "Company AI Demo",
-    "version": "18.0.1.1.0",
+    "version": "18.0.1.4.0",
     "summary": "Demo company, role-based users, and custom LLM tools",
     "category": "Human Resources",
     "depends": [

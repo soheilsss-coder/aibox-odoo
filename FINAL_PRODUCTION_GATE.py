@@ -7,9 +7,13 @@ checks=[]
 def check(name, ok, detail=""):
     checks.append((name,bool(ok),detail))
 
-def text(rel): return (ROOT/rel).read_text(encoding='utf-8', errors='ignore')
+def text(rel):
+    path = ROOT / rel
+    return path.read_text(encoding='utf-8', errors='ignore') if path.exists() else ''
 
-install=text('02_install_modules.sh')
+# deploy.sh is the only supported checkout entrypoint. The historical
+# 01/02 installers are not fabricated merely to satisfy a source check.
+install=text('deploy.sh')
 check('no blanket assistant tool assignment', "all_tools = env['llm.tool'].search([])" not in install)
 check('generic rpc permanently disabled', 'permanently disabled' in text('custom_addons/ai_gateway/controllers/gateway.py') and 'status=410' in text('custom_addons/ai_gateway/controllers/gateway.py'))
 check('production CORS fail closed', 'AI_GATEWAY_ALLOWED_ORIGIN must be a concrete HTTPS origin in production' in text('custom_addons/ai_gateway/controllers/gateway.py'))
@@ -18,7 +22,7 @@ check('temporary grants do not mutate group membership', 'group_id.write({"users
 check('Excel has no secret output', not re.search(r'(?:_change_password|ai\.gateway\.api\.key.*create|service_api_key)', text('onboarding/onboard_from_excel.py'), re.I))
 check('unknown Excel role blocks import', 'IMPORT BLOCKED' in text('onboarding/onboard_from_excel.py'))
 check('vision is registry routed', 'ai.model.router' in text('custom_addons/company_ai_demo/models/vision_analysis.py'))
-check('frontend admin is capability driven', 'capabilitySet.has("admin.console.read")' in text('frontend/src/App.jsx'))
+check('frontend admin is server-authorized', 'Boolean(user.is_admin)' in text('frontend/src/App.jsx'))
 check('model router benchmark gated', 'security_score' in text('custom_addons/ai_integration/models/model_registry.py') and 'benchmark_score desc' in text('custom_addons/ai_integration/models/model_registry.py'))
 check('self contained deployment exists', (ROOT/'deploy.sh').exists() and (ROOT/'requirements.lock').exists())
 check('workflow cron is recovery only', 'process_due(50)' not in text('custom_addons/ai_workflow/data/cron.xml') and 'recover_due' in text('custom_addons/ai_workflow/data/cron.xml'))

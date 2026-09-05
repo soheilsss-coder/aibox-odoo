@@ -4,44 +4,54 @@
     <!-- RISK 0: read-only -->
     <record id="risk_list_pending_leaves" model="ai.gateway.tool.risk">
         <field name="tool_name">list_pending_leaves</field>
+        <field name="module_name">hr_holidays</field>
         <field name="risk_level">0</field>
     </record>
     <record id="risk_list_overdue_tasks" model="ai.gateway.tool.risk">
         <field name="tool_name">list_overdue_tasks</field>
+        <field name="module_name">project</field>
         <field name="risk_level">0</field>
     </record>
     <record id="risk_list_documents" model="ai.gateway.tool.risk">
         <field name="tool_name">list_documents</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">0</field>
     </record>
     <record id="risk_get_document" model="ai.gateway.tool.risk">
         <field name="tool_name">get_document</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">0</field>
     </record>
     <record id="risk_list_elevated_access" model="ai.gateway.tool.risk">
         <field name="tool_name">list_elevated_access</field>
+        <field name="module_name">ai_business_tools</field>
         <field name="risk_level">0</field>
     </record>
     <record id="risk_recall_memory" model="ai.gateway.tool.risk">
         <field name="tool_name">recall_memory</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">0</field>
     </record>
     <record id="risk_get_attendance_report" model="ai.gateway.tool.risk">
         <field name="tool_name">get_attendance_report</field>
+        <field name="module_name">hr_attendance</field>
         <field name="risk_level">0</field>
     </record>
     <record id="risk_check_identity_integrity" model="ai.gateway.tool.risk">
         <field name="tool_name">check_identity_integrity</field>
+        <field name="module_name">ai_business_tools</field>
         <field name="risk_level">0</field>
         <field name="description">Read-only report, roadmap item #1 (Identity)</field>
     </record>
     <record id="risk_list_my_tasks" model="ai.gateway.tool.risk">
         <field name="tool_name">list_my_tasks</field>
+        <field name="module_name">project</field>
         <field name="risk_level">0</field>
         <field name="description">Read-only, hard-scoped to the caller's own tasks - roadmap item #9</field>
     </record>
     <record id="risk_get_my_attendance_summary" model="ai.gateway.tool.risk">
         <field name="tool_name">get_my_attendance_summary</field>
+        <field name="module_name">hr_attendance</field>
         <field name="risk_level">0</field>
         <field name="description">Read-only, hard-scoped to the caller's own attendance - roadmap item #9</field>
     </record>
@@ -56,27 +66,32 @@
          of registry drift #15's whole point is to prevent. -->
     <record id="risk_get_current_datetime" model="ai.gateway.tool.risk">
         <field name="tool_name">get_current_datetime</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">0</field>
         <field name="description">Read-only, server clock only - no business data involved</field>
     </record>
     <record id="risk_list_available_tools" model="ai.gateway.tool.risk">
         <field name="tool_name">list_available_tools</field>
+        <field name="module_name">ai_business_tools</field>
         <field name="risk_level">0</field>
         <field name="description">Read-only, reads this very registry - roadmap item #15</field>
     </record>
     <record id="risk_read_attached_file" model="ai.gateway.tool.risk">
         <field name="tool_name">read_attached_file</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">0</field>
         <field name="description">Read-only, hard-scoped to attachments already in the caller's own chat thread</field>
     </record>
     <record id="risk_search_internet" model="ai.gateway.tool.risk">
         <field name="tool_name">search_internet</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">0</field>
         <field name="description">Read-only, public web search - no internal business data read or mutated</field>
     </record>
 
     <record id="risk_generic_read" model="ai.gateway.tool.risk">
         <field name="tool_name">generic_read</field>
+        <field name="module_name">ai_integration</field>
         <field name="risk_level">0</field>
         <field name="capability_name">odoo.generic.read</field>
         <field name="description">Strict read-only adapter for discovered Odoo models; ACL and record rules remain active.</field>
@@ -85,37 +100,68 @@
     <!-- RISK 1: low-impact write, affects only the requester themselves -->
     <record id="risk_create_leave_request" model="ai.gateway.tool.risk">
         <field name="tool_name">create_leave_request</field>
+        <field name="module_name">hr_holidays</field>
         <field name="risk_level">1</field>
         <field name="capability_name">hr.leave.create</field>
     </record>
     <record id="risk_create_task" model="ai.gateway.tool.risk">
         <field name="tool_name">create_task</field>
+        <field name="module_name">project</field>
         <field name="risk_level">1</field>
+    </record>
+    <record id="risk_get_task_status" model="ai.gateway.tool.risk">
+        <field name="tool_name">get_task_status</field>
+        <field name="module_name">project</field>
+        <field name="risk_level">0</field>
+        <field name="description">Read-only task status through native ACL and record rules; used by deadline workflows.</field>
     </record>
     <record id="risk_save_memory" model="ai.gateway.tool.risk">
         <field name="tool_name">save_memory</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">1</field>
+    </record>
+    <record id="risk_save_memory_fact" model="ai.gateway.tool.risk">
+        <field name="tool_name">save_memory_fact</field>
+        <field name="module_name">company_ai_demo</field>
+        <field name="risk_level">1</field>
+        <field name="description">Explicit source-linked memory fact; immutable history and temporal supersession are retained.</field>
+    </record>
+    <record id="risk_recall_memory_facts" model="ai.gateway.tool.risk">
+        <field name="tool_name">recall_memory_facts</field>
+        <field name="module_name">company_ai_demo</field>
+        <field name="risk_level">0</field>
+        <field name="description">Read-only semantic and lexical recall of ACL-scoped structured facts with citations.</field>
+    </record>
+    <record id="risk_confirm_memory_fact" model="ai.gateway.tool.risk">
+        <field name="tool_name">confirm_memory_fact</field>
+        <field name="module_name">company_ai_demo</field>
+        <field name="risk_level">1</field>
+        <field name="description">Promotes only the requesting user's source-linked candidate after explicit confirmation.</field>
     </record>
 
     <!-- RISK 2: mutation affecting someone else, but reversible / low stakes -->
     <record id="risk_approve_leave" model="ai.gateway.tool.risk">
         <field name="tool_name">approve_leave</field>
+        <field name="module_name">hr_holidays</field>
         <field name="risk_level">2</field>
         <field name="capability_name">hr.leave.approve</field>
     </record>
     <record id="risk_reject_leave" model="ai.gateway.tool.risk">
         <field name="tool_name">reject_leave</field>
+        <field name="module_name">hr_holidays</field>
         <field name="risk_level">2</field>
     </record>
 
     <!-- RISK 3: sensitive, needs a human approver group -->
     <record id="risk_grant_temporary_access" model="ai.gateway.tool.risk">
         <field name="tool_name">grant_temporary_access</field>
+        <field name="module_name">ai_business_tools</field>
         <field name="risk_level">3</field>
         <field name="approver_group_id" ref="role_executive"/>
     </record>
     <record id="risk_analyze_image" model="ai.gateway.tool.risk">
         <field name="tool_name">analyze_image</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">0</field>
         <field name="description">Read-only vision analysis, no business data mutation</field>
     </record>
@@ -123,6 +169,7 @@
     <!-- RISK 4: high impact (pay/employment) - always needs approval -->
     <record id="risk_generate_hr_decree" model="ai.gateway.tool.risk">
         <field name="tool_name">generate_hr_decree</field>
+        <field name="module_name">company_ai_demo</field>
         <field name="risk_level">4</field>
         <field name="approver_group_id" ref="role_hr_manager"/>
         <field name="description">Already gated via ai.gateway.approval directly in code - this entry documents that, for list_available_tools()</field>
@@ -136,26 +183,33 @@
          mutate sensitive records, hence R1. -->
     <record id="risk_send_personal_message" model="ai.gateway.tool.risk">
         <field name="tool_name">send_personal_message</field>
+        <field name="module_name">mail</field>
         <field name="risk_level">2</field>
         <field name="description">Messaging another colleague via native messenger; receiver sees the sender</field>
     </record>
     <record id="risk_schedule_meeting" model="ai.gateway.tool.risk">
         <field name="tool_name">schedule_meeting</field>
+        <field name="module_name">calendar</field>
         <field name="risk_level">2</field>
         <field name="description">Creates a native calendar.event with attendees and native invitations</field>
     </record>
     <record id="risk_fill_document_template" model="ai.gateway.tool.risk">
         <field name="tool_name">fill_document_template</field>
-        <field name="risk_level">1</field>
-        <field name="description">Renders an uploaded docx template with HR/payroll field values; output kept as ir.attachment</field>
+        <field name="module_name">ai_business_tools</field>
+        <field name="risk_level">2</field>
+        <field name="capability_name">document.template.fill</field>
+        <field name="description">Renders an uploaded docx template with HR/payroll field values; output kept as an owner-scoped attachment</field>
     </record>
     <record id="risk_generate_qweb_report" model="ai.gateway.tool.risk">
         <field name="tool_name">generate_qweb_report</field>
-        <field name="risk_level">1</field>
-        <field name="description">Triggers an allowlisted QWeb report render; output kept as ir.attachment</field>
+        <field name="module_name">ai_business_tools</field>
+        <field name="risk_level">2</field>
+        <field name="capability_name">document.report.generate</field>
+        <field name="description">Triggers an allowlisted QWeb report render; output kept as an owner-scoped attachment</field>
     </record>
     <record id="risk_create_scheduled_command" model="ai.gateway.tool.risk">
         <field name="tool_name">create_scheduled_command</field>
+        <field name="module_name">ai_business_tools</field>
         <field name="risk_level">2</field>
         <field name="description">Creates an ir.cron that periodically runs a stored assistant prompt</field>
     </record>

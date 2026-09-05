@@ -24,10 +24,20 @@
   </record>
   <record id="customer_config_manage" model="ai.control.capability">
     <field name="name">customer.config.manage</field><field name="module_name">ai_customer_plane</field>
-    <field name="operation">manage</field><field name="risk_level">3</field><field name="source">control_plane</field>
+    <field name="operation">execute</field><field name="risk_level">3</field><field name="source">manual</field>
     <field name="group_ids" eval="[(4, ref('ai_business_tools.role_system_admin')), (4, ref('ai_business_tools.role_executive'))]"/>
   </record>
   <record id="cap_artifact_generate" model="ai.control.capability">
-    <field name="name">artifact.generate</field><field name="module_name">ai_experience</field><field name="operation">create</field><field name="risk_level">1</field><field name="source">control_plane</field>
+    <field name="name">artifact.generate</field><field name="module_name">ai_experience</field><field name="operation">create</field><field name="risk_level">1</field><field name="source">manual</field>
+  </record>
+  <record id="cap_fill_document_template" model="ai.control.capability">
+    <field name="name">document.template.fill</field><field name="module_name">ai_business_tools</field>
+    <field name="operation">execute</field><field name="risk_level">2</field><field name="source">adapter</field>
+    <field name="group_ids" eval="[(4, ref('ai_business_tools.role_hr_manager')), (4, ref('ai_business_tools.role_executive'))]"/>
+  </record>
+  <record id="cap_generate_qweb_report" model="ai.control.capability">
+    <field name="name">document.report.generate</field><field name="module_name">ai_business_tools</field>
+    <field name="operation">execute</field><field name="risk_level">2</field><field name="source">adapter</field>
+    <field name="group_ids" eval="[(4, ref('ai_business_tools.role_hr_manager')), (4, ref('ai_business_tools.role_finance_manager')), (4, ref('ai_business_tools.role_executive'))]"/>
   </record>
 </odoo>

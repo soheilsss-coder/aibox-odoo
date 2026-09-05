@@ -83,7 +83,7 @@ PASS  forbidden pattern "model"\s*:\s*"vision-model"
 تمام شد: فاز ۱.۱ Discovery خودکار ماژول‌های جدید — کد واقعی ir.cron اضافه شد به `custom_addons/ai_control_plane/data/cron_data.xml` (فایل قبلاً فقط کامنت خالی داشت): رکورد `cron_discover_modules` (model=ai.control.module، interval=1hour، user=ai_automation_service_user مینیمال نه ادمین، state=code → `model.sync_now()`). این مسیر از طریق `ai_integration/models/discovery.py` همان `sync_installed_modules` را extend می‌کند که برای هر مدلِ ماژول تازه‌نصب‌شده capability با operation=read / risk=0 / source=discovered می‌سازد (idempotent با `Cap.search(...) limit=1` قبل از create). post_init_hook موجود در `ai_control_plane/hooks.py` فقط موقع نصب خود ماژول یک‌بار اجرا می‌شود؛ کرون ساعتی هر ماژولی که بعداً نصب شود را بی‌دخالت ادمین می‌گیرد + endpoint دستی `/api/control-plane/integrations/sync` هم موجود است. XML پارس شد (OK). — تست واقعی «نصب fleet/maintenance و خواندن مدلش با generic_read» اینجا امکان‌پذیر نیست → RUNTIME_CERTIFICATION_REQUIRED؛ مکانیزم کامل و متصل است.
 
 تمام شد: فاز ۱.۲ صف واقعی concurrency — کد واقعی + تست اجراشده:
-- فایل جدید `custom_addons/ai_gateway/models/chat_queue.py` (خالص stdlib، بدون وابستگی به odoo تا خارج از runtime قابل تست باشد): کلاس `BoundedWorkerPool` — worker pool باندشده با cap هم‌زمانی (پیش‌فرض ۲)، صف FIFO با `max_waiters` (پیش‌فرض ۱۰)، worker های daemon به تعداد cap، fast-path اجرای inline وقتی worker آزاد است، timeout برای worker (پیش‌فرض ۱۸۰s)، و fail-fast «busy» وقتی صف پر است؛ کرش یک worker هرگز پول را نمی‌کشد. متغیرهای env: AI_CHAT_QUEUE_CONCURRENCY / MAX_WAITERS / TIMEOUT. سینگلتون `get_chat_pool()` + `reset_chat_pool()`.
+- فایل جدید `custom_addons/ai_gateway/models/chat_queue.py` (خالص stdlib، بدون وابستگی به odoo تا خارج از runtime قابل تست باشد): کلاس `BoundedWorkerPool` — worker pool باندشده با cap هم‌زمانی (پیش‌فرض ۸)، صف FIFO با `max_waiters` (پیش‌فرض ۱۲۸ برای burst صدتایی)، worker های daemon به تعداد cap، fast-path اجرای inline وقتی worker آزاد است، timeout برای worker (پیش‌فرض ۲۴۰s)، و backpressure محدود؛ کرش یک worker هرگز پول را نمی‌کشد. متغیرهای env: AI_CHAT_QUEUE_CONCURRENCY / MAX_WAITERS / TIMEOUT. سینگلتون `get_chat_pool()` + `reset_chat_pool()`.
 - `custom_addons/ai_gateway/models/__init__.py`: import `chat_queue` اضافه شد.
 - `custom_addons/ai_gateway/controllers/gateway.py`:
   - بدنهٔ `_run_chat` به `_run_chat_env(env, message, thread_id, attachment_ids)` منتقل شد (بدن کد یکسان، `env.uid`/`env.user` جایگزین `user` — به‌جز `user.id` حساب کاربر) تا هم در env درخواست و هم روی worker با cursor جدا اجرا شود.
@@ -311,10 +311,10 @@ note، و هیچ‌کدام کامل‌سازی نشد چون چیزی ناقص 
 ### فاز ۱.۲ — صف concurrency (کد واقعی، متصل)
 - فایل: `custom_addons/ai_gateway/models/chat_queue.py`
 - کد واقعی: کلاس `BoundedWorkerPool` (خط ۴۱–۱۳۶) — pool باندشده با
-  concurrency (پیش‌فرض ۲)، صف FIFO (`deque`)، max_waiters (پیش‌فرض ۱۰)،
-  worker-های daemon thread، fast-path inline، timeout (پیش‌فرض ۱۸۰s)،
-  fail-fast busy وقتی صف پر است (خط ۸۴–۸۵)، worker/crash هرگز پول را
-  نمی‌کشد (خط ۱۳۰). سینگلتون `get_chat_pool`/`reset_chat_pool`
+  concurrency (پیش‌فرض ۸)، صف FIFO (`deque`)، max_waiters (پیش‌فرض ۱۲۸ برای
+  burst صدتایی)، worker-های daemon thread، fast-path inline، timeout (پیش‌فرض
+  ۲۴۰s)، backpressure محدود وقتی صف پر است، worker/crash هرگز پول را نمی‌کشد.
+  سینگلتون `get_chat_pool`/`reset_chat_pool`
   (خط ۱۴۳–۱۵۷). بدون وابستگی به odoo (pure stdlib).
 - wiring: `ai_gateway/models/__init__.py:11` از chat_queue import می‌کند؛
   `ai_gateway/controllers/gateway.py:11` `from .chat_queue import
@@ -343,3 +343,14 @@ note، و هیچ‌کدام کامل‌سازی نشد چون چیزی ناقص 
 - نتیجه: **مورد ۱.۳ کامل است با کد واقعی؛ رفتار update بر کاربر موجود.**
 
 ═══ پایان session راستی‌آزمایی static فاز ۱ ═══
+---
+
+## تکمیل hardening RAG / memory / ظرفیت — 2026-09-04
+
+- مسیر اصلی RAG اکنون ACL/FGA را قبل از retrieval اعمال می‌کند و پس از آن دو candidate scan مستقل انجام می‌دهد: HNSW با `ORDER BY embedding <=> query` و full-text با GIN/`ts_rank_cd`. merge و threshold/rank در حافظه انجام می‌شود؛ sort ترکیبی روی کل corpus که می‌توانست HNSW را بی‌اثر کند حذف شد.
+- embedding query cache فقط digest را نگه می‌دارد، با endpoint/model/revision key می‌شود و vectorها به‌صورت float32 bounded نگه‌داری می‌شوند. تغییر revision با `AI_VLLM_EMBEDDING_REVISION` یا version مدل cache را invalid می‌کند.
+- memory encrypted برای query search از HMAC token digest و GIN index استفاده می‌کند؛ plaintext در index/search ذخیره نمی‌شود، query پس از decrypt به‌صورت phrase-level verify می‌شود و migration `18.0.1.3.0` برای backfill اضافه شد. مسیر no-query همچنان به ۱۰ رکورد محدود است و fallback رکوردهای قدیمی bounded می‌ماند.
+- file reader سقف ۵۰ MiB attachment و ۲ میلیون کاراکتر extraction دارد، chunk loop در برابر overlap نامعتبر امن شده و relevance فقط از embedding service certified مشترک استفاده می‌کند؛ failure آن نتیجهٔ ساختگی تولید نمی‌کند.
+- RAG tool در نبود context کافی صریحاً `insufficient_context` و دستور عدم جعل پاسخ می‌دهد. benchmark پیش‌فرض به burst صدتایی/هم‌زمانی صدتایی و aliasهای native صحیح تنظیم شد؛ capacity gate کمتر از این اندازه‌گیری را رد می‌کند.
+- اجرا: `python3 -m unittest discover -s tests -v` → **28/28 OK**؛ compileall و parse همه XML → **OK**؛ queue self-test → **PASS=14 FAIL=0**.
+- همچنان هیچ ادعای production capacity، semantic accuracy کامل یا ۱۰۰ concurrent بدون خطا مجاز نیست: install/upgrade واقعی Odoo، PostgreSQL/pgvector planner، Redis، vLLM/DGX، security matrix و load benchmark باید روی دستگاه هدف اجرا و evidence ذخیره شود.

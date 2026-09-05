@@ -61,6 +61,20 @@ def main(env):
     check(rows, 'workflow_engine', 'ai.workflow' in env)
     check(rows, 'audit_engine', 'ai.control.audit' in env)
     check(rows, 'frontend_capability_registry', 'ai.control.capability' in env)
+    binding_model = env['ai.integration.agent.module'] if 'ai.integration.agent.module' in env else None
+    if binding_model:
+        binding_model.sudo().sync_installed_module_bindings()
+    bindings = binding_model.sudo().search([]) if binding_model else binding_model
+    assistant_bindings = bindings.filtered(
+        lambda binding: binding.agent_id and binding.agent_id.name == 'Company Assistant'
+    ) if bindings else []
+    check(rows, 'single_company_assistant_binding', bool(assistant_bindings))
+    for binding in assistant_bindings:
+        linked = set(binding.tool_ids.ids)
+        catalog = set(binding.agent_id.tool_ids.ids)
+        check(rows, 'binding.catalog.%s' % binding.module_id.name, linked.issubset(catalog))
+        check(rows, 'binding.counts.%s' % binding.module_id.name,
+              binding.tool_count == len(linked) and binding.operation_count == len(binding.operation_ids))
 
     # Prove the gateway is fail-closed for an unknown tool.
     if gate:

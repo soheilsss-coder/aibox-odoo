@@ -5,13 +5,13 @@
          rendered third-party widgets; it is NOT the source of truth. -->
     <template id="debrand_login_layout" inherit_id="web.login_layout">
         <xpath expr="//a[contains(@href, 'odoo.com')]" position="replace">
-            <span t-esc="request.env['ir.config_parameter'].sudo().get_param('ai.brand.name') or 'Company AI'"/>
+            <span t-esc="request.env['ai.customer.branding'].sudo().search([('company_id', '=', request.env.company.id), ('active', '=', True)], limit=1).brand_name or request.env['ir.config_parameter'].sudo().get_param('ai.brand.name.%s' % request.env.company.id) or request.env['ir.config_parameter'].sudo().get_param('ai.brand.name') or 'Company AI'"/>
         </xpath>
     </template>
 
     <template id="debrand_web_layout" inherit_id="web.layout">
         <xpath expr="//title" position="replace">
-            <title t-esc="request.env['ir.config_parameter'].sudo().get_param('ai.brand.name') or (title or 'Company AI')"/>
+            <title t-esc="request.env['ai.customer.branding'].sudo().search([('company_id', '=', request.env.company.id), ('active', '=', True)], limit=1).product_title or request.env['ai.customer.branding'].sudo().search([('company_id', '=', request.env.company.id), ('active', '=', True)], limit=1).brand_name or request.env['ir.config_parameter'].sudo().get_param('ai.brand.name.%s' % request.env.company.id) or request.env['ir.config_parameter'].sudo().get_param('ai.brand.name') or (title or 'Company AI')"/>
         </xpath>
     </template>
 

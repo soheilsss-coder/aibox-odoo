@@ -17,6 +17,10 @@ class LLMToolRegistry(models.Model):
         of every Python method - any custom tool added later must be
         registered there to show up here."""
         risks = self.env["ai.gateway.tool.risk"].sudo().search([], order="risk_level desc, tool_name")
+        installed_names = set(self.env["ir.module.module"].sudo().search([
+            ("state", "=", "installed"),
+        ]).mapped("name"))
+        risks = risks.filtered(lambda risk: bool(risk.module_name and risk.module_name in installed_names))
         return {
             "count": len(risks),
             "tools": [

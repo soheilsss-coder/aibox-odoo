@@ -1,7 +1,39 @@
 {
-  "release": "v50",
-  "modules": ["purchase","stock","accounting","mrp","crm","hr","hr_holidays","sale","project","documents","calendar","helpdesk","hr_expense"],
-  "gates": ["install","discovery","models","groups","capabilities","adapter","tool","authorization","policy","risk","approval","commit_time","events","workflow","notifications","audit","ai_tools","rag_acl","frontend_capabilities","security","e2e"],
+  "release": "v58",
+  "source_of_truth": "62_v58_module_certification.py against the live ir.module.module registry",
+  "business_domains": [
+    "hr", "hr_attendance", "hr_holidays", "hr_expense", "project", "calendar",
+    "crm", "sale", "sale_management", "purchase", "stock", "account", "mrp",
+    "documents", "helpdesk", "point_of_sale", "pos_restaurant", "event",
+    "maintenance", "quality", "repair", "lunch", "website", "mass_mailing",
+    "sale_subscription", "sale_renting"
+  ],
+  "coverage_gates": [
+    "installed-module discovery",
+    "company/department/user authorization",
+    "capability registration",
+    "reviewed operational adapter",
+    "risk and approval contract",
+    "event subscription and durable workflow",
+    "audit and observability",
+    "ACL-safe RAG retrieval",
+    "frontend capability API",
+    "live integration probes",
+    "security and negative-path tests"
+  ],
+  "status_semantics": {
+    "reviewed_operational": "adapter, operation, contract and handler are present; live certification is still required",
+    "discovered_read_only": "generic discovery/capability metadata only; not an operational certification",
+    "blocked": "business module is installed but reviewed operational coverage is incomplete"
+  },
   "fail_closed": true,
-  "production_requires": "all modules installed in the target customer DB and every gate PASS"
+  "production_requires": "run the live matrix and business certification on the target database; every installed business module must be reviewed_operational and all live/security gates must pass",
+  "runtime_evidence_required": [
+    "module matrix JSON",
+    "negative ACL/cross-tenant tests",
+    "event/workflow recovery report",
+    "vLLM serving benchmark with p50/p95/p99/TTFT/TPOT",
+    "GPU, queue, PostgreSQL and Redis observations from the same run",
+    "backup/restore and external integration evidence"
+  ]
 }

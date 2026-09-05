@@ -38,12 +38,13 @@ if [ "$1" = "--dev" ]; then
     npm install --no-audit --no-fund
   fi
   echo ""
-  echo "Starting dev server on http://127.0.0.1:5173 ..."
-  echo "(Ctrl+C to stop. If you're on a remote server, SSH-tunnel first:"
+  echo "Starting dev server on http://0.0.0.0:5173 ..."
+  echo "(Ctrl+C to stop. In a managed preview, use the assigned preview URL."
+  echo " For a remote server, SSH-tunnel port 5173 if needed:"
   echo " ssh -L 5173:127.0.0.1:5173 you@this-server, then open"
   echo " http://127.0.0.1:5173 in the browser on YOUR OWN computer.)"
   echo ""
-  npm run dev -- --host 127.0.0.1
+  npm run dev -- --host 0.0.0.0
   exit 0
 fi
 
