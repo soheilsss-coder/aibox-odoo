@@ -313,6 +313,20 @@ class AiConfigurationProfile(models.Model):
                         raise ValueError
                 except (TypeError, ValueError):
                     raise ValidationError("approval_matrix.%s must be an integer from 0 to 5." % key)
+        approver_xmlids = []
+        if approval_policy.get("approver_group_xmlid"):
+            approver_xmlids.append(approval_policy["approver_group_xmlid"])
+        mapping = approval_policy.get("approver_groups", {})
+        if mapping and not isinstance(mapping, dict):
+            raise ValidationError("approval_matrix.approver_groups must be an object.")
+        approver_xmlids.extend((mapping or {}).values())
+        for xmlid in approver_xmlids:
+            group = self.env.ref(str(xmlid), raise_if_not_found=False)
+            external_ids = set(group.get_external_id().values()) if group else set()
+            if not group or group._name != "res.groups" or not any(
+                value.startswith("ai_business_tools.role_") for value in external_ids
+            ):
+                raise ValidationError("Approval matrix references an unknown product role: %s" % xmlid)
         feature_policy = sections["features"]
         for key in ("enabled_features", "disabled_features"):
             value = feature_policy.get(key, [])

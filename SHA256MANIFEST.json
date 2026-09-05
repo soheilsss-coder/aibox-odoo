@@ -211,7 +211,7 @@
   "custom_addons/ai_customer_plane/data/scim_data.xml": "7f0b84ebcee3eb2f54da4af5fab055a48feb3ba99e98588937a1699880075379",
   "custom_addons/ai_customer_plane/models/__init__.py": "fc131cef71386147bf4646ac4f5c1b32019359f89f90c93103e2ebc37fa4d4ea",
   "custom_addons/ai_customer_plane/models/access_review.py": "6cc075083aacf9fd1b9ba7f252900f234230ae4461273b4d7d46c4da033d31ba",
-  "custom_addons/ai_customer_plane/models/customer_config.py": "f380d4b2d8862e2ea3e5a5c95bc792c67dae02dcfb2374b2ffc853a94ceb61f7",
+  "custom_addons/ai_customer_plane/models/customer_config.py": "bc7fa184e2c5defb304e580b788d859b05246bc749a7fba7cd859600be7187c6",
   "custom_addons/ai_customer_plane/models/customer_designer.py": "2aba3e13e45e826e66bb21f155fe1272d7f251dc5d8b1a06c4ae8372554773e0",
   "custom_addons/ai_customer_plane/models/delegation.py": "436898e3c05679c63e106dff0ab9eda98454dd49038525eb828dc9ed39a2207a",
   "custom_addons/ai_customer_plane/models/identity.py": "37c7149d000407af5d556796cebc88bc905f22b66f9f9c9f4a1531881d829e58",
