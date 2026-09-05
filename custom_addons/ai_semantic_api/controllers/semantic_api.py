@@ -974,6 +974,7 @@ class AiSemanticApiController(http.Controller):
             {
                 "id": r.id,
                 "name": r.name,
+                "xmlid": r.get_external_id().get(r.id, "") or "",
                 "comment": r.comment or "",
                 "implied_roles": [g.name for g in r.implied_ids],
                 "members": [{"id": u.id, "name": u.name, "login": u.login} for u in r.users.filtered(lambda u: env.company in u.company_ids)],

@@ -112,7 +112,8 @@ const PROFILE_FIELD_SCHEMAS = {
   ],
   approval_matrix: [
     ["risk_threshold", "حد ریسک نیازمند تایید", "number"],
-    ["approver_group", "گروه تاییدکننده", "text"],
+    ["approver_group_xmlid", "XML ID گروه تاییدکننده محصول", "text"],
+    ["force_approval_tools", "ابزارهای همیشه نیازمند تایید (comma-separated)", "list"],
     ["high_risk_requires_approval", "ریسک بالا نیازمند تایید است", "boolean"],
   ],
   document_policy: [
@@ -132,6 +133,8 @@ const PROFILE_FIELD_SCHEMAS = {
   ],
   workflow_config: [
     ["default_workflow", "Workflow پیش‌فرض", "text"],
+    ["allowed_workflows", "Workflowهای مجاز (comma-separated)", "list"],
+    ["disabled_workflows", "Workflowهای مسدود (comma-separated)", "list"],
     ["notification_channel", "کانال اعلان", "text"],
     ["retry_limit", "حد retry", "number"],
   ],
@@ -151,9 +154,39 @@ function profileSectionObject(value) {
   }
 }
 
+function RolePolicyRulesEditor({ section, disabled, onChange }) {
+  const [roles] = useLoad(adminListRoles, []);
+  const rules = Array.isArray(section.rules) ? section.rules : [];
+  const roleOptions = (roles?.roles || []).filter((role) => role.xmlid).map((role) => ({ value: role.xmlid, label: role.name }));
+  function update(index, field, raw) {
+    const next = rules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, [field]: raw } : rule);
+    onChange({ ...section, rules: next });
+  }
+  function addRule() {
+    onChange({ ...section, rules: [...rules, { key: `rule-${rules.length + 1}`, name: "", role_group_xmlid: "", department: "", position: "", job_level: "", manager_required: false, priority: 10 }] });
+  }
+  return <div className="profile-rule-editor">
+    <div className="profile-rule-header"><strong>Role policy rules</strong><Button size="sm" variant="ghost" type="button" onClick={addRule} disabled={disabled}>+ rule</Button></div>
+    {!rules.length && <p className="muted">هنوز ruleای اضافه نشده است.</p>}
+    {rules.map((rule, index) => <div className="profile-rule-card" key={rule.key || index}>
+      <div className="admin-form-grid">
+        <Input label="نام rule" value={rule.name || ""} disabled={disabled} onChange={(e) => update(index, "name", e.target.value)} />
+        <Select label="Product role" value={rule.role_group_xmlid || ""} disabled={disabled} onChange={(e) => update(index, "role_group_xmlid", e.target.value)} options={roleOptions} />
+        <Input label="Department" value={rule.department || ""} disabled={disabled} onChange={(e) => update(index, "department", e.target.value)} />
+        <Input label="Position" value={rule.position || ""} disabled={disabled} onChange={(e) => update(index, "position", e.target.value)} />
+        <Input label="Job level" value={rule.job_level || ""} disabled={disabled} onChange={(e) => update(index, "job_level", e.target.value)} />
+        <Input label="Location" value={rule.location || ""} disabled={disabled} onChange={(e) => update(index, "location", e.target.value)} />
+        <Input label="Employment type" value={rule.employment_type || ""} disabled={disabled} onChange={(e) => update(index, "employment_type", e.target.value)} />
+        <Input label="Priority" type="number" value={rule.priority ?? 10} disabled={disabled} onChange={(e) => update(index, "priority", Number(e.target.value || 10))} />
+      </div>
+      <label className="admin-toggle"><input type="checkbox" checked={Boolean(rule.manager_required)} disabled={disabled} onChange={(e) => update(index, "manager_required", e.target.checked)} /><span>فقط برای مدیران</span></label>
+    </div>)}
+  </div>;
+}
+
 function ProfileSectionEditor({ sectionKey, label, value, disabled, onChange }) {
   const section = profileSectionObject(value);
-  const schema = PROFILE_FIELD_SCHEMAS[sectionKey] || [];
+  const schema = sectionKey === "role_policy" ? [] : (PROFILE_FIELD_SCHEMAS[sectionKey] || []);
   function update(field, raw, kind) {
     const next = { ...section };
     if (kind === "list") next[field] = String(raw).split(",").map((item) => item.trim()).filter(Boolean);
@@ -165,6 +198,7 @@ function ProfileSectionEditor({ sectionKey, label, value, disabled, onChange }) 
   }
   return <div className="profile-section-editor">
     <h4>{label}</h4>
+    {sectionKey === "role_policy" && <RolePolicyRulesEditor section={section} disabled={disabled} onChange={onChange} />}
     {schema.length > 0 && <div className="admin-form-grid">
       {schema.map(([field, fieldLabel, kind]) => kind === "boolean"
         ? <label className="admin-toggle" key={field}><input type="checkbox" checked={Boolean(section[field])} disabled={disabled} onChange={(e) => update(field, e.target.checked, kind)} /><span>{fieldLabel}</span></label>
