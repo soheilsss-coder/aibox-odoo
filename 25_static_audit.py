@@ -54,8 +54,14 @@ for p in ROOT.rglob("*.sh"):
     if r.returncode:
         errors.append(f"SHELL {p}: {r.stderr.strip()}")
 
+# The checkout's supported deployment entrypoint is deploy.sh. Historical
+# 01/02 installers are intentionally not recreated; the source audit must
+# remain runnable when those retired files are absent.
 checks = {
-    "generic assistant assignment removed": "all_tools = env['llm.tool'].search([])" not in (ROOT / "02_install_modules.sh").read_text(),
+    "generic assistant assignment removed": not any(
+        "all_tools = env['llm.tool'].search([])" in p.read_text(errors="ignore")
+        for p in ROOT.rglob("*.py") if p.name not in AUDIT_SCRIPTS
+    ),
     "generic ORM tool refs removed": not any("llm_tool_odoo_record_" in p.read_text(errors="ignore") for p in ROOT.rglob("*.py") if p.name not in AUDIT_SCRIPTS),
     "query-string API key removed": not any("args.get(\"api_key\"" in p.read_text(errors="ignore") for p in ROOT.rglob("*.py")),
     "control plane present": (ROOT / "custom_addons/ai_control_plane/__manifest__.py").exists(),

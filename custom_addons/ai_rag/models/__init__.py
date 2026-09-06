@@ -5,3 +5,5 @@ from . import index_job
 from . import rag_index
 from . import rag_tool
 from . import event_subscriber
+from . import ranking
+from . import reranker_client

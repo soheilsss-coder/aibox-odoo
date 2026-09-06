@@ -1,3 +1,22 @@
+let csrfToken = "";
+
+function readCsrfCookie() {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(/(?:^|; )ai_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function rememberSession(data) {
+  if (data && data.csrf_token) csrfToken = data.csrf_token;
+  return data;
+}
+
+function csrfHeader(method) {
+  return method === "GET" || method === "HEAD" || method === "OPTIONS"
+    ? {}
+    : { "X-CSRF-Token": csrfToken || readCsrfCookie() };
+}
+
 export function getApiKey() { return ""; }
 export function setApiKey(_key) {}
 export function clearApiKey() {}
@@ -13,8 +32,9 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
     headers["Content-Type"] = "application/json";
     fetchBody = JSON.stringify(body);
   }
+  Object.assign(headers, csrfHeader(method));
   const resp = await fetch(path, { method, headers, body: fetchBody, credentials: "include" });
-  const data = await resp.json().catch(() => ({}));
+  const data = rememberSession(await resp.json().catch(() => ({})));
   if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status);
   return data;
 }
@@ -26,21 +46,67 @@ export const getMyCapabilities = () => request("/api/me/capabilities");
 export const getWorkspace = () => request("/api/workspace");
 export const getDepartments = () => request("/api/departments");
 export const getAgents = () => request("/api/agents");
+export const getCalendar = (start = "", end = "") => { const p = new URLSearchParams(); if (start) p.set("start", start); if (end) p.set("end", end); const q = p.toString(); return request(`/api/calendar${q ? `?${q}` : ""}`); };
+export const createCalendarEvent = (payload) => request("/api/calendar", { method: "POST", body: payload });
 export const getTasks = () => request("/api/tasks");
 export const createTask = (payload) => request("/api/tasks", { method: "POST", body: payload });
 export const getApprovals = () => request("/api/approvals");
+export const approveApproval = (id) => request(`/api/approvals/${id}/approve`, { method: "POST" });
+export const rejectApproval = (id, note = "") => request(`/api/approvals/${id}/reject`, { method: "POST", body: { note } });
 export const getNotifications = () => request("/api/notifications");
 export const getModels = () => request("/api/models");
 export const getIntegrations = () => request("/api/integrations");
+export const getBranding = () => request("/api/branding");
+export const adminGetSetup = () => request("/api/admin/setup");
+export const adminUpdateCompany = (payload) => request("/api/admin/setup/company", { method: "POST", body: payload });
+export const adminListConfigurationProfiles = () => request("/api/admin/configuration-profiles");
+export const adminCreateConfigurationProfile = (payload) => request("/api/admin/configuration-profiles", { method: "POST", body: payload });
+export const adminGetConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}`);
+export const adminUpdateConfigurationProfile = (id, payload) => request(`/api/admin/configuration-profiles/${id}`, { method: "PATCH", body: payload });
+export const adminCloneConfigurationProfile = (id, name) => request(`/api/admin/configuration-profiles/${id}/clone`, { method: "POST", body: { name } });
+export const adminGetConfigurationProfileHistory = (id) => request(`/api/admin/configuration-profiles/${id}/history`);
+export const adminExportConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/export`);
+export const adminImportConfigurationProfile = (snapshot, name) => request("/api/admin/configuration-profiles/import", { method: "POST", body: { snapshot, name } });
+export const adminRollbackConfigurationProfile = (id, historyId, name) => request(`/api/admin/configuration-profiles/${id}/rollback`, { method: "POST", body: { history_id: historyId, name } });
+export const adminValidateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/validate`, { method: "POST" });
+export const adminCompileConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/compile`, { method: "POST" });
+export const adminActivateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/activate`, { method: "POST" });
+export const adminArchiveConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/archive`, { method: "POST" });
+export const adminDryRunConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/dry-run`, { method: "POST" });
+export const adminGetSetupChecklist = () => request("/api/admin/setup/checklist");
+export const adminRunSetupChecklist = () => request("/api/admin/setup/checklist/run", { method: "POST" });
+export const adminListSetupRuns = () => request("/api/admin/setup/runs");
+export const adminGetSetupRun = (runKey) => request(`/api/admin/setup/runs/${encodeURIComponent(runKey)}`);
+export const adminRecordSetupEvidence = (runKey, payload) => request(`/api/admin/setup/runs/${encodeURIComponent(runKey)}/evidence`, { method: "POST", body: payload });
+export const adminListSsoProviders = () => request("/api/admin/sso/providers");
+export const adminCreateSsoProvider = (payload) => request("/api/admin/sso/providers", { method: "POST", body: payload });
+export const adminUpdateSsoProvider = (id, payload) => request(`/api/admin/sso/providers/${id}`, { method: "PATCH", body: payload });
+export const adminDisableSsoProvider = (id) => request(`/api/admin/sso/providers/${id}`, { method: "DELETE" });
+export const adminListScimTokens = () => request("/api/admin/scim/tokens");
+export const adminCreateScimToken = (name, expires_at) => request("/api/admin/scim/tokens", { method: "POST", body: { name, expires_at } });
+export const adminRevokeScimToken = (id) => request(`/api/admin/scim/tokens/${id}/revoke`, { method: "POST" });
+export const adminListScimGroups = () => request("/api/admin/scim/groups");
+export const adminCreateScimGroup = (payload) => request("/api/admin/scim/groups", { method: "POST", body: payload });
+export const adminListDepartments = () => request("/api/admin/departments");
+export const adminCreateDepartment = (payload) => request("/api/admin/departments", { method: "POST", body: payload });
+export const adminListRoleAssignments = () => request("/api/admin/role-assignments");
+export const adminCreateRoleAssignment = (payload) => request("/api/admin/role-assignments", { method: "POST", body: payload });
+export const adminRevokeRoleAssignment = (id) => request(`/api/admin/role-assignments/${id}/revoke`, { method: "POST" });
 export const sendChatMessage = (message, threadId) => request("/api/chat", { method: "POST", body: { message, thread_id: threadId } });
+export const getBuzzChannels = () => request("/api/collaboration/channels");
+export const optInBuzzChannel = (channelId, trigger = "@buzz", agentName = "Buzz") => request("/api/collaboration/channels", { method: "POST", body: { channel_id: channelId, trigger, agent_name: agentName } });
+export const optOutBuzzChannel = (channelId) => request("/api/collaboration/channels/optout", { method: "POST", body: { channel_id: channelId } });
+export const getBuzzMessages = (channelId, after = 0) => request(`/api/collaboration/channels/${channelId}/messages?after=${after}`);
+export const postBuzzMessage = (channelId, body) => request(`/api/collaboration/channels/${channelId}/messages`, { method: "POST", body: { body } });
 
 export function streamChat(payload, handlers) {
-  const { onThinking, onDelta, onDone, onError } = handlers || {};
+  const { onThinking, onDelta, onDone, onError, signal } = handlers || {};
   return fetch("/api/chat/stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...csrfHeader("POST") },
     body: JSON.stringify(payload),
     credentials: "include",
+    signal,
   })
     .then(async (resp) => {
       if (!resp.ok) {
@@ -79,6 +145,7 @@ export const listDocuments = (query = "", accessLevel = "") => { const p = new U
 export const getDocument = (id) => request(`/api/documents/${id}`);
 export const uploadDocument = (payload) => request("/api/documents", { method: "POST", body: payload });
 export const deleteDocument = (id) => request(`/api/documents/${id}`, { method: "DELETE" });
+export const reindexDocument = (id) => request(`/api/documents/${id}/reindex`, { method: "POST" });
 export const getDocumentOptions = () => request("/api/documents/options");
 export const searchDocuments = (query, topK = 5) => request("/api/documents/search", { method: "POST", body: { query, top_k: topK } });
 export const generateArtifact = (payload) => request("/api/artifacts/generate", { method: "POST", body: payload });
@@ -94,6 +161,11 @@ export const adminListAgents = () => request("/api/admin/agents");
 export const adminGetBranding = () => request("/api/admin/branding");
 export const adminUpdateBranding = (payload) => request("/api/admin/branding", { method: "POST", body: payload });
 export const adminGetMetrics = () => request("/api/metrics");
+export const adminListModules = () => request("/api/admin/modules");
+export const adminInstallModule = (moduleId) => request("/api/admin/modules/install", { method: "POST", body: { module_id: moduleId } });
+export const adminGetModuleReadiness = (moduleId) => request(`/api/admin/modules/${moduleId}/readiness`);
+export const getModuleNavigation = () => request("/api/modules/navigation");
+export const getModuleMenu = (menuId) => request(`/api/modules/menus/${menuId}`);
 export const getTelegramStatus = () => request("/api/integrations/telegram");
 export const generateTelegramCode = () => request("/api/integrations/telegram/code", { method: "POST" });
 export const unlinkTelegram = () => request("/api/integrations/telegram/unlink", { method: "POST" });

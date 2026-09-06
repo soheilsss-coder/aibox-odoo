@@ -1,0 +1,22 @@
+[Unit]
+Description=AI local LLM chat serving
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=odoo
+Group=odoo
+EnvironmentFile=/etc/ai-box/vllm-chat.env
+ExecStart=/opt/odoo-custom-addons/ai-runtime-workers/run_vllm_server.sh
+Restart=always
+RestartSec=8
+TimeoutStartSec=900
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/odoo /var/cache/ai-box
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,6 @@
-import React, { useRef, useState } from "react";
-import { streamChat, analyzeFile, ApiError } from "../api/client.js";
-import { Card, Button, Alert, EmptyState, Spinner } from "../components";
+import React, { useEffect, useRef, useState } from "react";
+import { streamChat, analyzeFile, getAgents, ApiError } from "../api/client.js";
+import { Card, Button, Alert, EmptyState, Spinner, TextArea } from "../components";
 
 export default function ChatPage({ user }) {
   const [messages, setMessages] = useState([]);
@@ -11,7 +11,12 @@ export default function ChatPage({ user }) {
   const [error, setError] = useState("");
   const [file, setFile] = useState(null);
   const [recording, setRecording] = useState(false);
+  const [personalAgent, setPersonalAgent] = useState(null);
   const fileRef = useRef(null);
+  useEffect(() => {
+    getAgents().then((data) => setPersonalAgent((data.agents || [])[0] || null)).catch(() => {});
+  }, []);
+  const abortRef = useRef(null);
 
   const closeAssistantBubble = () => {
     setThinking(false);
@@ -26,6 +31,7 @@ export default function ChatPage({ user }) {
     setError("");
     setMessages((m) => [...m, { role: "user", text: text.trim() || "[فایل]" }]);
     setBusy(true);
+    abortRef.current = new AbortController();
     try {
       let effective = text.trim();
       if (file) {
@@ -48,6 +54,7 @@ export default function ChatPage({ user }) {
       await streamChat(
         { message: effective, thread_id: threadId },
         {
+          signal: abortRef.current.signal,
           onThinking: () => setThinking(true),
           onDelta: ({ text }) => setMessages((m) => {
             const next = [...m];
@@ -69,8 +76,9 @@ export default function ChatPage({ user }) {
     } catch (err) {
       setThinking(false);
       setMessages((m) => m.filter((msg) => msg !== null && !(msg.role === "assistant" && msg.text === "")));
-      setError(err instanceof ApiError ? err.message : "ارسال پیام ناموفق بود");
+      if (err?.name !== "AbortError") setError(err instanceof ApiError ? err.message : "ارسال پیام ناموفق بود");
     } finally {
+      abortRef.current = null;
       setBusy(false);
     }
   }
@@ -95,6 +103,19 @@ export default function ChatPage({ user }) {
           <p>پاسخ به‌صورت تدریجی (streaming) دریافت می‌شود؛ فایل و صدا هم می‌توانید ارسال کنید.</p>
         </div>
       </div>
+
+      {personalAgent && (
+        <div className="personal-agent-strip" role="status">
+          <div className="agent-orb">✦</div>
+          <div>
+            <strong>{personalAgent.name}</strong>
+            <span>{personalAgent.role} · {personalAgent.tools || 0} ابزار مجاز · {personalAgent.connected_module_count || 0} برنامه متصل</span>
+          </div>
+          <b className={personalAgent.connection_state === "connected" ? "module-agent-ok" : "module-agent-warning"}>
+            {personalAgent.connection_state === "connected" ? "متصل" : "در حال بررسی اتصال"}
+          </b>
+        </div>
+      )}
 
       {error && <Alert>{error}</Alert>}
 
@@ -143,6 +164,7 @@ export default function ChatPage({ user }) {
             <Button type="button" variant="ghost" onClick={() => fileRef.current?.click()}>فایل</Button>
             <Button type="button" variant="ghost" onClick={voice}>{recording ? "در حال شنیدن..." : "صدا"}</Button>
             <div style={{ flex: 1 }} />
+            {busy && <Button type="button" variant="danger" onClick={() => abortRef.current?.abort()}>توقف</Button>}
             <Button type="submit" disabled={busy} loading={busy}>ارسال</Button>
           </div>
         </form>

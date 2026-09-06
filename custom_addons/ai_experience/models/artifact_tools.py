@@ -6,6 +6,11 @@ import json
 from odoo import models
 from odoo.addons.llm_tool.decorators import llm_tool
 
+from .artifact_policy import (
+    validate_artifact_output,
+    validate_artifact_payload,
+)
+
 
 class AiArtifactTools(models.AbstractModel):
     _inherit = "llm.tool"
@@ -21,9 +26,9 @@ class AiArtifactTools(models.AbstractModel):
         """
         self.env["ai.gateway.execution.gate"].authorize("generate_artifact", context_label="artifact generation")
         try:
-            payload = json.loads(rows_json or "{}")
-        except Exception:
-            return {"error": "invalid rows_json"}
+            payload = validate_artifact_payload(json.loads(rows_json or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {"error": "invalid or oversized artifact payload"}
         rows = payload.get("rows") or []
         columns = payload.get("columns") or (list(rows[0].keys()) if rows and isinstance(rows[0], dict) else [])
         kind = (artifact_type or "csv").lower()
@@ -74,6 +79,10 @@ class AiArtifactTools(models.AbstractModel):
         else:
             return {"error": f"unsupported artifact type: {kind}"}
 
+        try:
+            validate_artifact_output(data)
+        except ValueError:
+            return {"error": "generated artifact exceeds the output limit"}
         attachment = self.env["ir.attachment"].sudo().create({
             "name": filename, "datas": base64.b64encode(data).decode(), "mimetype": mimetype,
             "res_model": "res.users", "res_id": self.env.user.id, "public": False,

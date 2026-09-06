@@ -1,9 +1,11 @@
+import base64
 import logging
 from datetime import date
 
 from odoo import models
 from odoo.exceptions import AccessError, UserError
 from odoo.addons.llm_tool.decorators import llm_tool
+from odoo.addons.ai_gateway.controllers.file_policy import MAX_UPLOAD_BYTES, validate_upload
 
 _logger = logging.getLogger(__name__)
 
@@ -180,14 +182,36 @@ class LLMToolDocument(models.Model):
                    "employee_code": employee_code, "description": description}
 
         try:
-            template = self.env["ir.attachment"].browse(int(template_attachment_id)).sudo().exists()
+            template = self.env["ir.attachment"].browse(int(template_attachment_id)).exists()
+            template.check_access("read")
         except (AccessError, ValueError):
             template = self.env["ir.attachment"]
         if not template:
             _audit(self.env, "fill_document_template", payload, success=False, error_message="template_not_found")
             return {"error": "template_not_found",
                     "message": "فایل قالب پیدا نشد؛ مطمئن شوید فایل .docx به این گفتگو پیوست شده است."}
-        if not (template.mimetype or "").endswith(("docx", "doc", "octet-stream")):
+
+        # A guessed attachment id must not become a privileged template read.
+        # Accept only a file uploaded by this user or a file linked to one of
+        # this user's conversation threads.  Native attachment ACLs are also
+        # checked above; sudo is intentionally absent on this input path.
+        owned = template.create_uid.id == self.env.user.id
+        if not owned and "llm.thread" in self.env:
+            owned_thread_ids = self.env["llm.thread"].search([
+                ("create_uid", "=", self.env.user.id),
+            ]).ids
+            owned = template.res_model == "llm.thread" and template.res_id in owned_thread_ids
+        if not owned:
+            _audit(self.env, "fill_document_template", payload, success=False, error_message="template_ownership_denied")
+            return {"error": "access_denied", "message": "این فایل قالب در محدوده‌ی دسترسی شما نیست."}
+
+        try:
+            template_raw = base64.b64decode(template.datas or b"", validate=True)
+            upload = validate_upload(template.name or "template.docx", template_raw, max_bytes=MAX_UPLOAD_BYTES)
+        except (TypeError, ValueError):
+            _audit(self.env, "fill_document_template", payload, success=False, error_message="template_not_docx")
+            return {"error": "template_not_docx", "message": "فایل پیوست یک سند Word (.docx) معتبر نیست."}
+        if upload["extension"] != ".docx":
             _audit(self.env, "fill_document_template", payload, success=False, error_message="template_not_docx")
             return {"error": "template_not_docx", "message": "فایل پیوست یک سند Word (.docx) نیست."}
 
@@ -228,31 +252,26 @@ class LLMToolDocument(models.Model):
                     "message": "موتور پایتون‌داک روی سرور نصب نیست (python-docx)."}
 
         unfilled = []
-        raw = False
-        try:
-            raw = template.datas
-        except Exception:
-            raw = template.raw if hasattr(template, "raw") else None
-        if not raw:
+        if not template_raw:
             _audit(self.env, "fill_document_template", payload, success=False, error_message="template_empty")
             return {"error": "template_empty", "message": "فایل قالب خالی یا ناخوانا است."}
-        if hasattr(raw, "decode"):
-            raw = raw.decode("latin1") if False else raw  # keep bytes
 
         try:
             import io
-            filled = _render_docx(io.BytesIO(raw), sorted(_RESOLVABLE_FIELDS), self.env, employee, unfilled)
+            filled = _render_docx(io.BytesIO(template_raw), sorted(_RESOLVABLE_FIELDS), self.env, employee, unfilled)
         except Exception as exc:
             _audit(self.env, "fill_document_template", payload, success=False, error_message=str(exc))
             return {"error": "render_failed", "message": "پردازش قالب ناموفق بود."}
 
-        import base64
         output_name = "filled_%s.docx" % (template.name or "document")
         try:
             out_att = self.env["ir.attachment"].sudo().create({
                 "name": output_name,
                 "datas": base64.b64encode(filled).decode("ascii"),
                 "mimetype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "res_model": "res.users",
+                "res_id": self.env.user.id,
+                "public": False,
                 "company_id": employee.company_id.id if employee.company_id else False,
             })
         except (AccessError, UserError) as exc:

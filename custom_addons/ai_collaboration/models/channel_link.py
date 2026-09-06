@@ -1,4 +1,5 @@
 import logging
+import re
 
 from odoo import fields, models
 
@@ -23,7 +24,10 @@ class AiChannelLink(models.Model):
     trigger_text = fields.Char(
         string="Trigger text", required=True,
         help="The assistant replies only to messages containing this "
-             "text, e.g. '@assistant'. The trigger is the opt-in.")
+             "text, e.g. '@buzz'. The trigger is the opt-in.")
+    agent_name = fields.Char(
+        string="Agent display name", required=True, default="Buzz",
+        help="Name shown in group-chat instructions; the posted reply uses the configured service identity.")
     created_by_id = fields.Many2one("res.users", string="Opted in by",
                                     required=True, ondelete="set null",
                                     default=lambda self: self.env.user)
@@ -56,26 +60,60 @@ class AiChannelLink(models.Model):
             ], order="id asc", limit=200)
             for msg in messages:
                 body = msg.body or ""
-                if link.trigger_text and link.trigger_text not in body:
-                    continue
-                if self._reply_to_channel_message(link, channel, msg):
-                    replied += 1
-                link.last_seen_message_id = max(link.last_seen_message_id, msg.id)
+                if link.trigger_text and link.trigger_text in body:
+                    if self._reply_to_channel_message(link, channel, msg):
+                        replied += 1
+                # Advance the durable cursor for every inspected message,
+                # including non-trigger messages and failed attempts.  The
+                # previous code re-scanned the same first 200 messages forever
+                # whenever a channel contained ordinary traffic, creating a
+                # needless DB/cron hot loop.
+                link.write({"last_seen_message_id": max(link.last_seen_message_id, msg.id)})
         return replied
+
+    def _group_context(self, channel, current_message_id):
+        """Build bounded context from this opted-in channel only.
+
+        The gateway turn still executes as the mentioning employee, so the
+        agent cannot gain the group's privileges. Context is copied into the
+        prompt because the normal llm.thread is intentionally personal.
+        """
+        messages = self.env["mail.message"].sudo().search([
+            ("model", "=", "mail.channel"),
+            ("res_id", "=", channel.id),
+            ("id", "<=", current_message_id),
+        ], order="id desc", limit=30)
+        lines = []
+        for item in reversed(messages):
+            author = item.author_id.name or "عضو گروه"
+            body = re.sub(r"<[^>]+>", " ", item.body or "").strip()
+            if body:
+                lines.append("- %s: %s" % (author, body[:4000]))
+        return "\n".join(lines)[-24000:]
 
     def _reply_to_channel_message(self, link, channel, msg):
         author = msg.author_id
         if not author:
             return False
         user = self.env["res.users"].sudo().search(
-            [("partner_id", "=", author.id), ("share", "=", False)], limit=1)
+            [("partner_id", "=", author.id), ("share", "=", False),
+             ("company_id", "=", getattr(channel, "company_id", False).id if getattr(channel, "company_id", False) else self.env.company.id)],
+            limit=1,
+        )
         if not user.exists():
             return False
-        # Generate as the MENTIONING user (their tool privileges / thread
+        context = self._group_context(channel, msg.id)
+        prompt = (
+            "تو Agent گروهی %s هستی و عضو همین کانال محسوب می‌شوی. فقط به آخرین "
+            "پیامی که trigger شده پاسخ بده. از context زیر برای فهم گفتگو استفاده کن. "
+            "دسترسی‌ها و اجرای ابزارها باید دقیقاً با هویت Odoo فرستنده بررسی شود.\n\n"
+            "گفتگوی اخیر کانال:\n%s\n\nپیام جدید:\n%s"
+        ) % (link.agent_name or "Buzz", context, msg.body or "")
+        # Generate as the mentioning user (their tool privileges / thread
         # ownership), but post the reply with the assistant's own identity.
         try:
-            from custom_addons.ai_gateway.controllers.gateway import _run_chat_env  # noqa: PLC0415
-            result = _run_chat_env(self.env(user=user.id), msg.body or "")
+            from odoo.addons.ai_gateway.controllers.gateway import _run_chat_bounded  # noqa: PLC0415
+            result = _run_chat_bounded(self.env(user=user.id), prompt)
         except Exception as exc:  # noqa: BLE001
             _logger.warning("channel reply generation failed: %s", exc)
             return False

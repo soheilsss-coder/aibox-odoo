@@ -281,6 +281,34 @@ class LLMToolTask(models.Model):
             for t in tasks
         ]}
 
+    @llm_tool(read_only_hint=True)
+    def get_task_status(self, task_id: int = 0) -> dict:
+        """Read one task through the current user's native ACL/record rules.
+
+        Workflow deadline checks use this tool instead of trusting the stale
+        ``task.created`` event payload. It is also useful in chat when a user
+        asks whether a specific task is complete; it never changes task state.
+        """
+        try:
+            task_id = int(task_id)
+        except (TypeError, ValueError):
+            return {"error": "task_id must be an integer"}
+        if task_id <= 0:
+            return {"error": "task_id is required"}
+        task = self.env["project.task"].browse(task_id).exists()
+        if not task:
+            return {"error": "task not found or access denied"}
+        task.ensure_one()
+        today = fields.Date.context_today(self)
+        return {
+            "task_id": task.id,
+            "title": task.name,
+            "state": task.stage_id.name or "",
+            "done": bool(task.stage_id.is_closed),
+            "deadline": str(task.date_deadline) if task.date_deadline else None,
+            "overdue": bool(task.date_deadline and task.date_deadline < today and not task.stage_id.is_closed),
+        }
+
     def cron_notify_overdue_tasks(self):
         """Scheduled job (see data/cron_data.xml): runs as a dedicated
         restricted service user, not admin, so an autonomous job can

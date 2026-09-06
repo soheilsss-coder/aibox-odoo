@@ -6,12 +6,20 @@ import logging
 import os
 import tempfile
 from datetime import datetime
+from urllib.parse import quote as _quote_filename
 
 from odoo import http
 from odoo.http import request
 
 from odoo.addons.ai_semantic_api.controllers.semantic_api import _require_auth, _json_response, _require_privileged
 from odoo.addons.ai_gateway.controllers.gateway import _audit, _cors_preflight_response
+from odoo.addons.ai_gateway.controllers.file_policy import validate_upload, MAX_UPLOAD_BYTES
+from odoo.addons.ai_gateway.controllers.output_firewall import scrub_public_text
+from odoo.addons.ai_experience.models.artifact_policy import (
+    MAX_ARTIFACT_REQUEST_BYTES,
+    validate_artifact_output,
+    validate_artifact_payload,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -40,6 +48,60 @@ def _assigned_agent(env, user):
         if group and group in user.groups_id:
             return name
     return "Company Assistant"
+
+
+def _personal_agent_state(env, user):
+    """Return safe product metadata for the user's personal workspace.
+
+    There is one Company Assistant core per appliance. This endpoint exposes a
+    personal assignment/profile and the caller's effective tool count, never a
+    second model, provider or unrestricted tool catalog.
+    """
+    result = {
+        "label": "دستیار شخصی شما",
+        "role": _assigned_agent(env, user),
+        "shared_core": True,
+        "assigned": False,
+        "connection_state": "disconnected",
+        "tool_count": 0,
+        "connected_module_count": 0,
+        "memory_scope": "حافظه شخصی و مجوزهای مؤثر همین کاربر",
+    }
+    identity_model = _model(env, "ai.gateway.agent.identity")
+    if identity_model is not None:
+        identity = identity_model.sudo().ensure_personal(user)
+        result["assigned"] = bool(identity)
+    assistant_model = _model(env, "llm.assistant")
+    binding_model = _model(env, "ai.integration.agent.module")
+    if assistant_model is None or binding_model is None:
+        return result
+    assistant = assistant_model.sudo().search([
+        ("name", "=", "Company Assistant"), ("active", "=", True),
+    ], limit=1)
+    if not assistant:
+        return result
+    try:
+        binding_model.sudo().refresh_if_stale()
+        bindings = binding_model.sudo().search([
+            ("agent_id", "=", assistant.id),
+            ("company_id", "=", env.company.id),
+            ("active", "=", True),
+        ])
+        result["connected_module_count"] = len(bindings.filtered(
+            lambda binding: binding.state in ("connected", "connected_no_tools")
+        ))
+        if bindings and all(binding.state in ("connected", "connected_no_tools") for binding in bindings):
+            result["connection_state"] = "connected"
+        elif bindings:
+            result["connection_state"] = "error"
+        if "ai.gateway.tool.risk" in env:
+            connected_tools = binding_model.sudo().tool_ids_for_agent(assistant)
+            allowed_ids = set(env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(user))
+            result["tool_count"] = len(connected_tools.filtered(lambda tool: tool.id in allowed_ids))
+    except Exception:  # noqa: BLE001
+        _logger.exception("Could not resolve personal agent state")
+        result["connection_state"] = "error"
+    return result
 
 
 def _safe_name(value, fallback="artifact"):
@@ -166,14 +228,21 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         user = env.user
-        employee = _model(env, "hr.employee").search([("user_id", "=", user.id)], limit=1) if _model(env, "hr.employee") else None
+        employee_model = _model(env, "hr.employee")
+        employee = employee_model.search([("user_id", "=", user.id)], limit=1) if employee_model is not None else None
         capabilities = env["ai.control.capability.resolver"].effective_capabilities(user=user) if "ai.control.capability.resolver" in env else []
+        personal_agent = _personal_agent_state(env, user)
         return _json_response({
             "user": {"id": user.id, "name": user.name, "login": user.login},
             "company": {"id": env.company.id, "name": env.company.name},
             "department": {"id": employee.department_id.id, "name": employee.department_id.name} if employee and employee.department_id else None,
-            "agent": _assigned_agent(env, user),
-            "capabilities": capabilities,
+            "agent": personal_agent["label"],
+            "agent_role": personal_agent["role"],
+            "personal_agent": personal_agent,
+            # Capability names are internal policy identifiers; the browser
+            # receives only whether the feature surface is available.
+            "capability_count": len(capabilities),
+            "can_manage_documents": bool(env.user.has_group("base.group_system")),
         })
 
     @http.route("/api/departments", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
@@ -182,8 +251,9 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         dept_model = _model(env, "hr.department")
-        if not dept_model: return _json_response({"departments": []})
-        employee = _model(env, "hr.employee").search([("user_id", "=", env.user.id)], limit=1)
+        if dept_model is None: return _json_response({"departments": []})
+        employee_model = _model(env, "hr.employee")
+        employee = employee_model.search([("user_id", "=", env.user.id)], limit=1) if employee_model is not None else None
         privileged = env.user.has_group("base.group_system")
         depts = dept_model.search([]) if privileged else (employee.department_id | employee.child_ids.mapped("department_id"))
         return _json_response({"departments": [{"id": d.id, "name": d.name, "manager_id": d.manager_id.id if d.manager_id else None, "member_count": len(d.member_ids)} for d in depts]})
@@ -193,11 +263,19 @@ class AiExperienceApi(http.Controller):
         if request.httprequest.method == "OPTIONS": return _cors_preflight_response()
         env, err = _require_auth()
         if err: return err
-        assistants = _model(env, "llm.assistant")
-        data = [{"id": "role-default", "name": _assigned_agent(env, env.user), "description": "Agent اختصاصی نقش شما؛ محدود به Capabilityهای مؤثر همان کاربر.", "tools": 0, "assigned_to_user": True}]
-        if assistants:
-            for a in assistants.search([], order="name"):
-                data.append({"id": a.id, "name": a.name, "description": getattr(a, "description", "") or "", "tools": len(a.tool_ids) if hasattr(a, "tool_ids") else 0})
+        personal = _personal_agent_state(env, env.user)
+        data = [{
+            "id": "personal",
+            "name": personal["label"],
+            "description": "دستیار سازمانی با حافظه شخصی و دسترسی‌های مؤثر همین کاربر؛ هسته اصلی بین اعضای سازمان مشترک است.",
+            "tools": personal["tool_count"],
+            "assigned_to_user": personal["assigned"],
+            "shared_core": personal["shared_core"],
+            "role": personal["role"],
+            "connection_state": personal["connection_state"],
+            "connected_module_count": personal["connected_module_count"],
+            "memory_scope": personal["memory_scope"],
+        }]
         return _json_response({"agents": data})
 
     @http.route("/api/tasks", type="http", auth="none", csrf=False, methods=["GET", "POST", "OPTIONS"])
@@ -206,30 +284,70 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         model = _model(env, "project.task")
-        if not model: return _json_response({"tasks": []})
+        if model is None: return _json_response({"tasks": []})
         if request.httprequest.method == "POST":
-            payload = json.loads(request.httprequest.data or b"{}")
+            try:
+                payload = json.loads(request.httprequest.data or b"{}")
+            except (TypeError, ValueError):
+                return _json_response({"error": "invalid JSON body"}, status=400)
+            if not isinstance(payload, dict):
+                return _json_response({"error": "JSON body must be an object"}, status=400)
             vals = {"name": payload.get("name"), "description": payload.get("description", "")}
             if not vals["name"]: return _json_response({"error": "name is required"}, status=400)
-            task = model.create(vals)
-            _audit(env, env.user.id, "experience_api", "task.create", {"task_id": task.id}, True)
-            return _json_response({"id": task.id, "name": task.name}, status=201)
+            try:
+                result = env["ai.gateway.execution.gate"].execute(
+                    "project.task.create", args={"name": str(vals["name"])[:200], "description": str(vals["description"])[:4000]}
+                )
+            except Exception:  # noqa: BLE001
+                _logger.exception("task creation failed")
+                return _json_response({"error": "task could not be created"}, status=409)
+            task = model.browse(result.get("record_id")).exists()
+            _audit(env, env.user.id, "experience_api", "task.create", {"task_id": task.id if task else None}, True)
+            return _json_response({"id": task.id if task else result.get("record_id"), "name": task.name if task else vals["name"]}, status=201)
         tasks = model.search([("create_uid", "=", env.user.id)], order="create_date desc", limit=100)
         return _json_response({"tasks": [{"id": t.id, "name": t.name, "description": t.description or "", "state": getattr(t.stage_id, "name", "") if hasattr(t, "stage_id") else ""} for t in tasks]})
 
-    @http.route("/api/approvals", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
-    def approvals(self, **kwargs):
+    @http.route("/api/calendar", type="http", auth="none", csrf=False, methods=["GET", "POST", "OPTIONS"])
+    def calendar(self, **kwargs):
         if request.httprequest.method == "OPTIONS": return _cors_preflight_response()
         env, err = _require_auth()
         if err: return err
-        model = _model(env, "ai.gateway.approval")
-        if not model: return _json_response({"approvals": []})
-        recs = model.search([], order="create_date desc", limit=100)
-        fields_map = {f: True for f in ("name", "state", "status", "risk_level", "requester_id", "expires_at") if f in model._fields}
-        out=[]
-        for r in recs:
-            out.append({"id": r.id, "name": getattr(r, "name", f"Approval #{r.id}"), "state": getattr(r, "state", getattr(r, "status", "")), "risk": getattr(r, "risk_level", 0), "requester": getattr(getattr(r, "requester_id", False), "name", "")})
-        return _json_response({"approvals": out})
+        model = _model(env, "calendar.event")
+        if model is None: return _json_response({"events": []})
+        if request.httprequest.method == "POST":
+            try:
+                payload = json.loads(request.httprequest.data or b"{}")
+            except (TypeError, ValueError):
+                return _json_response({"error": "invalid JSON body"}, status=400)
+            if not isinstance(payload, dict) or not payload.get("name") or not payload.get("start"):
+                return _json_response({"error": "name and start are required"}, status=400)
+            try:
+                result = env["ai.gateway.execution.gate"].execute(
+                    "calendar.event.create", args={
+                        "name": str(payload["name"])[:200],
+                        "start": str(payload["start"]),
+                        "stop": str(payload.get("stop") or payload["start"]),
+                        "allday": bool(payload.get("allday")),
+                        "description": str(payload.get("description") or "")[:4000],
+                        "location": str(payload.get("location") or "")[:500],
+                    },
+                )
+                _audit(env, env.user.id, "experience_api", "calendar.create", {"record_id": result.get("record_id")}, True)
+                return _json_response(result, status=201)
+            except Exception:  # noqa: BLE001
+                _logger.exception("calendar event creation failed")
+                return _json_response({"error": "calendar event could not be created"}, status=409)
+        start = kwargs.get("start")
+        end = kwargs.get("end")
+        domain = ["|", ("partner_ids", "in", [env.user.partner_id.id]), ("user_id", "=", env.user.partner_id.id)]
+        if start: domain.append(("stop", ">=", start))
+        if end: domain.append(("start", "<=", end))
+        events = model.search(domain, order="start asc", limit=250)
+        return _json_response({"events": [{
+            "id": event.id, "name": event.name, "start": str(event.start) if event.start else None,
+            "stop": str(event.stop) if event.stop else None, "allday": bool(event.allday),
+            "location": event.location or "", "description": event.description or "",
+        } for event in events]})
 
     @http.route("/api/notifications", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def notifications(self, **kwargs):
@@ -238,7 +356,7 @@ class AiExperienceApi(http.Controller):
         if err: return err
         model = _model(env, "mail.notification")
         out=[]
-        if model:
+        if model is not None:
             recs = model.search([("res_partner_id", "=", env.user.partner_id.id)], order="id desc", limit=100)
             for r in recs:
                 msg = r.mail_message_id
@@ -252,9 +370,17 @@ class AiExperienceApi(http.Controller):
         if err: return err
         model = _model(env, "ai.model.profile")
         out=[]
-        if model:
+        if model is not None:
+            labels = {
+                "chat": "دستیار گفتگو", "reasoning": "دستیار تحلیل",
+                "vision": "تحلیل تصویر", "embedding": "جستجوی دانش",
+            }
             for m in model.sudo().search([], order="purpose,name"):
-                out.append({"id": m.id, "name": m.name, "provider": m.provider, "model_id": m.model_id, "purpose": m.purpose, "quantization": m.quantization, "production": m.production, "active": m.active})
+                # Keep infrastructure/provider/model identifiers out of the
+                # customer-facing capability surface.
+                out.append({"label": labels.get(m.purpose, "قابلیت هوشمند"),
+                            "purpose": m.purpose, "available": bool(m.active),
+                            "production": bool(m.production)})
         return _json_response({"models": out})
 
 
@@ -265,9 +391,12 @@ class AiExperienceApi(http.Controller):
         if err: return err
         try:
             payload = json.loads(request.httprequest.data or b"{}")
+            if not isinstance(payload, dict):
+                return _json_response({"error": "JSON body must be an object"}, status=400)
             filename = _safe_name(payload.get("filename", "file"), "file")
             raw = base64.b64decode(payload.get("data_base64", ""), validate=True)
-            question = payload.get("question", "خلاصه و نکات مهم این فایل را توضیح بده")
+            validate_upload(filename, raw, max_bytes=MAX_UPLOAD_BYTES)
+            question = str(payload.get("question") or "خلاصه و نکات مهم این فایل را توضیح بده")[:4000]
             lower = filename.lower()
             text = ""
             if lower.endswith((".txt", ".md", ".csv", ".json")):
@@ -276,7 +405,14 @@ class AiExperienceApi(http.Controller):
                 try:
                     from pypdf import PdfReader
                     reader = PdfReader(io.BytesIO(raw))
-                    text = "\n".join((page.extract_text() or "") for page in reader.pages)
+                    if len(reader.pages) > 100:
+                        return _json_response({"error": "PDF exceeds the page limit"}, status=413)
+                    chunks = []
+                    for page in reader.pages:
+                        chunks.append(page.extract_text() or "")
+                        if sum(len(chunk) for chunk in chunks) >= 60000:
+                            break
+                    text = "\n".join(chunks)
                 except ImportError:
                     return _json_response({"error": "PDF reader is not installed"}, status=501)
             elif lower.endswith(".docx"):
@@ -285,7 +421,9 @@ class AiExperienceApi(http.Controller):
                     doc = Document(io.BytesIO(raw)); text = "\n".join(p.text for p in doc.paragraphs)
                 except ImportError:
                     return _json_response({"error": "DOCX reader is not installed"}, status=501)
-            elif lower.endswith((".xlsx", ".xls")):
+            elif lower.endswith(".xls"):
+                return _json_response({"error": "legacy XLS extraction is not available"}, status=501)
+            elif lower.endswith(".xlsx"):
                 try:
                     import openpyxl
                     wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
@@ -298,15 +436,18 @@ class AiExperienceApi(http.Controller):
                     return _json_response({"error": "XLSX reader is not installed"}, status=501)
             elif lower.endswith((".png", ".jpg", ".jpeg", ".webp")):
                 import requests
-                base = env["ir.config_parameter"].sudo().get_param("company_ai_demo.vision_api_base", "http://127.0.0.1:8001/v1")
+                profile = env["ai.model.router"].route(purpose="vision")
+                base = profile.endpoint or env["ir.config_parameter"].sudo().get_param("company_ai_demo.vision_api_base", "http://127.0.0.1:8001/v1")
                 mime = "image/png" if lower.endswith(".png") else "image/jpeg"
-                resp = requests.post(f"{base}/chat/completions", json={"model":env["ai.model.router"].route(purpose="vision").model_id,"messages":[{"role":"user","content":[{"type":"text","text":question},{"type":"image_url","image_url":{"url":f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],"max_tokens":1500}, timeout=90)
+                resp = requests.post(f"{base.rstrip('/')}/chat/completions", json={"model":profile.model_id,"messages":[{"role":"user","content":[{"type":"text","text":question},{"type":"image_url","image_url":{"url":f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],"max_tokens":1500}, timeout=90)
                 resp.raise_for_status(); answer=resp.json()["choices"][0]["message"]["content"]
-                return _json_response({"filename": filename, "kind": "vision", "analysis": answer})
+                return _json_response({"filename": filename, "kind": "vision", "analysis": scrub_public_text(answer)})
             else:
                 return _json_response({"error": "unsupported file type"}, status=415)
             text = text[:60000]
-            return _json_response({"filename": filename, "kind": "text", "analysis": text if text else "No extractable text was found.", "question": question})
+            return _json_response({"filename": filename, "kind": "text", "analysis": scrub_public_text(text if text else "No extractable text was found."), "question": scrub_public_text(question)})
+        except (TypeError, ValueError):
+            return _json_response({"error": "invalid or unsupported file upload"}, status=400)
         except Exception:
             _logger.exception("file analysis failed")
             return _json_response({"error": "file analysis failed, try again later"}, status=500)
@@ -321,7 +462,11 @@ class AiExperienceApi(http.Controller):
         if not att.exists() or att.res_model != "res.users" or att.res_id != env.user.id:
             return _json_response({"error": "artifact not found or access denied"}, status=404)
         data = base64.b64decode(att.datas or b"")
-        headers = [("Content-Type", att.mimetype or "application/octet-stream"), ("Content-Disposition", f'attachment; filename="{att.name}"'), ("Content-Length", str(len(data)))]
+        headers = [
+            ("Content-Type", att.mimetype or "application/octet-stream"),
+            ("Content-Disposition", "attachment; filename*=UTF-8''%s" % _quote_filename(att.name or "artifact")),
+            ("Content-Length", str(len(data))),
+        ]
         return request.make_response(data, headers=headers)
 
     @http.route("/api/artifacts/generate", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])
@@ -329,13 +474,28 @@ class AiExperienceApi(http.Controller):
         if request.httprequest.method == "OPTIONS": return _cors_preflight_response()
         env, err = _require_auth()
         if err: return err
+        payload = {}
         try:
-            payload = json.loads(request.httprequest.data or b"{}")
-            kind = payload.get("type", "csv")
+            raw_body = request.httprequest.data or b""
+            if len(raw_body) > MAX_ARTIFACT_REQUEST_BYTES:
+                return _json_response({"error": "artifact request is too large"}, status=413)
+            payload = validate_artifact_payload(json.loads(raw_body or b"{}"))
+            kind = str(payload.get("type", "csv"))[:20]
+            # The HTTP façade is a second door to the same central contract as
+            # the generate_artifact tool.  Authentication alone is not enough
+            # for a resource-producing endpoint.
+            env["ai.gateway.execution.gate"].authorize(
+                "generate_artifact", args={"type": kind},
+                context_label="artifact generation api",
+            )
             filename, mimetype, data = _artifact_bytes(kind, payload.get("title", "artifact"), payload)
+            validate_artifact_output(data)
             _audit(env, env.user.id, "experience_api", "artifact.generate", {"type": kind, "filename": filename}, True)
             return _json_response({"filename": filename, "mimetype": mimetype, "data_base64": base64.b64encode(data).decode("ascii")})
         except (ValueError, RuntimeError, ImportError) as exc:
             _audit(env, env.user.id, "experience_api", "artifact.generate", {"type": payload.get("type") if isinstance(payload, dict) else ""}, False, str(exc))
-            detail = "unsupported artifact type or missing data" if isinstance(exc, (ValueError, ImportError)) else "artifact generation failed, try again later"
+            detail = "unsupported or oversized artifact request" if isinstance(exc, ValueError) else "artifact generation failed, try again later"
             return _json_response({"error": detail}, status=400 if isinstance(exc, ValueError) else 501)
+        except Exception:
+            _audit(env, env.user.id, "experience_api", "artifact.generate", {"type": payload.get("type") if isinstance(payload, dict) else ""}, False, "artifact gate failed")
+            return _json_response({"error": "artifact generation is unavailable"}, status=403)
