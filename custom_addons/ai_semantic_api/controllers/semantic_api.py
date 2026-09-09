@@ -293,7 +293,17 @@ class AiSemanticApiController(http.Controller):
             return _json_response({"error": "login and password are both required"}, status=400)
 
         try:
-            uid = request.session.authenticate(request.db, login_id, password)
+            # Odoo 18's low-level Session.authenticate accepts a single
+            # credential dict and returns an auth_info mapping. Older releases
+            # accepted login/password as separate positional arguments and
+            # returned the uid directly. Support both so the customer-facing
+            # /api/login route does not crash with HTTP 500 after an upgrade.
+            credential = {"login": login_id, "password": password, "type": "password"}
+            try:
+                auth_info = request.session.authenticate(request.db, credential)
+                uid = auth_info.get("uid") if isinstance(auth_info, dict) else request.session.uid
+            except TypeError:
+                uid = request.session.authenticate(request.db, login_id, password)
         except AccessDenied:
             uid = False
 
