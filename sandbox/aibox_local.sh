@@ -193,7 +193,8 @@ cmd_install() {
   "$VENV/bin/pip" install -q -r "$WS/odoo-reqs.txt"
   "$VENV/bin/pip" install -q psycopg2-binary redis requests numpy openpyxl jdatetime \
       pgvector openai 'pydantic>=2' jsonschema markdown2 markdownify emoji PyMuPDF \
-      authlib cryptography mcp pyyaml jinja2
+      'mcp<2' \
+      authlib cryptography pyyaml jinja2
   "$VENV/lib/python3.11/site-packages" >/dev/null 2>&1 || true
   local sp; sp="$("$VENV/bin/python" -c 'import site;print(site.getsitepackages()[0])')"
   echo "$SRC/odoo" > "$sp/odoo-src.pth"

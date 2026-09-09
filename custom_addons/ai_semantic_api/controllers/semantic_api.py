@@ -1227,6 +1227,445 @@ class AiSemanticApiController(http.Controller):
         })
 
     # ------------------------------------------------------------
+    # LLM provider configuration (Admin Console).
+    #
+    # Until now the only way to point the appliance at a hosted API was to
+    # export environment variables and re-run the seed script - fine for a
+    # deploy, useless for an operator who wants to try a key from the browser
+    # and take it back out again. These routes write the same records the seed
+    # writes (llm.provider / llm.model / llm.assistant / ai.model.profile),
+    # through the same detection and normalization code, so there is one
+    # definition of "which vendor is this" and not two.
+    #
+    # The key is stored in llm.provider.api_key like any other provider and is
+    # never returned to the browser - GET reports only a 4+4 fingerprint.
+    # DELETE removes the key and reactivates whatever provider was there
+    # before, so this stays a reversible experiment rather than a migration.
+    # ------------------------------------------------------------
+    @http.route("/api/admin/llm-provider", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "DELETE", "OPTIONS"])
+    def admin_llm_provider(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        method = request.httprequest.method
+        if method == "POST":
+            return self._admin_llm_provider_save(env)
+        if method == "DELETE":
+            return self._admin_llm_provider_clear(env)
+        return _json_response(self._llm_provider_state(env))
+
+    @http.route("/api/admin/llm-provider/test", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_llm_provider_test(self, **kwargs):
+        """Verify a candidate configuration WITHOUT saving it.
+
+        Separate from the save route on purpose: an operator pasting a key
+        they are not sure about should be able to see the raw provider error
+        before the appliance starts routing real user traffic to it.
+        """
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = _require_privileged()
+        if err:
+            return err
+        payload, err = _read_json_body()
+        if err:
+            return err
+        cfg = self._llm_config_from_payload(payload)
+        checks = self._llm_probe(cfg, prompt=payload.get("test_prompt") or "")
+        return _json_response({
+            "config": cfg.describe(),
+            "checks": checks,
+            "ok": all(c["ok"] for c in checks if c["required"]),
+        })
+
+    # -- helpers -----------------------------------------------------
+
+    # The env-var names are the public contract of this feature: the browser
+    # form, the seed script and the systemd unit all speak the same names, so
+    # a value that works in one works in the others.
+    _LLM_PAYLOAD_KEYS = (
+        "AI_LLM_PROVIDER", "AI_LLM_API_BASE", "AI_LLM_API_KEY", "AI_LLM_MODEL",
+        "AI_EMBEDDING_API_BASE", "AI_EMBEDDING_API_KEY", "AI_EMBEDDING_MODEL",
+        "AI_EMBEDDING_DIM", "AI_RAG_EMBEDDING_DIM", "AI_INFERENCE_LATENCY_BUDGET_MS",
+        "AI_LLM_MAX_OUTPUT_TOKENS",
+    )
+
+    # The frontend sends friendly camelCase names; map them onto the same
+    # variables so one code path handles both.
+    _LLM_FIELD_ALIASES = {
+        "provider": "AI_LLM_PROVIDER",
+        "api_base": "AI_LLM_API_BASE",
+        "api_key": "AI_LLM_API_KEY",
+        "model": "AI_LLM_MODEL",
+        "embedding_api_base": "AI_EMBEDDING_API_BASE",
+        "embedding_api_key": "AI_EMBEDDING_API_KEY",
+        "embedding_model": "AI_EMBEDDING_MODEL",
+        "embedding_dim": "AI_EMBEDDING_DIM",
+    }
+
+    def _llm_config_from_payload(self, payload):
+        from odoo.addons.ai_gateway.models.llm_api_config import load_config
+        mapping = {}
+        for key, value in (payload or {}).items():
+            if value in (None, ""):
+                continue
+            name = key if key in self._LLM_PAYLOAD_KEYS else self._LLM_FIELD_ALIASES.get(key)
+            if name:
+                mapping[name] = str(value)
+        if "AI_EMBEDDING_DIM" in mapping and "AI_RAG_EMBEDDING_DIM" not in mapping:
+            # document_chunk.py sizes the pgvector column from this one; a
+            # mismatch is rejected at index time, not at save time.
+            mapping["AI_RAG_EMBEDDING_DIM"] = mapping["AI_EMBEDDING_DIM"]
+        return load_config(env=mapping)
+
+    def _llm_http_call(self, url, payload, api_key, timeout):
+        """Return (status, parsed_json_or_None, elapsed_ms, error_text)."""
+        import json as _j
+        import ssl
+        import time
+        import urllib.error
+        import urllib.request
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if api_key:
+            headers["Authorization"] = "Bearer %s" % api_key
+        data = _j.dumps(payload).encode("utf-8") if payload is not None else None
+        req = urllib.request.Request(url, data=data, headers=headers,
+                                     method="POST" if data else "GET")
+        started = time.time()
+        try:
+            with urllib.request.urlopen(req, timeout=timeout,
+                                        context=ssl.create_default_context()) as resp:
+                body = resp.read()
+                status = resp.status
+        except urllib.error.HTTPError as exc:
+            body, status = exc.read(), exc.code
+        except Exception as exc:  # noqa: BLE001 - report, never 500
+            return 0, None, round((time.time() - started) * 1000), "%s: %s" % (type(exc).__name__, exc)
+        elapsed = round((time.time() - started) * 1000)
+        try:
+            return status, _j.loads(body.decode("utf-8")), elapsed, ""
+        except (ValueError, UnicodeDecodeError):
+            return status, None, elapsed, (body.decode("utf-8", "replace") or "")[:400]
+
+    def _llm_probe(self, cfg, prompt=""):
+        """Run the same checks verify_llm_api.py runs, as structured data."""
+        from odoo.addons.ai_gateway.models.llm_api_config import _resolve_key
+        mapping = {
+            "AI_LLM_API_BASE": cfg.chat.api_base,
+            "AI_LLM_API_KEY": cfg.chat_key or "",
+            "AI_EMBEDDING_API_KEY": cfg.embedding_key or "",
+        }
+        chat_key, _src = _resolve_key(cfg.chat.provider, mapping, cfg.chat_key or "")
+        emb_key = (cfg.embedding_key or chat_key or "").strip()
+        checks = []
+
+        if not cfg.chat.api_base:
+            checks.append({"name": "configured", "ok": False, "required": True,
+                           "detail": "no api_base supplied"})
+            return checks
+
+        timeout = max(5.0, min(float(cfg.latency_budget_ms) / 1000.0, 60.0))
+        status, data, ms, err = self._llm_http_call(
+            cfg.chat.api_base.rstrip("/") + "/models", None, chat_key, timeout)
+        checks.append({
+            "name": "models", "ok": status == 200, "required": False,
+            "status": status, "elapsed_ms": ms,
+            "detail": err or ", ".join(
+                str(m.get("id")) for m in (data or {}).get("data", [])[:6] if isinstance(m, dict))
+            or ("HTTP %d" % status),
+        })
+
+        status, data, ms, err = self._llm_http_call(
+            cfg.chat.api_base.rstrip("/") + "/chat/completions",
+            {
+                "model": cfg.chat.model,
+                "messages": [{"role": "user",
+                              "content": prompt or "Reply with the single word: ready"}],
+                "max_tokens": 64,
+                "temperature": 0.1,
+                "stream": False,
+            },
+            chat_key, timeout)
+        reply = ""
+        try:
+            reply = data["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError, TypeError):
+            reply = ""
+        checks.append({
+            "name": "chat", "ok": status == 200 and bool(reply), "required": True,
+            "status": status, "elapsed_ms": ms,
+            "detail": err or reply[:300] or ("HTTP %d, empty reply" % status),
+        })
+
+        if cfg.embedding and cfg.embedding.api_base:
+            status, data, ms, err = self._llm_http_call(
+                cfg.embedding.api_base.rstrip("/") + "/embeddings",
+                {"model": cfg.embedding.model, "input": ["connectivity probe"]},
+                emb_key, timeout)
+            dims = sorted({len(i.get("embedding") or [])
+                           for i in (data or {}).get("data", []) if isinstance(i, dict)})
+            detail = err or ("dimension %s" % dims if dims else "HTTP %d" % status)
+            ok = status == 200 and len(dims) == 1
+            # A dimension that disagrees with the pgvector column is a warning,
+            # not a failure - the operator may intend to reindex.
+            checks.append({
+                "name": "embeddings", "ok": ok, "required": False,
+                "status": status, "elapsed_ms": ms, "detail": detail,
+                "dimension": dims[0] if len(dims) == 1 else None,
+            })
+        return checks
+
+    def _llm_provider_state(self, env):
+        """Current configuration, with the key reduced to a fingerprint.
+
+        Deliberately NOT passed through scrub_public_text(). That firewall is
+        correct for assistant output reaching an end user, but it rewrites
+        exactly the strings this screen exists to show: it turns
+        "http://127.0.0.1:8000/v1" into "http://the service host/v1" and
+        "Local vLLM" into "Local the configured AI service". An operator
+        configuring an endpoint has to be able to read back what they typed,
+        verbatim, or they cannot tell a typo from a working value. The route
+        is behind _require_privileged(), and the one genuinely sensitive field
+        - the key - is still reduced to a fingerprint and never returned.
+        """
+        from odoo.addons.ai_gateway.models.llm_api_config import _redact
+        Providers = env["llm.provider"].sudo().with_context(active_test=False)
+        active = Providers.search([("active", "=", True)], order="id")
+        inactive = Providers.search([("active", "=", False)], order="id")
+        assistant = env["llm.assistant"].sudo().search(
+            [("name", "=", "Company Assistant")], limit=1) if "llm.assistant" in env else None
+
+        def _prov(p):
+            return {
+                "id": p.id,
+                "name": p.name,
+                "service": p.service,
+                "api_base": p.api_base or "",
+                "key_fingerprint": _redact(p.api_key or ""),
+                "has_key": bool(p.api_key),
+                "active": p.active,
+                "models": [m.name for m in p.model_ids],
+            }
+
+        profiles = []
+        if "ai.model.profile" in env:
+            for pr in env["ai.model.profile"].sudo().with_context(active_test=False).search([], order="priority"):
+                profiles.append({
+                    "name": pr.name,
+                    "purpose": pr.purpose,
+                    "provider": pr.provider or "",
+                    "model_id": pr.model_id or "",
+                    "production": pr.production,
+                    "health_state": pr.health_state,
+                    "active": pr.active,
+                    "latency_ms": pr.latency_ms,
+                })
+        return {
+            "providers": [_prov(p) for p in active],
+            "inactive_providers": [_prov(p) for p in inactive],
+            "assistant": {
+                "name": assistant.name,
+                "provider": assistant.provider_id.name if assistant.provider_id else None,
+                "model": assistant.model_id.name if assistant.model_id else None,
+            } if assistant else None,
+            "model_profiles": profiles,
+            "known_providers": [
+                {"id": pid, "label": spec.get("label") or pid,
+                 "base": spec.get("base") or "",
+                 "default_model": spec.get("default_chat_model") or "",
+                 "supports_embeddings": bool(spec.get("supports_embeddings"))}
+                for pid, spec in __import__(
+                    "odoo.addons.ai_gateway.models.llm_api_config",
+                    fromlist=["PROVIDERS"]).PROVIDERS.items()
+            ],
+        }
+
+    def _admin_llm_provider_save(self, env):
+        payload, err = _read_json_body()
+        if err:
+            return err
+        cfg = self._llm_config_from_payload(payload)
+        if not cfg.chat.api_base:
+            return _json_response({"error": "api_base is required"}, status=400)
+
+        checks = []
+        if payload.get("test", True):
+            checks = self._llm_probe(cfg, prompt=payload.get("test_prompt") or "")
+            if not all(c["ok"] for c in checks if c["required"]):
+                return _json_response({
+                    "error": "the provider did not answer correctly; nothing was saved",
+                    "checks": checks,
+                    "config": cfg.describe(),
+                }, status=422)
+
+        provider_name = "AI API (%s)" % cfg.chat.label
+        provider = env["llm.provider"].sudo().with_context(active_test=False).search(
+            [("name", "=", provider_name)], limit=1)
+        if not provider:
+            provider = env["llm.provider"].sudo().create({
+                "name": provider_name,
+                "service": cfg.chat.service,
+                "api_base": cfg.chat.api_base,
+            })
+        else:
+            provider.write({"service": cfg.chat.service, "api_base": cfg.chat.api_base})
+        provider.active = True
+        if cfg.chat_key:
+            provider.api_key = cfg.chat_key
+
+        # Retire loopback providers so the assistant cannot silently fall back
+        # to a dead local endpoint. Deactivate, never delete - reversible.
+        #
+        # `keep` must exclude the records this call is about to reuse. Without
+        # it the embedding provider (api_base on 127.0.0.1:8002) matched the
+        # loopback filter, got deactivated here, and the search below - which
+        # skips inactive records by default - then failed to find it and
+        # created a duplicate row on every save.
+        emb_provider_name = "AI API embeddings (%s)" % cfg.embedding.label
+        keep_names = [provider_name, emb_provider_name]
+        for old in env["llm.provider"].sudo().search([
+                ("id", "!=", provider.id), ("active", "=", True),
+                ("name", "not in", keep_names),
+                "|", ("api_base", "ilike", "127.0.0.1:800"),
+                     ("api_base", "ilike", "localhost:800")]):
+            old.active = False
+
+        def _ensure_model(name, use, prov, key=None):
+            model = env["llm.model"].sudo().search(
+                [("name", "=", name)], limit=1)
+            if not model:
+                model = env["llm.model"].sudo().create(
+                    {"name": name, "model_use": use, "provider_id": prov.id})
+            else:
+                model.provider_id = prov.id
+            model.active = True
+            if key:
+                prov.api_key = key
+            return model
+
+        chat_model = _ensure_model(cfg.chat.model, "chat", provider)
+
+        emb_model = None
+        if cfg.embedding and cfg.embedding.model:
+            if (cfg.embedding.api_base != cfg.chat.api_base
+                    or cfg.embedding.provider != cfg.chat.provider):
+                # active_test=False: this record is routinely toggled off by
+                # the clear route, and a search that ignored inactive rows
+                # would create a second provider with the same name.
+                emb_prov = env["llm.provider"].sudo().with_context(active_test=False).search(
+                    [("name", "=", emb_provider_name)], limit=1)
+                if not emb_prov:
+                    emb_prov = env["llm.provider"].sudo().create({
+                        "name": emb_provider_name, "service": "openai",
+                        "api_base": cfg.embedding.api_base,
+                    })
+                else:
+                    emb_prov.api_base = cfg.embedding.api_base
+                emb_prov.active = True
+                emb_model = _ensure_model(
+                    cfg.embedding.model, "embedding", emb_prov,
+                    key=(cfg.embedding_key or cfg.chat_key or "").strip() or None)
+            else:
+                emb_model = _ensure_model(
+                    cfg.embedding.model, "embedding", provider,
+                    key=(cfg.embedding_key or cfg.chat_key or "").strip() or None)
+
+        assistant = env["llm.assistant"].sudo().search(
+            [("name", "=", "Company Assistant")], limit=1) if "llm.assistant" in env else None
+        if assistant:
+            assistant.write({"provider_id": provider.id, "model_id": chat_model.id})
+
+        if "ai.model.profile" in env:
+            wanted = {"AI API chat": {
+                "purpose": "chat", "provider": cfg.chat.provider,
+                "endpoint": cfg.chat.api_base, "model_id": cfg.chat.model,
+                "latency_ms": float(cfg.latency_budget_ms),
+                "max_new_tokens": cfg.max_output_tokens,
+                "security_score": 0.9, "benchmark_score": 0.9,
+                "tool_calling_score": 0.85,
+                "supports_streaming": True, "supports_tools": True,
+            }}
+            if emb_model is not None:
+                wanted["AI API embedding"] = {
+                    "purpose": "embedding", "provider": cfg.embedding.provider,
+                    "endpoint": cfg.embedding.api_base, "model_id": cfg.embedding.model,
+                    "latency_ms": 1000.0, "security_score": 0.9, "benchmark_score": 0.85,
+                }
+            for pname, vals in wanted.items():
+                # active_test=False is required, not a nicety: the clear route
+                # deactivates these rows, and a search that skipped inactive
+                # records would fall through to create() and hit the
+                # (name, purpose) unique constraint on the very next save.
+                prof = env["ai.model.profile"].sudo().with_context(active_test=False).search(
+                    [("name", "=", pname)], limit=1)
+                updates = dict(vals, active=True, production=True, health_state="healthy")
+                if not prof:
+                    env["ai.model.profile"].sudo().create(dict({"name": pname}, **updates))
+                elif prof.read(list(updates.keys()))[0] != updates:
+                    prof.write(updates)
+
+        _audit(env, env.user.id, "admin_api", "llm_provider_saved", {
+            "provider": provider_name,
+            "model": cfg.chat.model,
+            "key_changed": bool(cfg.chat_key),
+        })
+        env.cr.commit()
+        return _json_response({
+            "saved": True,
+            "checks": checks,
+            "config": cfg.describe(),
+            "state": self._llm_provider_state(env),
+        })
+
+    def _admin_llm_provider_clear(self, env):
+        """Remove the manually entered key and reactivate the previous provider.
+
+        This is the "take it back out" half of the feature. It clears the
+        stored key and flips the loopback providers back on, so the appliance
+        returns to whatever it was doing before the experiment instead of
+        being left pointing at a provider with no credentials.
+        """
+        cleared = []
+        for p in env["llm.provider"].sudo().search([
+                ("name", "like", "AI API"), ("active", "=", True)]):
+            p.api_key = False
+            p.active = False
+            cleared.append(p.name)
+        restored = []
+        for p in env["llm.provider"].sudo().with_context(active_test=False).search([
+                ("active", "=", False), ("name", "not like", "AI API")]):
+            p.active = True
+            restored.append(p.name)
+        # Re-bind the assistant to whatever is active again.
+        if "llm.assistant" in env:
+            assistant = env["llm.assistant"].sudo().search(
+                [("name", "=", "Company Assistant")], limit=1)
+            fallback = env["llm.provider"].sudo().with_context(active_test=False).search(
+                [("active", "=", True)], limit=1)
+            if assistant and fallback:
+                model = env["llm.model"].sudo().with_context(active_test=False).search(
+                    [("provider_id", "=", fallback.id), ("model_use", "=", "chat")], limit=1)
+                if model:
+                    assistant.write({"provider_id": fallback.id, "model_id": model.id})
+        if "ai.model.profile" in env:
+            Profiles = env["ai.model.profile"].sudo().with_context(active_test=False)
+            for pr in Profiles.search([("name", "like", "AI API")]):
+                pr.active = False
+            for pr in Profiles.search([("name", "not like", "AI API"), ("active", "=", False)]):
+                pr.active = True
+        _audit(env, env.user.id, "admin_api", "llm_provider_cleared",
+               {"cleared": cleared, "restored": restored})
+        env.cr.commit()
+        return _json_response({
+            "cleared": cleared, "restored": restored,
+            "state": self._llm_provider_state(env),
+        })
+
+    # ------------------------------------------------------------
     # Customer configuration profiles. These routes expose the existing
     # versioned/compiled profile model through a structured contract; the
     # browser cannot write arbitrary ORM fields or activate an uncompiled

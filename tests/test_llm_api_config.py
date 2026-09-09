@@ -236,5 +236,66 @@ class LoadConfigTests(unittest.TestCase):
         self.assertIn("has_key", blob)
 
 
+class TestResolvedKeysNeverLeak(unittest.TestCase):
+    """`chat_key`/`embedding_key` are for the HTTP client, never for logs or the API."""
+
+    def test_keys_never_appear_in_any_debug_repr(self):
+        cfg = load_config({
+            "AI_LLM_API_BASE": "https://api.openai.com/v1",
+            "AI_LLM_API_KEY": "sk-chat-secret-1234567890",
+            "AI_EMBEDDING_API_BASE": "https://api.openai.com/v1",
+            "AI_EMBEDDING_API_KEY": "sk-emb-secret-abcdef12",
+        })
+        blob = (repr(cfg) + repr(cfg.chat) + repr(cfg.embedding)
+                + str(cfg.describe()) + str(cfg.chat.describe())
+                + str(cfg.embedding.describe()))
+        self.assertNotIn("sk-chat-secret-1234567890", blob)
+        self.assertNotIn("sk-emb-secret-abcdef12", blob)
+        # ...but they stay readable for the code that has to authenticate
+        self.assertEqual(cfg.chat_key, "sk-chat-secret-1234567890")
+        self.assertEqual(cfg.embedding_key, "sk-emb-secret-abcdef12")
+
+    def test_chat_and_embedding_keys_stay_independent(self):
+        cfg = load_config({
+            "AI_LLM_API_BASE": "https://api.groq.com/openai/v1",
+            "AI_LLM_API_KEY": "gsk_chat_1234567890",
+            "AI_EMBEDDING_API_BASE": "https://api.openai.com/v1",
+            "AI_EMBEDDING_API_KEY": "sk_emb_1234567890",
+        })
+        self.assertEqual(cfg.chat_key, "gsk_chat_1234567890")
+        self.assertEqual(cfg.embedding_key, "sk_emb_1234567890")
+        self.assertEqual(cfg.chat.provider, "groq")
+        self.assertEqual(cfg.chat.api_base, "https://api.groq.com/openai/v1")
+
+    def test_embedding_key_falls_back_to_the_chat_key(self):
+        cfg = load_config({
+            "AI_LLM_API_BASE": "https://api.openai.com/v1",
+            "AI_LLM_API_KEY": "sk_shared_1234567890",
+            "AI_EMBEDDING_API_BASE": "https://api.openai.com/v1",
+        })
+        self.assertEqual(cfg.embedding_key, "sk_shared_1234567890")
+
+    def test_friendly_alias_names_from_the_admin_ui(self):
+        """The controller maps api_base/api_key/model onto the env names."""
+        cfg = load_config({
+            "AI_LLM_API_BASE": "https://api.groq.com/openai/v1/chat/completions",
+            "AI_LLM_API_KEY": "gsk_alias1234567890",
+            "AI_LLM_MODEL": "llama-3.3-70b-versatile",
+            "AI_EMBEDDING_API_BASE": "https://api.openai.com/v1/embeddings",
+            "AI_EMBEDDING_API_KEY": "sk_emb_alias123456",
+            "AI_EMBEDDING_MODEL": "text-embedding-3-large",
+            "AI_EMBEDDING_DIM": "3072",
+        })
+        self.assertEqual(cfg.chat.api_base, "https://api.groq.com/openai/v1")
+        self.assertTrue(cfg.chat.has_key)
+        self.assertEqual(cfg.chat_key, "gsk_alias1234567890")
+        self.assertEqual(cfg.chat.provider, "groq")
+        self.assertEqual(cfg.embedding.api_base, "https://api.openai.com/v1")
+        self.assertTrue(cfg.embedding.has_key)
+        self.assertEqual(cfg.embedding_key, "sk_emb_alias123456")
+        # the resolved endpoint keeps whatever model name the operator typed
+        self.assertEqual(cfg.embedding.model, "text-embedding-3-large")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

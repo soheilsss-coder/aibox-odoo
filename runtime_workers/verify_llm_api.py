@@ -29,6 +29,9 @@ import json
 import os
 import ssl
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.environ.get("AIBOX_RUNTIME_WORKERS_DIR",
+                                os.path.dirname(os.path.abspath(__file__))))
 import time
 import urllib.error
 import urllib.request

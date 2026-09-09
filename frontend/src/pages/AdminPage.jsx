@@ -17,7 +17,8 @@ import {
   adminRevokeScimToken, adminListScimGroups, adminCreateScimGroup,
   adminListDepartments, adminCreateDepartment,
   adminListRoleAssignments, adminCreateRoleAssignment, adminRevokeRoleAssignment,
-  adminGetModuleReadiness, ApiError,
+  adminGetModuleReadiness, adminGetLlmProvider, adminSaveLlmProvider,
+  adminTestLlmProvider, adminClearLlmProvider, ApiError,
 } from "../api/client.js";
 import {
   Card, Table, Badge, Button, Tabs, Alert, Spinner, EmptyState, Modal, Select, Input, TextArea,
@@ -43,6 +44,7 @@ const TABS = [
   { key: "roles", label: "نقش‌ها" },
   { key: "grants", label: "دسترسی موقت / تفویض" },
   { key: "documents", label: "اسناد" },
+  { key: "llm", label: "مدل زبانی" },
   { key: "agents", label: "ایجنت‌ها" },
   { key: "branding", label: "برندینگ" },
   { key: "observability", label: "مانیتورینگ" },
@@ -76,6 +78,7 @@ export default function AdminPage() {
       {tab === "roles" && <RolesTab />}
       {tab === "grants" && <GrantsTab />}
       {tab === "documents" && <DocumentsTab />}
+      {tab === "llm" && <LlmProviderTab />}
       {tab === "agents" && <AgentsTab />}
       {tab === "branding" && <BrandingTab />}
       {tab === "observability" && <ObservabilityTab />}
@@ -622,6 +625,172 @@ function DocumentsTab() {
 }
 
 // --- Agents / Tool Registry (#15/#17/#20) ---------------------------------
+// --- LLM provider --------------------------------------------------------
+// Manual, reversible entry of a hosted LLM API. Writes the same records the
+// seed script writes, through the same provider-detection code, so nothing
+// here is a second definition of "which vendor is this". The key is never
+// read back - the server returns only a 4+4 fingerprint.
+const LLM_PRESETS = [
+  { id: "openai", label: "OpenAI", base: "https://api.openai.com/v1", model: "gpt-4.1-mini", emb: true },
+  { id: "gemini", label: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-2.5-flash", emb: true },
+  { id: "groq", label: "Groq", base: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", emb: false },
+  { id: "openrouter", label: "OpenRouter", base: "https://openrouter.ai/api/v1", model: "openai/gpt-4.1-mini", emb: false },
+  { id: "anthropic", label: "Anthropic", base: "https://api.anthropic.com", model: "claude-3-5-haiku-latest", emb: false },
+  { id: "mistral", label: "Mistral", base: "https://api.mistral.ai/v1", model: "mistral-large-latest", emb: true },
+  { id: "deepseek", label: "DeepSeek", base: "https://api.deepseek.com/v1", model: "deepseek-chat", emb: false },
+  { id: "custom", label: "endpoint سازگار با OpenAI", base: "", model: "", emb: true },
+];
+
+function LlmProviderTab() {
+  const [state, error, refresh] = useLoad(() => adminGetLlmProvider(), []);
+  const [preset, setPreset] = useState("openai");
+  const [form, setForm] = useState({ api_base: "", api_key: "", model: "", embedding_api_base: "", embedding_api_key: "", embedding_model: "", embedding_dim: "" });
+  const [busy, setBusy] = useState("");
+  const [result, setResult] = useState(null);
+  const [formError, setFormError] = useState("");
+
+  function applyPreset(id) {
+    setPreset(id);
+    const p = LLM_PRESETS.find((x) => x.id === id);
+    if (!p) return;
+    setForm((f) => ({ ...f, api_base: p.base, model: p.model }));
+  }
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function run(fn, label) {
+    setBusy(label); setFormError(""); setResult(null);
+    try {
+      const payload = {};
+      Object.entries(form).forEach(([k, v]) => { if (String(v).trim()) payload[k] = String(v).trim(); });
+      payload.test = true;
+      const data = await fn(payload);
+      setResult(data);
+      if (data.state) refresh();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "خطا در ارتباط با سرور");
+      if (err instanceof ApiError && err.payload) setResult(err.payload);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function clearAll() {
+    setBusy("clear"); setFormError(""); setResult(null);
+    try {
+      const data = await adminClearLlmProvider();
+      setResult({ cleared: data.cleared, restored: data.restored, state: data.state });
+      refresh();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "خطا در حذف");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const active = (state && state.providers) || [];
+  const embeddingNeeded = !(LLM_PRESETS.find((x) => x.id === preset) || {}).emb;
+
+  return (
+    <div>
+      <Alert tone="info">
+        این بخش برای وارد کردن دستی کلید API است و <b>کاملاً قابل برگشت</b>: دکمهٔ «حذف» کلید را
+        پاک می‌کند و provider قبلی را دوباره فعال می‌کند. کلید هرگز به مرورگر برنمی‌گردد — فقط اثر
+        ۴+۴ کاراکتری آن.
+      </Alert>
+      {error && <Alert>{error}</Alert>}
+      {formError && <Alert>{formError}</Alert>}
+
+      <Card title="۱. ارائه‌دهنده">
+        <div className="ds-form-grid">
+          <label className="ds-label" htmlFor="llm-preset">انتخاب سریع</label>
+          <select id="llm-preset" className="ds-input" value={preset} onChange={(e) => applyPreset(e.target.value)}>
+            {LLM_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+        </div>
+        <p className="ds-hint">
+          آدرس به‌صورت خودکار نرمال می‌شود (مثلاً Gemini به <code>/v1beta/openai</code> بازنویسی
+          می‌شود، وگرنه ۴۰۴ می‌گیری). اگه آدرس اشتباه بدی، سرور درستش می‌کند و در نتیجه گزارش می‌دهد.
+        </p>
+      </Card>
+
+      <Card title="۲. مشخصات چت">
+        <div className="ds-form-grid">
+          <Input label="آدرس API (base URL)" name="llm-api-base" dir="ltr" value={form.api_base} onChange={set("api_base")} placeholder="https://api.openai.com/v1" />
+          <Input label="کلید API" name="llm-api-key" dir="ltr" type="password" autoComplete="off" value={form.api_key} onChange={set("api_key")} placeholder="sk-..." />
+          <Input label="نام مدل" name="llm-model" dir="ltr" value={form.model} onChange={set("model")} placeholder="gpt-4.1-mini" />
+        </div>
+      </Card>
+
+      <Card title="۳. Embedding (برای جست‌وجوی معنایی اسناد)">
+        {embeddingNeeded && (
+          <Alert tone="info">
+            این ارائه‌دهنده <code>/v1/embeddings</code> ندارد. اگر این بخش را خالی بگذاری، RAG موقع
+            ایندکس کردن سند خطا می‌دهد — نه موقع نصب. یک endpoint دارای embedding وارد کن.
+          </Alert>
+        )}
+        <div className="ds-form-grid">
+          <Input label="آدرس embedding" name="llm-emb-base" dir="ltr" value={form.embedding_api_base} onChange={set("embedding_api_base")} placeholder="https://api.openai.com/v1" />
+          <Input label="کلید embedding (اگر خالی، کلید چت)" name="llm-emb-key" dir="ltr" type="password" autoComplete="off" value={form.embedding_api_key} onChange={set("embedding_api_key")} />
+          <Input label="مدل embedding" name="llm-emb-model" dir="ltr" value={form.embedding_model} onChange={set("embedding_model")} placeholder="text-embedding-3-small" />
+          <Input label="بعد بردار (AI_EMBEDDING_DIM)" name="llm-emb-dim" dir="ltr" value={form.embedding_dim} onChange={set("embedding_dim")} placeholder="1536" />
+        </div>
+      </Card>
+
+      <Card title="۴. اجرا" actions={
+        <>
+          <Button variant="ghost" size="sm" loading={busy === "test"} disabled={!!busy} onClick={() => run(adminTestLlmProvider, "test")}>فقط تست (ذخیره نمی‌شود)</Button>
+          <Button size="sm" loading={busy === "save"} disabled={!!busy} onClick={() => run(adminSaveLlmProvider, "save")}>تست و ذخیره</Button>
+          <Button variant="danger" size="sm" loading={busy === "clear"} disabled={!!busy} onClick={clearAll}>حذف کلید و بازگشت</Button>
+        </>
+      }>
+        {result && result.checks && result.checks.length > 0 && (
+          <Table
+            columns={[
+              { key: "ok", header: "نتیجه", render: (c) => <Badge tone={c.ok ? "success" : c.required ? "danger" : "warning"}>{c.ok ? "PASS" : "FAIL"}</Badge> },
+              { key: "name", header: "مرحله", render: (c) => `${c.name}${c.required ? "" : " (اختیاری)"}` },
+              { key: "status", header: "وضعیت", render: (c) => (c.status ? `HTTP ${c.status}` : "—") },
+              { key: "elapsed_ms", header: "زمان", render: (c) => (c.elapsed_ms != null ? `${c.elapsed_ms} ms` : "—") },
+              { key: "detail", header: "خروجی", render: (c) => <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{c.detail}</span> },
+            ]}
+            rows={result.checks}
+          />
+        )}
+        {result && result.config && (
+          <div className="ds-hint" style={{ direction: "ltr", textAlign: "left", whiteSpace: "pre-wrap" }}>
+            {JSON.stringify(result.config, null, 2)}
+          </div>
+        )}
+        {result && result.cleared && (
+          <Alert tone="success">
+            حذف شد: {(result.cleared || []).join("، ") || "—"} · بازگشت: {(result.restored || []).join("، ") || "—"}
+          </Alert>
+        )}
+        {!result && !busy && <p className="ds-hint">هنوز تستی اجرا نشده.</p>}
+      </Card>
+
+      <Card title="وضعیت فعلی">
+        {state && state.providers && state.providers.length === 0 && <p className="ds-hint">هیچ provider فعالی نیست.</p>}
+        <Table
+          columns={[
+            { key: "name", header: "نام" },
+            { key: "service", header: "سرویس" },
+            { key: "api_base", header: "آدرس", render: (p) => <span dir="ltr" style={{ fontSize: 12 }}>{p.api_base}</span> },
+            { key: "key_fingerprint", header: "کلید", render: (p) => <span dir="ltr">{p.key_fingerprint || "—"}</span> },
+            { key: "models", header: "مدل‌ها", render: (p) => (p.models || []).join("، ") },
+          ]}
+          rows={active}
+        />
+        {state && state.assistant && (
+          <p className="ds-hint">
+            دستیار «{state.assistant.name}» → provider: {state.assistant.provider || "—"} · مدل: {state.assistant.model || "—"}
+          </p>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 function AgentsTab() {
   const [data, error] = useLoad(adminListAgents, []);
   const RISK_TONE = (level) => (level >= 4 ? "danger" : level >= 2 ? "warning" : "neutral");

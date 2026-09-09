@@ -73,7 +73,10 @@ export function setApiKey(_key) {}
 export function clearApiKey() {}
 
 export class ApiError extends Error {
-  constructor(message, status) { super(message); this.status = status; }
+  // `payload` keeps the full response body: /api/admin/llm-provider answers a
+  // failed provider test with 422 + the per-check detail, and that detail is
+  // the entire point of the screen.
+  constructor(message, status, payload) { super(message); this.status = status; this.payload = payload; }
 }
 
 async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
@@ -87,7 +90,7 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
   const resp = await fetch(apiUrl(path), { method, headers, body: fetchBody, credentials: "include" });
   let data = rememberSession(await resp.json().catch(() => ({})));
   if (data && data.jsonrpc) data = data.result || {};
-  if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status);
+  if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status, data);
   return data;
 }
 
@@ -125,6 +128,10 @@ export const adminCompileConfigurationProfile = (id) => request(`/api/admin/conf
 export const adminActivateConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/activate`, { method: "POST" });
 export const adminArchiveConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/archive`, { method: "POST" });
 export const adminDryRunConfigurationProfile = (id) => request(`/api/admin/configuration-profiles/${id}/dry-run`, { method: "POST" });
+export const adminGetLlmProvider = () => request("/api/admin/llm-provider");
+export const adminSaveLlmProvider = (payload) => request("/api/admin/llm-provider", { method: "POST", body: payload });
+export const adminTestLlmProvider = (payload) => request("/api/admin/llm-provider/test", { method: "POST", body: payload });
+export const adminClearLlmProvider = () => request("/api/admin/llm-provider", { method: "DELETE" });
 export const adminGetSetupChecklist = () => request("/api/admin/setup/checklist");
 export const adminRunSetupChecklist = () => request("/api/admin/setup/checklist/run", { method: "POST" });
 export const adminListSetupRuns = () => request("/api/admin/setup/runs");

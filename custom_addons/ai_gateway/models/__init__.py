@@ -12,3 +12,4 @@ from . import personal_thread
 
 from . import chat_queue
 from . import inference_config
+from . import llm_api_config
