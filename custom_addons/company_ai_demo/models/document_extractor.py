@@ -16,6 +16,7 @@ import mimetypes
 import os
 import re
 import tempfile
+import warnings
 from importlib import metadata as importlib_metadata
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
@@ -23,6 +24,15 @@ from pathlib import Path
 from threading import Lock
 
 _logger = logging.getLogger(__name__)
+
+# PyMuPDF/RapidOCR may import SWIG extension types that still emit
+# Python 3.12 DeprecationWarning messages during Odoo registry loading.
+# They are third-party compatibility noise, not actionable product warnings.
+warnings.filterwarnings(
+    "ignore",
+    message=r"builtin type (SwigPyPacked|SwigPyObject|swigvarlink) has no __module__ attribute",
+    category=DeprecationWarning,
+)
 
 # Unstructured's optional telemetry is enabled by default in recent releases.
 # The appliance is explicitly local/on-prem, so disable analytics before any

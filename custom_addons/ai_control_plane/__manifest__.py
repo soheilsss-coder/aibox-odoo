@@ -1,6 +1,6 @@
 {
     "name": "AI Control Plane",
-    "version": "18.0.6.0.0",
+    "version": "18.0.6.1.0",
     "summary": "Central capabilities, authorization metadata, module discovery and durable domain events",
     "category": "Technical",
     "depends": ["base", "mail", "ai_gateway", "ai_business_tools"],

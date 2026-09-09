@@ -10,7 +10,7 @@
         <field name="login">ai-automation@service.local</field>
         <field name="email">ai-automation@service.local</field>
         <field name="active">True</field>
-        <field name="groups_id" eval="[(6, 0, [ref('base.group_user')])]"/>
+        <field name="groups_id" eval="[(6, 0, [ref('base.group_user'), ref('group_ai_automation_service')])]"/>
     </record>
 
     <record id="cron_notify_overdue_tasks" model="ir.cron">

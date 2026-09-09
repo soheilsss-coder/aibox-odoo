@@ -71,6 +71,12 @@ class LLMToolGenericRead(models.Model):
 
     @llm_tool(read_only_hint=True)
     def generic_read(self, model: str, fields: str = "", domain: str = "[]", limit: int = 20) -> dict:
+        """Read a small safe-field projection from a discovered model.
+
+        This is an administrator-only fallback for modules without a reviewed
+        adapter. It rejects relation traversal and sensitive field names before
+        using Odoo record rules to read bounded rows.
+        """
         if not model or model not in self.env:
             return {"error": "unknown_model"}
         Model = self.env[model]

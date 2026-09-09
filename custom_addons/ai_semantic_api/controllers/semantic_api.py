@@ -292,6 +292,7 @@ class AiSemanticApiController(http.Controller):
         if not login_id or not password:
             return _json_response({"error": "login and password are both required"}, status=400)
 
+        mfa_required = False
         try:
             # Odoo 18's low-level Session.authenticate accepts a single
             # credential dict and returns an auth_info mapping. Older releases
@@ -301,12 +302,19 @@ class AiSemanticApiController(http.Controller):
             credential = {"login": login_id, "password": password, "type": "password"}
             try:
                 auth_info = request.session.authenticate(request.db, credential)
-                uid = auth_info.get("uid") if isinstance(auth_info, dict) else request.session.uid
+                if isinstance(auth_info, dict):
+                    uid = request.session.uid
+                    mfa_required = bool(auth_info.get("uid") and auth_info.get("uid") != uid)
+                else:
+                    uid = request.session.uid
             except TypeError:
                 uid = request.session.authenticate(request.db, login_id, password)
         except AccessDenied:
             uid = False
 
+        if mfa_required:
+            request.session.logout(keep_db=True)
+            return _json_response({"error": "multi-factor authentication is required for this account"}, status=403)
         if not uid:
             _record_auth_failure(ip)
             return _json_response({"error": "invalid email or password"}, status=401)

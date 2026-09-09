@@ -27,6 +27,12 @@ class LLMToolAgentMemory(models.Model):
 
     @llm_tool(destructive_hint=True)
     def save_memory(self, key: str, value: str, scope: str = "personal") -> dict:
+        """Save a user-approved memory value in personal, department or company scope.
+
+        The write is audited and still goes through the execution gate; invalid
+        scopes fall back to personal so the assistant cannot widen access by
+        inventing a scope name.
+        """
         if "ai.gateway.tool.risk" in self.env:
             self.env["ai.gateway.execution.gate"].authorize("save_memory")
         if scope not in ("personal", "department", "company"):
@@ -137,6 +143,11 @@ class LLMToolAgentMemory(models.Model):
 
     @llm_tool(read_only_hint=True)
     def recall_memory(self, query: str = "") -> dict:
+        """Return visible legacy memory records, optionally filtered by text query.
+
+        Results are restricted by the memory model's user/company/department
+        visibility rules before any decrypted value is returned to the model.
+        """
         Memory = self.env["ai.agent.memory.record"]
         # The common no-query path reads only the newest ten records. A
         # bounded scan is used for encrypted-value search so a runaway memory

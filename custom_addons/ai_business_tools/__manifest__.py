@@ -1,6 +1,6 @@
 {
     "name": "AI Business Tools",
-    "version": "18.0.1.7.0",
+    "version": "18.0.1.8.0",
     "summary": "Named, audited, role-safe LLM tools for leave approval, task "
                 "delegation and role-scoped documents - replaces generic "
                 "unrestricted ORM tools with explicit business actions",

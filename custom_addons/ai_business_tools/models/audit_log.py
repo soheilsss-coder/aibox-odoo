@@ -60,7 +60,7 @@ class AiGatewayAuditLog(models.Model):
     request_id = fields.Char(index=True)
     trace_id = fields.Char(index=True)
     tenant_id = fields.Many2one("res.company", index=True, ondelete="restrict")
-    agent_id = fields.Many2one("ai.agent", index=True, ondelete="set null")
+    agent_id = fields.Many2one("ai.gateway.agent.identity", index=True, ondelete="set null")
     tool_id = fields.Many2one("llm.tool", index=True, ondelete="set null")
     policy_id = fields.Many2one("ai.control.policy", index=True, ondelete="set null")
     model_version = fields.Char(index=True)
