@@ -283,6 +283,9 @@ install_or_update_modules() {
   export AI_GATEWAY_ALLOWED_ORIGIN="${AI_GATEWAY_ALLOWED_ORIGIN:-https://example.invalid}"
   export AI_GATEWAY_COOKIE_SECURE="${AI_GATEWAY_COOKIE_SECURE:-1}"
   export AI_GATEWAY_COOKIE_SAMESITE="${AI_GATEWAY_COOKIE_SAMESITE:-None}"
+  if [[ "${AI_GATEWAY_ALLOWED_ORIGIN:-}" == https://*.trycloudflare.com || "${AIBOX_QUICK_TUNNEL:-0}" = "1" ]]; then
+    export AI_GATEWAY_ALLOW_TRYCLOUDFLARE="1"
+  fi
   export AI_GATEWAY_REDIS_URL="redis://127.0.0.1:${REDIS_PORT}/0"
   export AI_MEMORY_ENCRYPTION_KEY
   export AI_VLLM_CHAT_API_BASE
@@ -357,6 +360,9 @@ cmd_serve_odoo() {
   export AI_GATEWAY_ALLOWED_ORIGIN="$origin"
   export AI_GATEWAY_COOKIE_SECURE="1"
   export AI_GATEWAY_COOKIE_SAMESITE="None"
+  if [[ "$origin" == https://*.trycloudflare.com || "${AIBOX_QUICK_TUNNEL:-0}" = "1" ]]; then
+    export AI_GATEWAY_ALLOW_TRYCLOUDFLARE="1"
+  fi
   export AI_GATEWAY_REDIS_URL="redis://127.0.0.1:${REDIS_PORT}/0"
   export AI_MEMORY_ENCRYPTION_KEY
   export AI_VLLM_CHAT_API_BASE="http://127.0.0.1:8000/v1"

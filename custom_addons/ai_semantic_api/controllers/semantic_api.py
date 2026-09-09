@@ -49,7 +49,7 @@ from odoo.addons.ai_gateway.controllers.gateway import (
     _client_ip,
     _auth_fail_blocked,
     _record_auth_failure,
-    _CORS_HEADERS,
+    _cors_headers,
 )
 from odoo.addons.ai_gateway.controllers.file_policy import validate_upload, MAX_UPLOAD_BYTES
 from odoo.addons.ai_gateway.controllers.output_firewall import scrub_public_text
@@ -830,7 +830,7 @@ class AiSemanticApiController(http.Controller):
             headers=[
                 ("Content-Type", upload["mimetype"]),
                 ("Content-Disposition", "inline; filename*=UTF-8''%s" % _quote_filename(filename)),
-            ] + _CORS_HEADERS,
+            ] + _cors_headers(),
             status=200,
         )
 
@@ -2231,7 +2231,7 @@ class AiSemanticApiController(http.Controller):
                 ("Content-Type", mimetype),
                 ("Content-Disposition", "inline"),
                 ("Cache-Control", "private, max-age=0, must-revalidate"),
-            ] + _CORS_HEADERS,
+            ] + _cors_headers(),
             status=200,
         )
 
