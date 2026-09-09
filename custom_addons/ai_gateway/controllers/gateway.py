@@ -84,7 +84,6 @@ def _scoped_user_env(user):
         context={
             "lang": user.lang,
             "allowed_company_ids": [user.company_id.id],
-            "force_company": user.company_id.id,
         },
     )
 

@@ -31,6 +31,7 @@ MAX_MODEL_LEN = int(os.environ.get("AI_VLLM_MAX_MODEL_LEN", "32768"))
 tokenizer = None
 model = None
 _gen_lock = threading.Lock()
+_TEMPLATE_NO_THINK = False
 
 app = FastAPI(title="AIBOX Local Chat (CPU transformers)")
 app.add_middleware(
@@ -67,10 +68,18 @@ class EmbeddingRequest(BaseModel):
 
 
 def _app_init():
-    global tokenizer, model
+    global tokenizer, model, _TEMPLATE_NO_THINK
+    torch.set_num_threads(int(os.environ.get("AI_VLLM_NUM_THREADS", "20")))
     started = time.time()
     print(f"CHAT_SERVER loading model {MODEL_PATH}", flush=True)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+    # Qwen3 instruct enables a long "thinking" preamble by default.  On a CPU
+    # box that means hundreds of tokens of chain-of-thought before every answer
+    # (minutes of wall time).  When the deployed template supports it, force
+    # direct answers; the model is still the exact same weights.
+    _TEMPLATE_NO_THINK = isinstance(tokenizer.chat_template, str) and "enable_thinking" in tokenizer.chat_template
+    if _TEMPLATE_NO_THINK:
+        print("CHAT_SERVER thinking disabled via enable_thinking=False", flush=True)
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_PATH,
         trust_remote_code=True,
@@ -152,10 +161,14 @@ def _generate(payload: ChatRequest):
     msgs = [{"role": m.role, "content": m.content or ""} for m in payload.messages]
     tools = payload.tools
     kwargs = {}
+    template_kwargs = {}
     if tools:
         kwargs["tools"] = tools
+    if _TEMPLATE_NO_THINK:
+        template_kwargs["enable_thinking"] = False
     prompt = tokenizer.apply_chat_template(
-        msgs, tokenize=False, add_generation_prompt=True, **kwargs
+        msgs, tokenize=False, add_generation_prompt=True,
+        chat_template_kwargs=template_kwargs, **kwargs,
     )
     inputs = tokenizer(prompt, return_tensors="pt")
     ids_len = inputs["input_ids"].shape[1]

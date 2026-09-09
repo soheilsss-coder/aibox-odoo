@@ -61,8 +61,34 @@ class AiGatewaySession(models.Model):
                 rec.csrf_token_hash or "", _hash(csrf_token)
             ):
                 return self.browse()
-        rec.sudo().write({"last_seen_at": fields.Datetime.now()})
+        self._touch(rec)
         return rec
+
+    @api.model
+    def _touch(self, rec):
+        """Refresh the session heartbeat cheaply and safely.
+
+        The browser fires several API calls per keystroke/poll in parallel, so
+        many threads race on the *same* session row.  An ORM ``write`` on a
+        single record compiles to ``UPDATE ... FROM (VALUES ...)`` and, under a
+        concurrent update of the same row, PostgreSQL raises a serialization
+        failure (EvalPlanQual cannot re-evaluate the self-join), which Odoo
+        retries up to 4 times with backoff -- turning every request into a
+        multi-second stall.  Use a plain single-statement UPDATE (which simply
+        queues behind the row lock) and throttle it to once per 30s so the
+        heartbeat never contends.
+        """
+        now = fields.Datetime.now()
+        last = rec.last_seen_at
+        if last and fields.Datetime.from_string(last) >= fields.Datetime.add(now, minutes=-0.5):
+            return
+        rec.invalidate_recordset(["last_seen_at"])
+        rec.env.cr.execute(
+            "UPDATE ai_gateway_session SET last_seen_at = now() WHERE id = %s",
+            [rec.id],
+        )
+        rec.invalidate_recordset(["last_seen_at"])
+        rec.last_seen_at = now
 
     @api.model
     def rotate(self, token, user_agent=None, ttl_hours=8):
