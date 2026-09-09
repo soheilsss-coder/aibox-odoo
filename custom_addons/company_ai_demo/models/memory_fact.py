@@ -18,7 +18,10 @@ from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
 _logger = logging.getLogger(__name__)
-FACT_EMBEDDING_DIM = 1024
+try:
+    FACT_EMBEDDING_DIM = max(64, int(os.getenv("AI_RAG_EMBEDDING_DIM", "1024")))
+except (TypeError, ValueError):
+    FACT_EMBEDDING_DIM = 1024
 FACT_INDEX_VERSION = os.getenv("AI_RAG_INDEX_VERSION", "rag-v1")
 FACT_EMBEDDING_REVISION = os.getenv(
     "AI_VLLM_EMBEDDING_REVISION",

@@ -7,7 +7,19 @@ is returned by these helpers; they are internal routing inputs only.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+
+
+def _env_budget(default):
+    """Allow ops to tune the request latency budget for their inference
+    hardware. The stock defaults assume a fast accelerator; a CPU-served
+    deployment needs a much larger window or every route call fails the
+    benchmark gate and no model is ever routable."""
+    try:
+        return max(100, min(int(os.environ.get("AI_INFERENCE_LATENCY_BUDGET_MS", default)), 300_000))
+    except (TypeError, ValueError):
+        return max(100, min(default, 300_000))
 
 
 @dataclass(frozen=True)
@@ -56,8 +68,10 @@ def classify_request(message: str = "", has_attachment: bool = False) -> Inferen
         "تایید", "رد", "پرداخت", "فاکتور", "فرآیند", "چند مرحله", "مقایسه کن",
     )
     if len(text) > 2_000 or any(marker in lowered for marker in reasoning_markers):
+        long_budget = _env_budget(45_000)
         return InferenceBudget(
-            purpose="reasoning", latency_budget_ms=45_000, max_input_chars=128_000,
+            purpose="reasoning", latency_budget_ms=long_budget, max_input_chars=128_000,
             max_output_tokens=3_072, temperature=0.1, requires_tools=True,
         )
-    return InferenceBudget()
+    chat_budget = _env_budget(300_000)
+    return InferenceBudget(latency_budget_ms=chat_budget)

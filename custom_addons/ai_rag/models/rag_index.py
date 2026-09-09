@@ -28,7 +28,7 @@ class AiRagIndexSnapshot(models.Model):
     status = fields.Selection([
         ("building", "Building"), ("active", "Active"), ("failed", "Failed"),
     ], default="building", required=True, index=True)
-    embedding_dimension = fields.Integer(required=True, default=1024)
+    embedding_dimension = fields.Integer(required=True, default=lambda self: int(os.getenv("AI_RAG_EMBEDDING_DIM", "1024") or 1024))
     document_count = fields.Integer(default=0)
     chunk_count = fields.Integer(default=0)
     content_checksum = fields.Char(index=True)
@@ -145,7 +145,7 @@ class CompanyDocumentRag(models.Model):
             snapshot = Snapshot.create({
                 "version": RAG_INDEX_VERSION,
                 "company_id": company_id,
-                "embedding_dimension": 1024,
+                "embedding_dimension": int(os.getenv("AI_RAG_EMBEDDING_DIM", "1024") or 1024),
                 "status": "building",
             })
         Chunk = self.env["ai.document.chunk"].sudo()

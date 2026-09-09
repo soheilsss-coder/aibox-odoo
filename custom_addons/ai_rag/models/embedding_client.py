@@ -22,6 +22,10 @@ EMBEDDING_API_BASE = os.getenv(
 )
 EMBEDDING_MODEL = os.getenv("AI_VLLM_EMBEDDING_MODEL", "embedding-model")
 EMBEDDING_REVISION = os.getenv("AI_VLLM_EMBEDDING_REVISION", EMBEDDING_MODEL)
+try:
+    EMBEDDING_DIM = max(64, int(os.getenv("AI_RAG_EMBEDDING_DIM", "1024")))
+except (TypeError, ValueError):
+    EMBEDDING_DIM = 1024
 # Qwen3 uses an instruction on the query side only. BGE-M3 explicitly does
 # not require a query instruction, so the model-name guard below keeps the
 # same client compatible with both benchmark candidates.
@@ -119,8 +123,8 @@ def embed_texts(texts, timeout=60, env=None, is_query=False, instruction=None):
         if len(items) != len(input_texts) or [item["index"] for item in items] != list(range(len(input_texts))):
             raise UserError("Embedding response does not contain one ordered vector per input.")
         vectors = [[float(value) for value in item["embedding"]] for item in items]
-        if any(len(v) != 1024 or any(not math.isfinite(value) for value in v) for v in vectors):
-            raise UserError("Embedding dimension/value mismatch: expected 1024 finite values. Reconfigure the certified embedding model and reindex documents.")
+        if any(len(v) != EMBEDDING_DIM or any(not math.isfinite(value) for value in v) for v in vectors):
+            raise UserError("Embedding dimension/value mismatch: expected %d finite values. Reconfigure the certified embedding model and reindex documents." % EMBEDDING_DIM)
         if cache_key and vectors:
             _cache_query_vector(cache_key, vectors[0])
         return vectors

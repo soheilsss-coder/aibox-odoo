@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import time
@@ -12,6 +13,8 @@ from .output_firewall import scrub_public_text, scrub_public_payload
 from odoo.addons.ai_gateway.models.chat_queue import get_chat_pool, get_global_chat_gate
 from odoo.addons.ai_gateway.models.inference_config import classify_request
 from werkzeug.wrappers import Response
+
+_logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -76,9 +79,13 @@ def _scoped_user_env(user):
     the HTTP request. Multi-company users may switch explicitly in a separate
     audited flow; the API default is the credential owner's current company.
     """
-    return request.env(user=user.id).with_context(
-        allowed_company_ids=[user.company_id.id],
-        force_company=user.company_id.id,
+    return request.env(
+        user=user.id,
+        context={
+            "lang": user.lang,
+            "allowed_company_ids": [user.company_id.id],
+            "force_company": user.company_id.id,
+        },
     )
 
 
@@ -408,12 +415,20 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     if personal_identity and "personal_agent_identity_id" in env["llm.thread"]._fields:
         thread_values["personal_agent_identity_id"] = personal_identity.id
     if not thread:
+        provider = assistant.provider_id or assistant.model_id.provider_id
+        if not provider or not assistant.model_id:
+            _audit(env, user_id, "chat", "chat_provider_not_configured", {
+                "assistant_id": assistant.id,
+            }, success=False, error_message="assistant has no provider/model")
+            return {"error": "assistant is not configured with a provider/model"}
         allowed_tools = agent_tools
         if "ai.gateway.tool.risk" in env:
             allowed_ids = set(env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user))
             allowed_tools = agent_tools.filtered(lambda tool: tool.id in allowed_ids)
         thread_values.update({
             "assistant_id": assistant.id,
+            "provider_id": provider.id,
+            "model_id": assistant.model_id.id,
             "tool_ids": [(6, 0, allowed_tools.ids)],
         })
         thread = env["llm.thread"].create(thread_values)
@@ -487,7 +502,7 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
 
     last_message = env["mail.message"].search(
         [("model", "=", "llm.thread"), ("res_id", "=", thread.id)],
-        order="create_date desc",
+        order="id desc",
         limit=1,
     )
     _audit(env, user_id, "chat", "chat", {"message": message, "purpose": budget.purpose}, success=True,
@@ -528,8 +543,8 @@ def _run_chat_detached(dbname, user_id, message, thread_id=None, attachment_ids=
     cr = None
     try:
         cr = db_connect(dbname).cursor()
-        with api.Environment(cr, user_id, {}) as env:
-            result = _run_chat_env(env, message, thread_id, attachment_ids)
+        env = api.Environment(cr, user_id, {})
+        result = _run_chat_env(env, message, thread_id, attachment_ids)
         cr.commit()
         return result
     except Exception:  # noqa: BLE001
@@ -538,6 +553,7 @@ def _run_chat_detached(dbname, user_id, message, thread_id=None, attachment_ids=
                 cr.rollback()
         except Exception:  # noqa: BLE001
             pass
+        _logger.exception("Detached chat turn failed")
         return {"error": "generation failed, check server logs for details"}
     finally:
         try:

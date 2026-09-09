@@ -34,7 +34,8 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
   }
   Object.assign(headers, csrfHeader(method));
   const resp = await fetch(path, { method, headers, body: fetchBody, credentials: "include" });
-  const data = rememberSession(await resp.json().catch(() => ({})));
+  let data = rememberSession(await resp.json().catch(() => ({})));
+  if (data && data.jsonrpc) data = data.result || {};
   if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status);
   return data;
 }
@@ -92,7 +93,7 @@ export const adminCreateDepartment = (payload) => request("/api/admin/department
 export const adminListRoleAssignments = () => request("/api/admin/role-assignments");
 export const adminCreateRoleAssignment = (payload) => request("/api/admin/role-assignments", { method: "POST", body: payload });
 export const adminRevokeRoleAssignment = (id) => request(`/api/admin/role-assignments/${id}/revoke`, { method: "POST" });
-export const sendChatMessage = (message, threadId) => request("/api/chat", { method: "POST", body: { message, thread_id: threadId } });
+export const sendChatMessage = (message, threadId) => request("/api/chat", { method: "POST", body: { jsonrpc: "2.0", method: "call", params: { message, thread_id: threadId } } });
 export const getBuzzChannels = () => request("/api/collaboration/channels");
 export const optInBuzzChannel = (channelId, trigger = "@buzz", agentName = "Buzz") => request("/api/collaboration/channels", { method: "POST", body: { channel_id: channelId, trigger, agent_name: agentName } });
 export const optOutBuzzChannel = (channelId) => request("/api/collaboration/channels/optout", { method: "POST", body: { channel_id: channelId } });

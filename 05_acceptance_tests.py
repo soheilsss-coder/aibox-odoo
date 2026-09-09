@@ -282,7 +282,7 @@ try:
     if "error" in res17 and "embedding" in res17["error"]:
         print(f"[SKIP] RAG access-filter test - embedding server not running: {res17['error']}")
     else:
-        leaked = any(r["document_id"] == rag_doc.id for r in res17.get("results", []))
+        leaked = any(r.get("document_name") == rag_doc.name for r in res17.get("results", []))
         check("RAG search does NOT leak a document outside the searching user's access",
               not leaked, res17)
 
@@ -290,7 +290,7 @@ try:
         # same phrase, SHOULD find it - proves the filter is precise
         # (denying everyone) rather than accidentally denying everyone.
         res18 = wh_env["llm.tool"].search_documents_semantic(query=secret_phrase, top_k=5)
-        found = any(r["document_id"] == rag_doc.id for r in res18.get("results", []))
+        found = any(r.get("document_name") == rag_doc.name for r in res18.get("results", []))
         check("RAG search DOES find a document for a user who owns it",
               found, res18)
 except Exception as exc:  # noqa: BLE001

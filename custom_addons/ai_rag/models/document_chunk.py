@@ -14,8 +14,13 @@ _logger = logging.getLogger(__name__)
 # Must match the certified embedding revision served by the native
 # embedding unit. If the revision changes dimension, change this AND
 # reindex everything - vectors of different dimensions cannot coexist
-# in one pgvector column.
-EMBEDDING_DIM = 1024
+# in one pgvector column. Deployment-specific via AI_RAG_EMBEDDING_DIM
+# (the default 1024 targets a native vLLM BGE-M3-class unit; the local
+# CPU serving unit uses 384-dim MiniLM).
+try:
+    EMBEDDING_DIM = max(64, int(os.getenv("AI_RAG_EMBEDDING_DIM", "1024")))
+except (TypeError, ValueError):
+    EMBEDDING_DIM = 1024
 RAG_INDEX_VERSION = os.getenv("AI_RAG_INDEX_VERSION", "rag-v1")
 RAG_MAX_QUERY_CHARS = 8_000
 try:
@@ -127,6 +132,23 @@ class AiDocumentChunk(models.Model):
                 "ALTER TABLE ai_document_chunk ADD COLUMN embedding vector(%s)"
                 % EMBEDDING_DIM
             )
+        else:
+            # Reconcile a deployment that switched embedding revisions. A
+            # column created under a different vector dimension rejects
+            # every new vector outright; rebuild the column/index for the
+            # configured dimension. Existing vectors of the old revision
+            # must be reindexed (the module-level comment says exactly this).
+            self.env.cr.execute(
+                "SELECT format_type(atttypid, atttypmod) FROM pg_attribute "
+                "WHERE attrelid = 'ai_document_chunk'::regclass AND attname = 'embedding'"
+            )
+            coltype = self.env.cr.fetchone()
+            if coltype and coltype[0] != "vector" and ("(%d)" % EMBEDDING_DIM) not in coltype[0]:
+                self.env.cr.execute("DROP INDEX IF EXISTS ai_document_chunk_embedding_hnsw_idx")
+                self.env.cr.execute(
+                    "ALTER TABLE ai_document_chunk ALTER COLUMN embedding TYPE vector(%s) "
+                    "USING embedding::vector(%s)" % (EMBEDDING_DIM, EMBEDDING_DIM)
+                )
 
         self.env.cr.execute(
             "SELECT indexname FROM pg_indexes WHERE tablename = 'ai_document_chunk' "
