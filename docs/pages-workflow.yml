@@ -31,9 +31,18 @@
 #   setting the AIBOX_API_BASE repository variable below.
 #
 # ONE-TIME SETUP (owner only, ~30 seconds - the deploy token cannot do this)
-#   1. Repository > Settings > Pages
+#   1. Repository > Settings > Pages          <-- the REPO settings page, i.e.
+#      https://github.com/<you>/aibox-odoo/settings/pages
+#      NOT github.com/settings/pages, which is your account's "Verified
+#      domains" screen and has no source selector at all.
 #   2. "Build and deployment" > Source > **GitHub Actions**
 #   3. Re-run this workflow (Actions tab > Publish to GitHub Pages > Run workflow)
+#
+# BEFORE YOU DO THAT: merge the working branch into the default branch.
+#   This workflow runs against the default branch (master/main), and the
+#   sub-path build it relies on - frontend/vite.config.js reading
+#   VITE_BASE_PATH / VITE_OUT_DIR - does not exist there yet. Publishing from
+#   an unmerged master produces a site whose assets 404 and shows a blank page.
 #
 # OPTIONAL
 #   Settings > Secrets and variables > Actions > Variables:
@@ -98,7 +107,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p site
-          cp docs/index.html site/index.html
+          # docs/index.html is the landing/"connect" page. It is absent on
+          # branches cut before it was added, so fall back to redirecting
+          # straight into the app rather than failing the whole deploy.
+          if [ -f docs/index.html ]; then
+            cp docs/index.html site/index.html
+          else
+            printf '%s\n' '<!doctype html><meta charset="utf-8">' \
+              '<meta http-equiv="refresh" content="0; url=app/">' \
+              '<title>AIBOX</title><a href="app/">Open the app</a>' > site/index.html
+            echo "::warning::docs/index.html not found on ${GITHUB_REF_NAME}; published a redirect instead"
+          fi
           # SPA deep links (/chat, /admin, ...) 404 on Pages without this;
           # serving the shell from 404.html makes the router handle them.
           cp site/app/index.html site/app/404.html
