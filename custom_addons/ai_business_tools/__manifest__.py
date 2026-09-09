@@ -7,6 +7,7 @@
     "category": "Technical",
     "depends": [
         "base", "hr", "hr_holidays", "hr_attendance", "project", "mail", "stock", "account", "mrp",
+        "sales_team", "sale_management", "purchase",
         "llm", "llm_tool", "llm_assistant",
         "ai_gateway", "company_ai_demo",
     ],

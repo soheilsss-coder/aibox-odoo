@@ -41,23 +41,27 @@ class LLMToolAgentMemory(models.Model):
         # structured fact layer when installed. Legacy storage remains the
         # compatibility source and a fact failure must not lose the save.
         if "ai.agent.memory.fact" in self.env:
-            try:
-                fact = self.env["ai.agent.memory.fact"].create_fact(
-                    subject="user:%s" % self.env.user.id,
-                    predicate=key,
-                    object_value=value,
-                    scope=scope,
-                    user=self.env.user,
-                    confirmed=True,
-                    confidence=1.0,
-                    source_type="explicit_user",
-                    source_message_id=self._current_source_message_id(),
-                    source_thread_id=self.env.context.get("memory_source_thread_id"),
-                    source_quote=value,
-                )
-                fact_id = fact.id
-            except Exception:  # noqa: BLE001
-                _logger.info("structured fact mirror unavailable", exc_info=True)
+            source_message_id = self._current_source_message_id()
+            if source_message_id:
+                try:
+                    fact = self.env["ai.agent.memory.fact"].create_fact(
+                        subject="user:%s" % self.env.user.id,
+                        predicate=key,
+                        object_value=value,
+                        scope=scope,
+                        user=self.env.user,
+                        confirmed=True,
+                        confidence=1.0,
+                        source_type="explicit_user",
+                        source_message_id=source_message_id,
+                        source_thread_id=self.env.context.get("memory_source_thread_id"),
+                        source_quote=value,
+                    )
+                    fact_id = fact.id
+                except Exception:  # noqa: BLE001
+                    _logger.info("structured fact mirror unavailable", exc_info=True)
+            else:
+                _logger.debug("structured fact mirror skipped: no source message in context")
         if "ai.gateway.audit.log" in self.env:
             self.env["ai.gateway.audit.log"].sudo().log(user_id=self.env.user.id, source="tool", action="save_memory", payload={"key": key, "scope": scope})
         return {"status": "saved", "key": rec.key, "scope": rec.scope, "memory_id": rec.id, "fact_id": fact_id}

@@ -8,8 +8,8 @@ from odoo.http import request
 from odoo.exceptions import AccessError, UserError
 from odoo.sql_db import db_connect
 from .rate_limit import check as _shared_rate_limit, blocked as _shared_rate_blocked
-from .chat_queue import get_chat_pool, get_global_chat_gate
 from .output_firewall import scrub_public_text, scrub_public_payload
+from odoo.addons.ai_gateway.models.chat_queue import get_chat_pool, get_global_chat_gate
 from odoo.addons.ai_gateway.models.inference_config import classify_request
 from werkzeug.wrappers import Response
 

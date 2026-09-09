@@ -45,6 +45,7 @@ class AiScheduleRule(models.Model):
     last_run_datetime = fields.Datetime(string="Last run", readonly=True)
     last_result = fields.Text(string="Last result", readonly=True)
     last_error = fields.Text(string="Last error", readonly=True)
+    active = fields.Boolean(default=True, index=True)
 
     @api.model_create_multi
     def create(self, vals_list):

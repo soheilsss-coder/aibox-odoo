@@ -58,10 +58,12 @@ class AiGatewayToolRisk(models.Model):
 
     @api.model
     def enforce(self, tool_name, context_label=""):
-        """Backward-compatible shim. All enforcement is now centralized
-        in ai.gateway.execution.gate; no business tool should implement
-        its own risk decision.
+        """Backward-compatible shim. RISK_5 remains a hard UserError here
+        for callers/tests that historically used this API directly; all other
+        decisions continue through the central execution gate.
         """
+        if int(self.get_risk_level(tool_name) or 0) >= 5:
+            raise UserError("RISK_5 tools are human-only")
         return self.env["ai.gateway.execution.gate"].authorize(
             tool_name, context_label=context_label
         )

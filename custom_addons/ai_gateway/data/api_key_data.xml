@@ -1,15 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_ceo')}]" />
-    </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_accountant')}]" />
-    </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_warehouse')}]" />
-    </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_hr_security')}]" />
-    </function>
+    <!-- API keys cannot be created from XML data because ai.gateway.api.key
+         stores only one-way hashes and the plaintext secret is returned only
+         once by create_key(). Browser users authenticate through /api/login
+         sessions; machine-to-machine keys are generated explicitly by
+         provisioning scripts or administrators after installation. -->
 </odoo>

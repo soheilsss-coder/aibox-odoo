@@ -18,7 +18,7 @@ def _plain(text):
 
 class AiCollabApi(http.Controller):
     def _channel_for_user(self, env, channel_id):
-        channel = env["mail.channel"].browse(int(channel_id or 0)).exists()
+        channel = env["discuss.channel"].browse(int(channel_id or 0)).exists()
         if not channel:
             return None, _json_response({"error": "channel not found"}, 404)
         partner_ids = set(channel.channel_member_ids.mapped("partner_id").ids)
@@ -130,7 +130,7 @@ class AiCollabApi(http.Controller):
         env, err = _require_auth()
         if err:
             return err
-        channel_model = env["mail.channel"]
+        channel_model = env["discuss.channel"]
         member_channels = channel_model.search([]).filtered(
             lambda channel: env.user.partner_id in channel.channel_member_ids.mapped("partner_id")
         )
@@ -152,7 +152,7 @@ class AiCollabApi(http.Controller):
             if link and link.created_by_id != env.user and not env.user.has_group("base.group_system"):
                 return _json_response({"error": "only the opt-in owner can change this channel"}, 403)
             latest = env["mail.message"].sudo().search([
-                ("model", "=", "mail.channel"),
+                ("model", "=", "discuss.channel"),
                 ("res_id", "=", channel.id),
             ], order="id desc", limit=1)
             values = {
@@ -218,7 +218,7 @@ class AiCollabApi(http.Controller):
             limit = min(_MAX_CHANNEL_MESSAGES, max(1, int(request.params.get("limit") or 100)))
         except (TypeError, ValueError):
             return _json_response({"error": "limit must be an integer"}, 400)
-        domain = [("model", "=", "mail.channel"), ("res_id", "=", channel.id)]
+        domain = [("model", "=", "discuss.channel"), ("res_id", "=", channel.id)]
         if after:
             domain.append(("id", ">", after))
         messages = message_model.search(domain, order="id desc", limit=limit)

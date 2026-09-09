@@ -40,17 +40,18 @@ class AiEventSubscription(models.Model):
         method = vals.get("subscriber_method")
         if bool(model_name) != bool(method):
             raise ValueError("subscriber_model and subscriber_method must be provided together")
-        if method and not (method == "_handle_event" or method.startswith("_handle_event_")):
-            raise ValueError("event subscriber method must use the _handle_event* contract")
+        if method and not method.startswith("_handle_"):
+            raise ValueError("event subscriber method must use the _handle_* contract")
         if model_name and model_name not in self.env:
             raise ValueError("subscriber model is not installed: %s" % model_name)
         if model_name and not callable(getattr(self.env[model_name], method, None)):
             raise ValueError("subscriber handler does not exist: %s.%s" % (model_name, method))
 
-    @api.model
-    def create(self, vals):
-        self._validate_handler_contract(vals)
-        return super().create(vals)
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            self._validate_handler_contract(vals)
+        return super().create(vals_list)
 
     def write(self, vals):
         if any(k in vals for k in ("subscriber_model", "subscriber_method")):

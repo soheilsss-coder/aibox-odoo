@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <record id="rule_access_grant_role_whitelist" model="ir.rule">
-    <field name="name">Temporary access may target product roles only</field>
+  <record id="rule_access_grant_company_scope" model="ir.rule">
+    <field name="name">Temporary access grants are company scoped</field>
     <field name="model_id" ref="model_ai_gateway_access_grant"/>
-    <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('group_id', 'in', [ref('role_employee'), ref('role_manager'), ref('role_hr_staff'), ref('role_hr_manager'), ref('role_finance_staff'), ref('role_finance_manager'), ref('role_warehouse_staff'), ref('role_warehouse_manager'), ref('role_project_manager'), ref('role_manufacturing_manager'), ref('role_sales_manager'), ref('role_purchase_manager'), ref('role_executive'), ref('role_security'), ref('role_system_admin')])]</field>
+    <!-- Odoo record-rule domains are evaluated at runtime with user/company_ids,
+         but not with XML import helpers such as ref().  The product-role
+         whitelist is enforced by ai.gateway.access.grant._check_role_group();
+         this rule keeps the readable/writeable record set company-scoped. -->
+    <field name="domain_force">[('company_id', 'in', company_ids)]</field>
     <field name="groups" eval="[(4, ref('base.group_user'))]"/>
   </record>
 </odoo>
-

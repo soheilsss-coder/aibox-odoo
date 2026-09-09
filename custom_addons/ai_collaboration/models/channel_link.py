@@ -8,7 +8,7 @@ _logger = logging.getLogger(__name__)
 
 class AiChannelLink(models.Model):
     """Explicit, per-channel opt-in for the assistant inside Odoo's
-    native mail.channel (Discuss). A channel shows up in the assistant's
+    native discuss.channel (Discuss). A channel shows up in the assistant's
     reach ONLY when a channel member created an active ai.collab.channel
     link for it, and even then the assistant only reacts to messages that
     literally contain the configured trigger (name/mention) text.
@@ -16,10 +16,10 @@ class AiChannelLink(models.Model):
     This keeps Buzz groups fully opt-in: no scanning of channels that
     were never opted in, no ambient listening on every channel."""
     _name = "ai.collab.channel.link"
-    _description = "AI Channel Opt-in (mail.channel)"
+    _description = "AI Channel Opt-in (Discuss channel)"
     _order = "id desc"
 
-    channel_id = fields.Many2one("mail.channel", required=True, ondelete="cascade",
+    channel_id = fields.Many2one("discuss.channel", required=True, ondelete="cascade",
                                  string="Discuss Channel")
     trigger_text = fields.Char(
         string="Trigger text", required=True,
@@ -29,7 +29,7 @@ class AiChannelLink(models.Model):
         string="Agent display name", required=True, default="Buzz",
         help="Name shown in group-chat instructions; the posted reply uses the configured service identity.")
     created_by_id = fields.Many2one("res.users", string="Opted in by",
-                                    required=True, ondelete="set null",
+                                    required=True, ondelete="restrict",
                                     default=lambda self: self.env.user)
     last_seen_message_id = fields.Integer(string="Last scanned message", default=0)
     active = fields.Boolean(string="Active", default=True)
@@ -43,7 +43,7 @@ class AiChannelLink(models.Model):
         minimal service user; every read/write is limited to channels
         with an active opt-in link and guarded by the message id cursor,
         so it only ever looks at what was opted in."""
-        if "mail.channel" not in self.env:
+        if "discuss.channel" not in self.env:
             return False
         links = self.sudo().search([("active", "=", True)])
         if not links:
@@ -54,7 +54,7 @@ class AiChannelLink(models.Model):
             if not channel.exists():
                 continue
             messages = self.env["mail.message"].sudo().search([
-                ("model", "=", "mail.channel"),
+                ("model", "=", "discuss.channel"),
                 ("res_id", "=", channel.id),
                 ("id", ">", link.last_seen_message_id),
             ], order="id asc", limit=200)
@@ -79,7 +79,7 @@ class AiChannelLink(models.Model):
         prompt because the normal llm.thread is intentionally personal.
         """
         messages = self.env["mail.message"].sudo().search([
-            ("model", "=", "mail.channel"),
+            ("model", "=", "discuss.channel"),
             ("res_id", "=", channel.id),
             ("id", "<=", current_message_id),
         ], order="id desc", limit=30)

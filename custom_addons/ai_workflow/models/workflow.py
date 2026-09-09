@@ -210,7 +210,7 @@ class AiWorkflowRun(models.Model):
                 continue
         return created
 
-    def _context(self):
+    def _workflow_context(self):
         self.ensure_one()
         value = json.loads(self.context_json or "{}")
         return value if isinstance(value, dict) else {}
@@ -504,7 +504,7 @@ class AiWorkflowRun(models.Model):
             try:
                 definition = json.loads(run.workflow_id.definition_json or "{}")
                 steps = definition.get("steps", [])
-                context = run._context()
+                context = run._workflow_context()
 
                 # Waiting states are resumed only when their durable timestamp is due.
                 if run.state == "waiting" and run.waiting_until and run.waiting_until > fields.Datetime.now():
@@ -581,7 +581,7 @@ class AiWorkflowRun(models.Model):
         definition = json.loads(self.workflow_id.compensation_definition_json or "[]")
         if not isinstance(definition, list):
             return
-        context = self._context()
+        context = self._workflow_context()
         for step in definition:
             try:
                 self._execute_step(step, context)

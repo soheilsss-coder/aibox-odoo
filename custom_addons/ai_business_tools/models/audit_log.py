@@ -27,7 +27,16 @@ class AiGatewayAuditLog(models.Model):
 
     user_id = fields.Many2one("res.users", required=True, index=True, ondelete="cascade")
     source = fields.Selection(
-        [("tool", "AI Tool Call"), ("rpc", "Gateway RPC"), ("chat", "Gateway Chat")],
+        [
+            ("tool", "AI Tool Call"),
+            ("rpc", "Gateway RPC"),
+            ("chat", "Gateway Chat"),
+            ("execution_gate", "Execution Gate"),
+            ("authorization", "Authorization"),
+            ("customer_control_plane", "Customer Control Plane"),
+            ("event_bus", "Event Bus"),
+            ("workflow", "Workflow"),
+        ],
         required=True, index=True,
     )
     action = fields.Char(required=True, index=True, help="Tool name, or 'model.operation' for rpc")
