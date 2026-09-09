@@ -162,18 +162,47 @@ def make_handler(served_model: str, embedding_model: str, embedding_dim: int, la
 
         # -- implementations ------------------------------------------
         def _echo_reply(self, payload: dict) -> str:
-            """Produce a reply that proves which model/prompt the gateway sent."""
+            """Report exactly what the gateway sent, and say plainly this is a stand-in.
+
+            A test double that quietly pretends to be a model is worse than
+            useless: someone reads a plausible sentence and assumes the LLM
+            link works. So the reply leads with what it is, then dumps the
+            request the appliance actually produced - which is the part worth
+            inspecting when a real provider misbehaves.
+            """
+            messages = payload.get("messages") or []
+            system = next((m.get("content") or "" for m in messages if m.get("role") == "system"), "")
             last_user = next(
-                (m.get("content") or "" for m in reversed(payload.get("messages") or [])
-                 if m.get("role") == "user"),
+                (m.get("content") or "" for m in reversed(messages) if m.get("role") == "user"),
                 "",
             )
+            tools = [
+                (t.get("function") or {}).get("name") for t in (payload.get("tools") or [])
+            ]
             model = payload.get("model") or served_model
+            roles = ", ".join(m.get("role") or "?" for m in messages)
             return (
-                "MOCK-LLM OK via %s\n"
-                "model=%s\n"
-                "messages=%d\n"
-                "prompt: %s" % (model, model, len(payload.get("messages") or []), last_user[:400])
+                "STAND-IN RESPONSE - no real LLM is attached to this endpoint.\n"
+                "Point AI_LLM_API_BASE / AI_LLM_API_KEY at a real provider for real answers.\n"
+                "\n"
+                "--- what the appliance sent ---\n"
+                "model        : %s\n"
+                "messages     : %d  (%s)\n"
+                "tools        : %s\n"
+                "max_tokens   : %s   temperature: %s   stream: %s\n"
+                "system prompt: %s\n"
+                "user message : %s"
+                % (
+                    model,
+                    len(messages),
+                    roles or "none",
+                    ", ".join(t for t in tools if t) or "none offered",
+                    payload.get("max_tokens") or payload.get("max_completion_tokens") or "-",
+                    payload.get("temperature", "-"),
+                    bool(payload.get("stream")),
+                    (system[:300] + ("..." if len(system) > 300 else "")) or "(none)",
+                    last_user[:400] or "(none)",
+                )
             )
 
         def _chat(self, payload: dict) -> None:
