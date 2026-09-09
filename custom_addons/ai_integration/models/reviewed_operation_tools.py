@@ -18,6 +18,12 @@ class LLMToolReviewedOperation(models.Model):
 
     @llm_tool(destructive_hint=True)
     def run_reviewed_operation(self, operation: str, arguments_json: str = "{}") -> dict:
+        """Execute one source-reviewed ERP operation through the guarded registry.
+
+        The operation must already be registered and authorized; arguments are
+        accepted only as a bounded JSON object and are audited by the execution
+        gate before the adapter mutates business data.
+        """
         operation = str(operation or "").strip()
         if not operation or len(operation) > 160:
             raise UserError("a reviewed operation name is required")

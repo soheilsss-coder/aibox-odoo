@@ -15,7 +15,7 @@
     <field name="code">model.sync_now()</field>
     <field name="interval_number">1</field>
     <field name="interval_type">minutes</field>
-    <field name="user_id" ref="ai_automation_service_user"/>
+    <field name="user_id" ref="ai_business_tools.ai_automation_service_user"/>
     <field name="active">True</field>
   </record>
 </odoo>

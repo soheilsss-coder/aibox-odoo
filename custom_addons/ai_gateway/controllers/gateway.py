@@ -8,8 +8,8 @@ from odoo.http import request
 from odoo.exceptions import AccessError, UserError
 from odoo.sql_db import db_connect
 from .rate_limit import check as _shared_rate_limit, blocked as _shared_rate_blocked
-from .chat_queue import get_chat_pool, get_global_chat_gate
 from .output_firewall import scrub_public_text, scrub_public_payload
+from odoo.addons.ai_gateway.models.chat_queue import get_chat_pool, get_global_chat_gate
 from odoo.addons.ai_gateway.models.inference_config import classify_request
 from werkzeug.wrappers import Response
 
@@ -28,12 +28,44 @@ if not _ALLOWED_ORIGIN and os.environ.get("AI_GATEWAY_ENV", "development") == "p
 _ALLOWED_ORIGIN = _ALLOWED_ORIGIN or ("http://localhost:5173" if os.environ.get("AI_GATEWAY_ENV", "development") != "production" else None)
 if os.environ.get("AI_GATEWAY_ENV", "development") == "production" and (not _ALLOWED_ORIGIN or _ALLOWED_ORIGIN == "*"):
     raise RuntimeError("AI_GATEWAY_ALLOWED_ORIGIN must be a concrete HTTPS origin in production")
+_ALLOWED_ORIGINS = {
+    origin.strip().rstrip("/")
+    for origin in (os.environ.get("AI_GATEWAY_ALLOWED_ORIGINS") or _ALLOWED_ORIGIN or "").split(",")
+    if origin.strip()
+}
+_ALLOW_TRYCLOUDFLARE = os.environ.get("AI_GATEWAY_ALLOW_TRYCLOUDFLARE", "0") == "1"
+_TRYCLOUDFLARE_RE = re.compile(r"^https://[A-Za-z0-9-]+\.trycloudflare\.com$")
+
+
+def _origin_allowed(origin):
+    origin = (origin or "").rstrip("/")
+    if not origin:
+        return True
+    if origin in _ALLOWED_ORIGINS:
+        return True
+    return bool(_ALLOW_TRYCLOUDFLARE and _TRYCLOUDFLARE_RE.match(origin))
+
+
+def _cors_origin():
+    origin = request.httprequest.headers.get("Origin", "") if request else ""
+    origin = origin.rstrip("/")
+    return origin if origin and _origin_allowed(origin) else _ALLOWED_ORIGIN
+
+
+def _cors_headers():
+    return [
+        ("Access-Control-Allow-Origin", _cors_origin()),
+        ("Access-Control-Allow-Credentials", "true"),
+        ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
+        ("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization, X-CSRF-Token"),
+    ]
+
 
 _CORS_HEADERS = [
     ("Access-Control-Allow-Origin", _ALLOWED_ORIGIN),
     ("Access-Control-Allow-Credentials", "true"),
     ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
-    ("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization"),
+    ("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization, X-CSRF-Token"),
 ]
 
 
@@ -53,13 +85,13 @@ def _scoped_user_env(user):
 def _json_response(data, status=200):
     return request.make_response(
         json.dumps(data, ensure_ascii=False, default=str),
-        headers=[("Content-Type", "application/json; charset=utf-8")] + _CORS_HEADERS,
+        headers=[("Content-Type", "application/json; charset=utf-8")] + _cors_headers(),
         status=status,
     )
 
 
 def _cors_preflight_response():
-    return request.make_response("", headers=_CORS_HEADERS)
+    return request.make_response("", headers=_cors_headers())
 
 
 # --- Shared rate limiting ---------------------------------------------
@@ -110,7 +142,7 @@ def _authenticate():
     """
     method = request.httprequest.method.upper()
     origin = request.httprequest.headers.get("Origin", "")
-    if method not in ("GET", "HEAD", "OPTIONS") and origin and origin != _ALLOWED_ORIGIN:
+    if method not in ("GET", "HEAD", "OPTIONS") and origin and not _origin_allowed(origin):
         return None, None, False
 
     ip = _client_ip()
@@ -825,7 +857,5 @@ class AiGatewayController(http.Controller):
             ("Content-Type", "text/event-stream; charset=utf-8"),
             ("Cache-Control", "no-cache"),
             ("X-Accel-Buffering", "no"),
-            ("Access-Control-Allow-Origin", _ALLOWED_ORIGIN),
-            ("Access-Control-Allow-Credentials", "true"),
-        ]
+        ] + _cors_headers()
         return Response(generate(), headers=headers)

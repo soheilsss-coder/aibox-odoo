@@ -1,6 +1,6 @@
 {
     "name": "AI Semantic API",
-    "version": "18.0.1.7.0",
+    "version": "18.0.1.8.0",
     "summary": "Semantic REST endpoints (/api/hr/leaves, /api/documents, "
                 "/api/admin/*, /api/integrations/*, ...) so a frontend never has to know an Odoo "
                 "model name (roadmap #43-44). /api/rpc (the old generic ORM/RPC "

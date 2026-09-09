@@ -80,7 +80,11 @@ class AiIntegrationModule(models.Model):
                 "last_error": False,
             }
             try:
-                model_names = self.env["ir.model"].sudo().search([("model", "!=", False), ("modules", "ilike", mod.name)]).mapped("model")
+                model_meta = self.env["ir.model"].sudo().search([("model", "!=", False)])
+                model_names = [
+                    record.model for record in model_meta
+                    if mod.name in {item.strip() for item in (record.modules or "").split(",") if item.strip()}
+                ]
                 groups = self.env["res.groups"].sudo().search([("category_id", "!=", False), ("module", "ilike", mod.name)]) if "module" in self.env["res.groups"]._fields else self.env["res.groups"].browse()
                 vals.update({"discovered_models": len(model_names), "discovered_groups": len(groups)})
                 rec = rec or self.sudo().create(vals)

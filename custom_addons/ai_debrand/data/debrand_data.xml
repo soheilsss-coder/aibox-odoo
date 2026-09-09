@@ -8,8 +8,7 @@
         <field name="key">ai.brand.domain</field>
         <field name="value">https://example.invalid</field>
     </record>
-    <function model="res.company" name="write">
-        <value model="res.company" eval="obj().search([])"/>
-        <value eval="{'report_footer': 'Company AI'}"/>
-    </function>
+    <record id="base.main_company" model="res.company">
+        <field name="report_footer">Company AI</field>
+    </record>
 </odoo>

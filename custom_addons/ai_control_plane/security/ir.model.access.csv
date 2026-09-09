@@ -4,6 +4,7 @@ access_ai_control_module_user,ai.control.module.user,model_ai_control_module,bas
 access_ai_control_event_user,ai.control.event.user,model_ai_control_event,base.group_user,0,0,0,0
 access_ai_control_capability_admin,ai.control.capability.admin,model_ai_control_capability,base.group_system,1,1,1,1
 access_ai_control_module_admin,ai.control.module.admin,model_ai_control_module,base.group_system,1,1,1,1
+access_ai_control_module_automation,ai.control.module.automation,model_ai_control_module,ai_business_tools.group_ai_automation_service,1,1,1,0
 access_ai_control_event_admin,ai.control.event.admin,model_ai_control_event,base.group_system,1,1,1,1
 access_ai_control_relation,ai.control.relation,model_ai_control_relation,base.group_system,1,1,1,1
 access_ai_control_relation_user,ai.control.relation.user,model_ai_control_relation,base.group_user,1,0,0,0

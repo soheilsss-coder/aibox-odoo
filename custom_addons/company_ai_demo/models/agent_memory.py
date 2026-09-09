@@ -27,6 +27,12 @@ class LLMToolAgentMemory(models.Model):
 
     @llm_tool(destructive_hint=True)
     def save_memory(self, key: str, value: str, scope: str = "personal") -> dict:
+        """Save a user-approved memory value in personal, department or company scope.
+
+        The write is audited and still goes through the execution gate; invalid
+        scopes fall back to personal so the assistant cannot widen access by
+        inventing a scope name.
+        """
         if "ai.gateway.tool.risk" in self.env:
             self.env["ai.gateway.execution.gate"].authorize("save_memory")
         if scope not in ("personal", "department", "company"):
@@ -41,23 +47,27 @@ class LLMToolAgentMemory(models.Model):
         # structured fact layer when installed. Legacy storage remains the
         # compatibility source and a fact failure must not lose the save.
         if "ai.agent.memory.fact" in self.env:
-            try:
-                fact = self.env["ai.agent.memory.fact"].create_fact(
-                    subject="user:%s" % self.env.user.id,
-                    predicate=key,
-                    object_value=value,
-                    scope=scope,
-                    user=self.env.user,
-                    confirmed=True,
-                    confidence=1.0,
-                    source_type="explicit_user",
-                    source_message_id=self._current_source_message_id(),
-                    source_thread_id=self.env.context.get("memory_source_thread_id"),
-                    source_quote=value,
-                )
-                fact_id = fact.id
-            except Exception:  # noqa: BLE001
-                _logger.info("structured fact mirror unavailable", exc_info=True)
+            source_message_id = self._current_source_message_id()
+            if source_message_id:
+                try:
+                    fact = self.env["ai.agent.memory.fact"].create_fact(
+                        subject="user:%s" % self.env.user.id,
+                        predicate=key,
+                        object_value=value,
+                        scope=scope,
+                        user=self.env.user,
+                        confirmed=True,
+                        confidence=1.0,
+                        source_type="explicit_user",
+                        source_message_id=source_message_id,
+                        source_thread_id=self.env.context.get("memory_source_thread_id"),
+                        source_quote=value,
+                    )
+                    fact_id = fact.id
+                except Exception:  # noqa: BLE001
+                    _logger.info("structured fact mirror unavailable", exc_info=True)
+            else:
+                _logger.debug("structured fact mirror skipped: no source message in context")
         if "ai.gateway.audit.log" in self.env:
             self.env["ai.gateway.audit.log"].sudo().log(user_id=self.env.user.id, source="tool", action="save_memory", payload={"key": key, "scope": scope})
         return {"status": "saved", "key": rec.key, "scope": rec.scope, "memory_id": rec.id, "fact_id": fact_id}
@@ -133,6 +143,11 @@ class LLMToolAgentMemory(models.Model):
 
     @llm_tool(read_only_hint=True)
     def recall_memory(self, query: str = "") -> dict:
+        """Return visible legacy memory records, optionally filtered by text query.
+
+        Results are restricted by the memory model's user/company/department
+        visibility rules before any decrypted value is returned to the model.
+        """
         Memory = self.env["ai.agent.memory.record"]
         # The common no-query path reads only the newest ten records. A
         # bounded scan is used for encrypted-value search so a runaway memory

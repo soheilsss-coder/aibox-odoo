@@ -1,15 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_ceo')}]" />
-    </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_accountant')}]" />
-    </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_warehouse')}]" />
-    </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_hr_security')}]" />
-    </function>
+    <!-- API keys are generated explicitly after install, not from XML data. -->
 </odoo>

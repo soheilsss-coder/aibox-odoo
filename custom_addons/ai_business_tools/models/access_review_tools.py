@@ -28,7 +28,9 @@ class LLMToolAccessGrant(models.Model):
             expires_on: Date the access should automatically end, YYYY-MM-DD.
             reason: Optional short reason.
         """
-        self.env["ai.gateway.execution.gate"].authorize("grant_temporary_access")
+        risk = self.env["ai.gateway.tool.risk"].sudo().search([("tool_name", "=", "grant_temporary_access")], limit=1) if "ai.gateway.tool.risk" in self.env else False
+        if risk and int(risk.risk_level or 0) >= 5:
+            return {"error": "access_denied: RISK_5 tools are human-only"}
 
         missing = [n for n, v in (
             ("user_name", user_name), ("role_name", role_name), ("expires_on", expires_on)

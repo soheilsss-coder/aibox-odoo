@@ -49,7 +49,7 @@ from odoo.addons.ai_gateway.controllers.gateway import (
     _client_ip,
     _auth_fail_blocked,
     _record_auth_failure,
-    _CORS_HEADERS,
+    _cors_headers,
 )
 from odoo.addons.ai_gateway.controllers.file_policy import validate_upload, MAX_UPLOAD_BYTES
 from odoo.addons.ai_gateway.controllers.output_firewall import scrub_public_text
@@ -292,11 +292,29 @@ class AiSemanticApiController(http.Controller):
         if not login_id or not password:
             return _json_response({"error": "login and password are both required"}, status=400)
 
+        mfa_required = False
         try:
-            uid = request.session.authenticate(request.db, login_id, password)
+            # Odoo 18's low-level Session.authenticate accepts a single
+            # credential dict and returns an auth_info mapping. Older releases
+            # accepted login/password as separate positional arguments and
+            # returned the uid directly. Support both so the customer-facing
+            # /api/login route does not crash with HTTP 500 after an upgrade.
+            credential = {"login": login_id, "password": password, "type": "password"}
+            try:
+                auth_info = request.session.authenticate(request.db, credential)
+                if isinstance(auth_info, dict):
+                    uid = request.session.uid
+                    mfa_required = bool(auth_info.get("uid") and auth_info.get("uid") != uid)
+                else:
+                    uid = request.session.uid
+            except TypeError:
+                uid = request.session.authenticate(request.db, login_id, password)
         except AccessDenied:
             uid = False
 
+        if mfa_required:
+            request.session.logout(keep_db=True)
+            return _json_response({"error": "multi-factor authentication is required for this account"}, status=403)
         if not uid:
             _record_auth_failure(ip)
             return _json_response({"error": "invalid email or password"}, status=401)
@@ -812,7 +830,7 @@ class AiSemanticApiController(http.Controller):
             headers=[
                 ("Content-Type", upload["mimetype"]),
                 ("Content-Disposition", "inline; filename*=UTF-8''%s" % _quote_filename(filename)),
-            ] + _CORS_HEADERS,
+            ] + _cors_headers(),
             status=200,
         )
 
@@ -2213,7 +2231,7 @@ class AiSemanticApiController(http.Controller):
                 ("Content-Type", mimetype),
                 ("Content-Disposition", "inline"),
                 ("Cache-Control", "private, max-age=0, must-revalidate"),
-            ] + _CORS_HEADERS,
+            ] + _cors_headers(),
             status=200,
         )
 

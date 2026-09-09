@@ -20,16 +20,16 @@ class AiModuleInstallRequest(models.Model):
         required=True, readonly=True, index=True,
         default=lambda self: uuid.uuid4().hex,
     )
-    module_id = fields.Many2one("ir.module.module", required=True, readonly=True, index=True)
+    module_id = fields.Many2one("ir.module.module", required=True, readonly=True, index=True, ondelete="cascade")
     module_name = fields.Char(required=True, readonly=True, index=True)
     module_label = fields.Char(required=True, readonly=True)
     company_id = fields.Many2one(
         "res.company", required=True, readonly=True, index=True,
-        default=lambda self: self.env.company,
+        ondelete="restrict", default=lambda self: self.env.company,
     )
     requested_by_id = fields.Many2one(
         "res.users", required=True, readonly=True,
-        default=lambda self: self.env.user,
+        ondelete="restrict", default=lambda self: self.env.user,
     )
     state = fields.Selection([
         ("queued", "Queued"),

@@ -420,20 +420,19 @@ else:
 # (manual action_revoke_now(), which IS instant) actually works.
 # ---------------------------------------------------------------------
 if role_manager_group is not None:
-    grant = env["ai.gateway.access.grant"].create({
+    grant = env["ai.gateway.access.grant"].sudo().create({
         "to_user_id": warehouse.id, "group_id": role_manager_group.id,
-        "start_date": fields.Date.today() - timedelta(days=2),
-        "expires_on": fields.Date.today() - timedelta(days=1),  # already in the past
+        "start_date": _fields.Date.today(),
+        "expires_on": _fields.Date.today() + timedelta(days=1),
         "state": "active",
+        "reason": "acceptance test active grant",
     })
-    role_manager_group.write({"users": [(4, warehouse.id)]})
-    check("KNOWN GAP (documented, not a false pass): a grant past its expiry date "
-          "is still an active group membership until the daily cron runs",
-          warehouse.id in role_manager_group.users.ids)
-    grant.action_revoke_now()
-    check("Manual action_revoke_now() DOES remove access immediately "
-          "(the mitigation to use for anything urgent, don't wait for the cron)",
+    check("Temporary access grant does NOT mutate permanent res.groups membership",
           warehouse.id not in role_manager_group.users.ids)
+    grant.action_revoke_now()
+    check("Manual action_revoke_now() DOES revoke the temporary grant immediately",
+          grant.state == "revoked" and not grant.active,
+          {"state": grant.state, "active": grant.active})
 
 # ---------------------------------------------------------------------
 # Scenario 25 (v19, roadmap #50): a regular employee cannot self-
@@ -462,23 +461,28 @@ if role_manager_group is not None:
 # closing rather than leaving unverified. Self-contained fixtures,
 # same pattern as Scenario 23.
 # ---------------------------------------------------------------------
-dept_doc_a = env["hr.department"].create({"name": "Acceptance Test Doc Dept A"})
-dept_doc_b = env["hr.department"].create({"name": "Acceptance Test Doc Dept B"})
-doc_staff_a = env["res.users"].create({"name": "Acceptance Test Doc Staff A",
-                                        "login": "acctest.docstaff.a@local.test"})
-env["hr.employee"].create({"name": "Acceptance Test Doc Staff A", "user_id": doc_staff_a.id,
-                            "department_id": dept_doc_a.id})
-doc_staff_b = env["res.users"].create({"name": "Acceptance Test Doc Staff B",
-                                        "login": "acctest.docstaff.b@local.test"})
-env["hr.employee"].create({"name": "Acceptance Test Doc Staff B", "user_id": doc_staff_b.id,
-                            "department_id": dept_doc_b.id})
+dept_doc_a = env["hr.department"].sudo().create({"name": "Acceptance Test Doc Dept A"})
+dept_doc_b = env["hr.department"].sudo().create({"name": "Acceptance Test Doc Dept B"})
+
+# Use the already-provisioned demo internal users here. Creating ad-hoc
+# res.users records in a shell fixture can leave them without the generated
+# User Type state that Odoo's ACL check expects, which tests the fixture
+# instead of the document rule. The demo users are real internal users and
+# are already part of the product onboarding contract.
+warehouse_employee = env["hr.employee"].sudo().search([("user_id", "=", warehouse.id)], limit=1)
+if not accountant_employee:
+    accountant_employee = env["hr.employee"].sudo().create({"name": accountant.name, "user_id": accountant.id})
+if not warehouse_employee:
+    warehouse_employee = env["hr.employee"].sudo().create({"name": warehouse.name, "user_id": warehouse.id})
+accountant_employee.sudo().write({"department_id": dept_doc_a.id})
+warehouse_employee.sudo().write({"department_id": dept_doc_b.id})
 
 dept_doc = env["company.document"].sudo().create({
     "name": "Acceptance Test Dept-A-only Policy",
     "access_level": "department", "department_id": dept_doc_a.id,
 })
-doc_staff_a_env = env(user=doc_staff_a.id)
-doc_staff_b_env = env(user=doc_staff_b.id)
+doc_staff_a_env = env(user=accountant.id)
+doc_staff_b_env = env(user=warehouse.id)
 staff_a_docs = doc_staff_a_env["llm.tool"].list_documents().get("documents", [])
 staff_b_docs = doc_staff_b_env["llm.tool"].list_documents().get("documents", [])
 check("Employee in the SAME department sees a department-scoped document",
@@ -486,26 +490,20 @@ check("Employee in the SAME department sees a department-scoped document",
 check("Employee in a DIFFERENT department does NOT see it",
       not any(d["id"] == dept_doc.id for d in staff_b_docs))
 
-# Group branch: reuse role_manager_group as an arbitrary "limited
-# group" for this test - its actual permission meaning is irrelevant
-# here, only membership matters for company_document_rule_user's
-# group_id check.
-if role_manager_group is not None:
-    group_member = env["res.users"].create({
-        "name": "Acceptance Test Group Member", "login": "acctest.groupmember@local.test",
-        "groups_id": [(4, role_manager_group.id)],
-    })
+# Group branch: use an already-assigned product role so the test does not
+# mutate permanent res.groups membership just to create a fixture.
+doc_group = env.ref("ai_business_tools.role_finance_staff", raise_if_not_found=False)
+if doc_group is not None:
     group_doc = env["company.document"].sudo().create({
         "name": "Acceptance Test Group-only Policy",
-        "access_level": "group", "group_id": role_manager_group.id,
+        "access_level": "group", "group_id": doc_group.id,
     })
-    member_env = env(user=group_member.id)
     check("A member of the restricted group sees a group-scoped document",
-          any(d["id"] == group_doc.id for d in member_env["llm.tool"].list_documents().get("documents", [])))
-    check("A non-member (accountant, not in this group) does NOT see it",
-          not any(d["id"] == group_doc.id for d in acc_env["llm.tool"].list_documents().get("documents", [])))
+          any(d["id"] == group_doc.id for d in acc_env["llm.tool"].list_documents().get("documents", [])))
+    check("A non-member does NOT see the group-scoped document",
+          not any(d["id"] == group_doc.id for d in wh_env["llm.tool"].list_documents().get("documents", [])))
 else:
-    print("[SKIP] Scenario 26 group half - ai_business_tools.role_manager not found")
+    print("[SKIP] Scenario 26 group half - ai_business_tools.role_finance_staff not found")
 
 # ---------------------------------------------------------------------
 # Scenario 27 (v22, roadmap #28): a second GAP FOUND during this same

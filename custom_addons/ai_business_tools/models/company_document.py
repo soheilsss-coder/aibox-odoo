@@ -73,7 +73,12 @@ class LLMToolDocument(models.Model):
             query: Optional text to filter by document name.
         """
         domain = [("name", "ilike", query)] if query else []
-        docs = self.env["company.document"].search(domain)
+        try:
+            docs = self.env["company.document"].search(domain)
+        except AccessError as exc:
+            _audit(self.env, "list_documents", {"query": query},
+                   success=False, error_message=str(exc))
+            return {"error": "access_denied", "count": 0, "documents": []}
         result = {"count": len(docs), "documents": [
             {"id": d.id, "name": d.name, "access_level": d.access_level,
              "description": d.description or ""}
