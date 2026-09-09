@@ -101,6 +101,19 @@ export const postBuzzMessage = (channelId, body) => request(`/api/collaboration/
 
 export function streamChat(payload, handlers) {
   const { onThinking, onDelta, onDone, onError, signal } = handlers || {};
+  if (import.meta.env.VITE_CHAT_STREAMING === "0") {
+    onThinking && onThinking({});
+    return sendChatMessage(payload.message, payload.thread_id)
+      .then((data) => {
+        if (signal?.aborted) return;
+        onDelta && onDelta({ text: data.reply || "" });
+        onDone && onDone({ thread_id: data.thread_id, personal_agent: data.personal_agent });
+      })
+      .catch((err) => {
+        onError && onError({ error: err?.message || "ارسال پیام ناموفق بود" });
+        throw err;
+      });
+  }
   return fetch("/api/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...csrfHeader("POST") },
