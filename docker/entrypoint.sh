@@ -66,6 +66,18 @@ if [ "${AIBOX_START_MOCK_LLM:-1}" = "1" ]; then
   export AI_RAG_EMBEDDING_DIM="${AI_RAG_EMBEDDING_DIM:-384}"
 fi
 
+# --------------------------------------------------------- memory headroom
+# Free container tiers are 512MB-1GB, which is tight for Odoo + PostgreSQL +
+# Redis in one image. AIBOX_LITE=1 drops the six heaviest Odoo modules
+# (stock/mrp/account/purchase/sales_team/sale_management); the AI product
+# itself - gateway, semantic API, RAG, assistant, admin console - is untouched.
+# sandbox/aibox_local.sh already reads AIBOX_MODULES, so no other change is
+# needed to make the shorter list take effect.
+if [ "${AIBOX_LITE:-0}" = "1" ] && [ -z "${AIBOX_MODULES:-}" ]; then
+  export AIBOX_MODULES="web,mail,hr,hr_attendance,hr_holidays,project,llm,llm_tool,llm_openai,llm_thread,llm_assistant,llm_knowledge,company_ai_demo,ai_gateway,ai_business_tools,ai_control_plane,ai_integration,ai_rag,ai_customer_plane,ai_semantic_api,ai_correspondence,ai_document_intelligence,ai_workflow,ai_collaboration,ai_production,ai_experience,ai_telegram_bridge,ai_debrand"
+  log "AIBOX_LITE=1: installing 28 modules instead of 34"
+fi
+
 # ------------------------------------------------------- install (first boot)
 mkdir -p "$PGDATA" "$WS/logs"
 if [ ! -f "$WS/.installed" ]; then
@@ -81,6 +93,22 @@ import sys, pgserver
 srv = pgserver.get_server(sys.argv[1], cleanup_mode=None)
 print("postgres ready:", srv.get_uri())
 PY
+fi
+
+# PostgreSQL defaults (shared_buffers 128MB, max_connections 100) are sized for
+# a dedicated database box. This one shares the container with Odoo, Redis and
+# nginx, so trim it once - after initdb has written postgresql.conf.
+if [ -f "$PGDATA/postgresql.conf" ] && ! grep -q "AIBOX container tuning" "$PGDATA/postgresql.conf"; then
+  cat >> "$PGDATA/postgresql.conf" <<'PGCONF'
+
+# --- AIBOX container tuning ---
+shared_buffers = 64MB
+max_connections = 40
+work_mem = 4MB
+maintenance_work_mem = 32MB
+effective_cache_size = 256MB
+PGCONF
+  log "applied PostgreSQL memory tuning for a shared container"
 fi
 
 if [ ! -f "$WS/.demo" ]; then
