@@ -1,0 +1,130 @@
+# Publish the product shell to GitHub Pages.
+#
+# WHY THIS FILE LIVES IN docs/ AND NOT IN .github/workflows/
+#   The GitHub App credential available in the automated workspace has no
+#   `workflows` write permission, so a commit touching .github/workflows/ is
+#   rejected outright:
+#     ! [remote rejected] (refusing to allow a GitHub App to create or update
+#        workflow `.github/workflows/pages.yml` without `workflows` permission)
+#   So this file is shipped as a template. To activate it:
+#
+#     mkdir -p .github/workflows
+#     cp docs/pages-workflow.yml .github/workflows/pages.yml
+#     git add .github/workflows/pages.yml && git commit && git push
+#
+#   Or grant the app `Workflows: Read and write` under
+#   Settings > Actions > General > Workflow permissions, and it can be
+#   committed directly.
+#
+# WHAT THIS DOES
+#   Builds the React frontend and a landing page, and deploys both as one
+#   GitHub Pages artifact:
+#
+#       https://<user>.github.io/aibox-odoo/          landing + "connect" page
+#       https://<user>.github.io/aibox-odoo/app/      the product itself
+#
+# WHAT THIS IS NOT
+#   GitHub Pages serves static files only. The ERP backend (Odoo + PostgreSQL
+#   + the LLM API) cannot run there, and no workflow can make it run there.
+#   The published app talks to an appliance you host somewhere else; you point
+#   it at that appliance from the landing page (stored in localStorage) or by
+#   setting the AIBOX_API_BASE repository variable below.
+#
+# ONE-TIME SETUP (owner only, ~30 seconds - the deploy token cannot do this)
+#   1. Repository > Settings > Pages
+#   2. "Build and deployment" > Source > **GitHub Actions**
+#   3. Re-run this workflow (Actions tab > Publish to GitHub Pages > Run workflow)
+#
+# OPTIONAL
+#   Settings > Secrets and variables > Actions > Variables:
+#     AIBOX_API_BASE   default appliance URL baked into the build, e.g.
+#                      https://assistant.example.com
+#     AIBOX_PAGES_BASE asset base path; defaults to /<repo>/app/
+#
+# Private repositories need GitHub Pro/Team/Enterprise for Pages. On a free
+# account with a private repo, publish the frontend from a public repo or use
+# the appliance's own reverse proxy instead.
+
+name: Publish to GitHub Pages
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "frontend/**"
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: "Appliance API base baked into this build (leave empty to keep the runtime picker)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: Build the product shell
+        working-directory: frontend
+        env:
+          # Project pages are served from /<repo>/, so the app under /app needs
+          # that prefix on every asset URL.
+          VITE_BASE_PATH: ${{ vars.AIBOX_PAGES_BASE || format('/{0}/app/', github.event.repository.name) }}
+          VITE_OUT_DIR: ../site/app
+          VITE_API_BASE: ${{ github.event.inputs.api_base || vars.AIBOX_API_BASE || '' }}
+        run: npm run build
+
+      - name: Assemble the Pages artifact
+        run: |
+          set -euo pipefail
+          mkdir -p site
+          cp docs/index.html site/index.html
+          # SPA deep links (/chat, /admin, ...) 404 on Pages without this;
+          # serving the shell from 404.html makes the router handle them.
+          cp site/app/index.html site/app/404.html
+          # Record what was built and when, so the landing page can show it
+          # without a second request to the appliance.
+          cat > site/build-info.json <<JSON
+          {
+            "commit": "${GITHUB_SHA}",
+            "branch": "${GITHUB_REF_NAME}",
+            "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run": "${GITHUB_RUN_ID}"
+          }
+          JSON
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

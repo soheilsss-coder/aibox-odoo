@@ -8,6 +8,13 @@ import react from "@vitejs/plugin-react";
 // pointing at a different domain for the Odoo box).
 export default defineConfig({
   plugins: [react()],
+  // VITE_BASE_PATH lets the same source be published under a sub-path such as
+  // a GitHub Pages project site (/<repo>/app/). Empty/"/" is the appliance
+  // deployment, where the frontend is served from the site root.
+  base: process.env.VITE_BASE_PATH || "/",
+  build: {
+    outDir: process.env.VITE_OUT_DIR || "dist",
+  },
   server: {
     host: "0.0.0.0",
     allowedHosts: true,

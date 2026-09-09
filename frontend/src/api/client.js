@@ -1,5 +1,56 @@
 let csrfToken = "";
 
+// ---------------------------------------------------------------------------
+// API base resolution
+// ---------------------------------------------------------------------------
+// Every request in this file is relative by default, which is correct when the
+// frontend is served from the same origin as the ERP box (behind a reverse
+// proxy, or through the Vite dev server's /api proxy).
+//
+// A static host such as GitHub Pages has no backend of its own, so the base
+// has to be resolvable at *runtime* rather than baked in at build time -
+// otherwise pointing the published app at a different appliance means a
+// rebuild and a redeploy. Precedence:
+//
+//   1. localStorage override (what the landing page's "connect" box writes)
+//   2. window.AIBOX_API_BASE (a config.js dropped next to index.html)
+//   3. import.meta.env.VITE_API_BASE (build time)
+//   4. "" - same origin, the normal appliance deployment
+//
+// This is still the only file in the app that knows a URL. Pages keep calling
+// the exported functions and stay deployment-agnostic.
+export const API_BASE_STORAGE_KEY = "aibox_api_base";
+
+export function getApiBase() {
+  if (typeof window === "undefined") return "";
+  let stored = "";
+  try {
+    stored = window.localStorage.getItem(API_BASE_STORAGE_KEY) || "";
+  } catch (_err) {
+    /* storage can throw in private mode; fall through to the next source */
+  }
+  const injected = window.AIBOX_API_BASE || "";
+  const baked = import.meta.env.VITE_API_BASE || "";
+  return (stored || injected || baked).replace(/\/+$/, "");
+}
+
+export function setApiBase(base) {
+  const value = String(base || "").trim().replace(/\/+$/, "");
+  try {
+    if (value) window.localStorage.setItem(API_BASE_STORAGE_KEY, value);
+    else window.localStorage.removeItem(API_BASE_STORAGE_KEY);
+  } catch (_err) {
+    /* non-fatal: the build-time/env value still applies */
+  }
+  return value;
+}
+
+/** Join an API path onto the resolved base. */
+export function apiUrl(path) {
+  const base = getApiBase();
+  return base ? base + path : path;
+}
+
 function readCsrfCookie() {
   if (typeof document === "undefined") return "";
   const match = document.cookie.match(/(?:^|; )ai_csrf=([^;]+)/);
@@ -33,7 +84,7 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
     fetchBody = JSON.stringify(body);
   }
   Object.assign(headers, csrfHeader(method));
-  const resp = await fetch(path, { method, headers, body: fetchBody, credentials: "include" });
+  const resp = await fetch(apiUrl(path), { method, headers, body: fetchBody, credentials: "include" });
   let data = rememberSession(await resp.json().catch(() => ({})));
   if (data && data.jsonrpc) data = data.result || {};
   if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status);
@@ -115,7 +166,7 @@ export function streamChat(payload, handlers) {
         throw err;
       });
   }
-  return fetch("/api/chat/stream", {
+  return fetch(apiUrl("/api/chat/stream"), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...csrfHeader("POST") },
     body: JSON.stringify(payload),

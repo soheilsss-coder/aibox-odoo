@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AIBOX — دستیار سازمانی روی ERP</title>
+<meta name="description" content="دستیار هوشمند سازمانی روی ERP: چت نقش‌آگاه، اسناد و RAG، گردش تأیید، و کنسول مدیریت." />
+<style>
+  :root{
+    --bg:#0b1020; --panel:#141a2e; --panel2:#1b2340; --line:#2a3355;
+    --text:#e8ecf7; --muted:#9aa6c7; --accent:#6ea8fe; --ok:#3ecf8e; --warn:#f5b544;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#080c18,#0b1020 40%,#0b1020);color:var(--text);
+       font-family:"Vazirmatn","Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.75}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1000px;margin:0 auto;padding:40px 22px 80px}
+  header{display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;justify-content:space-between}
+  h1{font-size:30px;margin:0 0 6px}
+  h2{font-size:19px;margin:38px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .sub{color:var(--muted);font-size:15px}
+  .pill{display:inline-block;padding:3px 10px;border:1px solid var(--line);border-radius:999px;
+        font-size:12px;color:var(--muted);background:var(--panel)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:14px}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+  .k{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .k b{display:block;color:var(--muted);font-weight:500;font-size:13px;margin-bottom:4px}
+  input[type=text]{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);
+                   background:#0e1426;color:var(--text);font-family:var(--mono);font-size:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  button{padding:11px 20px;border-radius:10px;border:1px solid transparent;background:var(--accent);
+         color:#04101f;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+  button.ghost{background:transparent;color:var(--text);border-color:var(--line);font-weight:500}
+  button:hover{filter:brightness(1.08)}
+  code,pre{font-family:var(--mono);font-size:13px}
+  code{background:#0e1426;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+  pre{background:#0e1426;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;direction:ltr;text-align:left}
+  .status{font-size:13px;margin-top:10px;min-height:22px}
+  .status.ok{color:var(--ok)} .status.bad{color:var(--warn)} .status.idle{color:var(--muted)}
+  ul{margin:8px 0 0;padding-inline-start:22px} li{margin:5px 0}
+  .warnbox{border-color:#5b4a22;background:#1d1a10}
+  .big{font-size:16px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:500}
+  footer{margin-top:44px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>AIBOX — دستیار سازمانی روی ERP</h1>
+      <div class="sub">چت نقش‌آگاه · اسناد و جست‌وجوی معنایی · گردش تأیید · کنسول مدیریت · یک مسیر عملیات محافظت‌شده</div>
+    </div>
+    <span class="pill" id="buildinfo">build: —</span>
+  </header>
+
+  <div class="card">
+    <h2 style="margin-top:0">اتصال به نسخهٔ در حال اجرا</h2>
+    <p class="sub" style="margin-top:0">
+      این صفحه روی GitHub Pages فقط فایل ثابت سرو می‌کند؛ بک‌اند جای دیگری اجرا می‌شود.
+      آدرس appliance خودت را وارد کن تا همین رابط کاربری به آن وصل شود.
+    </p>
+    <label for="base" class="sub">آدرس بک‌اند (بدون اسلش آخر)</label>
+    <input id="base" type="text" placeholder="https://assistant.example.com" spellcheck="false" dir="ltr" />
+    <div class="row">
+      <button id="save">ذخیره و باز کردن محصول</button>
+      <button class="ghost" id="test">تست اتصال</button>
+      <button class="ghost" id="sameorigin">همین دامنه (پیش‌فرض)</button>
+    </div>
+    <div id="status" class="status idle">هنوز تستی انجام نشده.</div>
+  </div>
+
+  <div class="card warnbox">
+    <b>چرا بک‌اند اینجا اجرا نمی‌شود؟</b>
+    <ul>
+      <li>GitHub Pages فقط HTML/CSS/JS ثابت سرو می‌کند. Odoo یک سرویس پایتون با PostgreSQL است و روی Pages قابل اجرا نیست — با هیچ workflow ای.</li>
+      <li>پس این لینک <b>رابط کاربری محصول</b> را نشان می‌دهد؛ داده‌ها و LLM از appliance خودت می‌آید.</li>
+      <li>اگر appliance روی دامنهٔ دیگری است، در Odoo باید <code>AI_GATEWAY_ALLOWED_ORIGIN</code> روی آدرس همین Pages تنظیم شود، وگرنه مرورگر درخواست را به خاطر CORS رد می‌کند.</li>
+      <li>کوکی نشست باید cross-site ارسال شود: <code>AI_GATEWAY_COOKIE_SECURE=1</code> و <code>AI_GATEWAY_COOKIE_SAMESITE=None</code> (نیازمند HTTPS روی بک‌اند).</li>
+    </ul>
+  </div>
+
+  <h2>چه چیزی کجا اجرا می‌شود</h2>
+  <div class="grid">
+    <div class="k"><b>GitHub Pages (اینجا)</b>رابط React + صفحهٔ فرود. بدون سرور، بدون داده.</div>
+    <div class="k"><b>Appliance شما (Odoo)</b>ماژول‌های <code>ai_*</code>، gateway، ACL، ممیزی، RAG.</div>
+    <div class="k"><b>PostgreSQL + pgvector</b>داده‌های ERP و بردارهای اسناد.</div>
+    <div class="k"><b>LLM API</b>هر ارائه‌دهندهٔ OpenAI-compatible؛ با متغیر محیطی انتخاب می‌شود.</div>
+  </div>
+
+  <h2>جایگزینی LLM لوکال با API</h2>
+  <p class="sub">مسیر کد تغییر نکرده — فقط <code>llm.provider</code> حالا یک آدرس و کلید خارجی نگه می‌دارد. تشخیص ارائه‌دهنده خودکار است:</p>
+<pre>export AI_LLM_API_BASE=https://api.openai.com/v1
+export AI_LLM_API_KEY=sk-...
+export AI_LLM_MODEL=gpt-4.1-mini
+
+# Embedding جدا تنظیم می‌شود (Groq و OpenRouter اصلاً embedding ندارند)
+export AI_EMBEDDING_API_BASE=https://api.openai.com/v1
+export AI_EMBEDDING_MODEL=text-embedding-3-small
+export AI_EMBEDDING_DIM=1536
+
+python odoo-bin shell -c odoo.conf -d &lt;db&gt; --no-http &lt; runtime_workers/seed_api_inference.py
+python runtime_workers/verify_llm_api.py --verbose</pre>
+  <p class="sub">آدرس‌های تشخیص‌داده‌شده: OpenAI، Gemini، Groq، OpenRouter، Anthropic، Mistral، DeepSeek، xAI، DeepInfra، Together و هر endpoint سازگار (vLLM، Ollama، LM Studio).</p>
+
+  <h2>صفحه‌های محصول</h2>
+  <table>
+    <tr><th>مسیر</th><th>کار</th></tr>
+    <tr><td><code>/</code></td><td>داشبورد</td></tr>
+    <tr><td><code>/chat</code></td><td>چت با دستیار (SSE)</td></tr>
+    <tr><td><code>/documents</code></td><td>مرکز اسناد + جست‌وجوی معنایی</td></tr>
+    <tr><td><code>/approvals</code></td><td>گردش تأیید عملیات پرخطر</td></tr>
+    <tr><td><code>/leaves</code> · <code>/tasks</code> · <code>/calendar</code></td><td>مرخصی، وظایف، تقویم</td></tr>
+    <tr><td><code>/agents</code> · <code>/integrations</code></td><td>رجیستری ابزارها و یکپارچه‌سازی‌ها</td></tr>
+    <tr><td><code>/admin</code></td><td>کنسول مدیریت (نقش‌ها، گرنت‌ها، نصب اپ)</td></tr>
+  </table>
+
+  <footer>
+    <div>مخزن: <a href="https://github.com/soheilsss-coder/aibox-odoo">soheilsss-coder/aibox-odoo</a></div>
+    <div id="foot">—</div>
+  </footer>
+</div>
+
+<script>
+const KEY = "aibox_api_base";
+const $ = (id) => document.getElementById(id);
+
+function currentBase() {
+  try { return localStorage.getItem(KEY) || window.AIBOX_API_BASE || ""; }
+  catch (e) { return window.AIBOX_API_BASE || ""; }
+}
+function saveBase(v) {
+  const value = String(v || "").trim().replace(/\/+$/, "");
+  try { value ? localStorage.setItem(KEY, value) : localStorage.removeItem(KEY); } catch (e) {}
+  return value;
+}
+
+$("base").value = currentBase();
+
+// Resolve the app URL relative to this page so it works on any Pages path.
+const APP_URL = new URL("app/", document.baseURI).href;
+
+function openApp() {
+  const base = saveBase($("base").value);
+  window.location.href = base ? APP_URL : APP_URL;
+}
+$("save").addEventListener("click", openApp);
+$("sameorigin").addEventListener("click", () => { $("base").value = ""; saveBase(""); setStatus("idle", "روی همین دامنه تنظیم شد."); });
+
+function setStatus(kind, msg) {
+  const el = $("status");
+  el.className = "status " + kind;
+  el.textContent = msg;
+}
+
+$("test").addEventListener("click", async () => {
+  const base = saveBase($("base").value);
+  const url = base + "/api/health";
+  setStatus("idle", "در حال تست " + url + " …");
+  const started = performance.now();
+  try {
+    const resp = await fetch(url, { credentials: "include" });
+    const ms = Math.round(performance.now() - started);
+    const text = await resp.text();
+    if (!resp.ok) return setStatus("bad", "HTTP " + resp.status + " — " + text.slice(0, 200));
+    setStatus("ok", "متصل شد (" + ms + "ms): " + text.slice(0, 200));
+  } catch (err) {
+    setStatus("bad", "خطا: " + err.message + " — اگر بک‌اند بالاست، AI_GATEWAY_ALLOWED_ORIGIN را روی آدرس همین Pages بگذار.");
+  }
+});
+
+fetch("build-info.json").then(r => r.json()).then(info => {
+  const short = (info.commit || "").slice(0, 7);
+  $("buildinfo").textContent = "build: " + short + " · " + (info.built_at || "");
+  $("foot").textContent = "commit " + short + " روی " + (info.branch || "?") + " · run " + (info.workflow_run || "?");
+}).catch(() => {
+  $("buildinfo").textContent = "build: دستی (بدون workflow)";
+});
+</script>
+</body>
+</html>
