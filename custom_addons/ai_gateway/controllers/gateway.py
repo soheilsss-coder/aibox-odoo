@@ -830,29 +830,54 @@ class AiGatewayController(http.Controller):
         def _sse(event, payload):
             return "event: %s\ndata: %s\n\n" % (event, json.dumps(payload, ensure_ascii=False))
 
+        # Everything this stream needs must be read out of the request BEFORE
+        # the generator is handed back to the WSGI server. The generator body
+        # is consumed after the request context has been unbound, so touching
+        # `request` in there raises RuntimeError('object is not bound') - which
+        # used to surface as a bare "invalid request", because the body parse
+        # sat inside a catch-all except and swallowed the real error.
+        #
+        # Reading once, here, while the request is live, also fixes the second
+        # half of that bug: for a form-encoded POST the dispatcher has already
+        # consumed the body building `request.params`, so `httprequest.data`
+        # is empty by the time we get to it. Both sources are accepted now.
+        raw = request.httprequest.get_data(as_text=True)
+        data = {}
+        if raw:
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                data = {}
+        if not data:
+            # Form-encoded POST: the body was already consumed building
+            # request.params, so the raw bytes are gone. Take them from there.
+            data = dict(request.params or {})
+        if not isinstance(data, dict):
+            return _json_response({"error": "invalid request"}, status=400)
+
+        message = data.get("message")
+        thread_id = data.get("thread_id")
+        attachment_ids = data.get("attachment_ids") or []
+        if not isinstance(attachment_ids, list):
+            attachment_ids = []
+        attachment_ids = [int(x) for x in attachment_ids if str(x).isdigit()]
+        if not message and not attachment_ids:
+            return _json_response(
+                {"error": "'message' or attachment_ids is required"}, status=400
+            )
+
+        # Same bounded worker pool as /api/chat - the heavy turn is
+        # queued when the engine is saturated, overflowing requests
+        # get the busy error instead of piling up, and the SSE stream
+        # still delivers the final reply progressively.
+        # Captured as plain values: the worker thread has no request context.
+        dbname = request.env.cr.dbname
+        user_id = user.id
+
         def generate():
             yield _sse("thinking", {})
-            try:
-                data = json.loads(request.httprequest.data or b"{}")
-            except Exception:  # noqa: BLE001
-                yield _sse("error", {"error": "invalid request"})
-                return
-            message = data.get("message")
-            thread_id = data.get("thread_id")
-            attachment_ids = data.get("attachment_ids") or []
-            if not isinstance(attachment_ids, list):
-                attachment_ids = []
-            attachment_ids = [int(x) for x in attachment_ids if str(x).isdigit()]
-            if not message and not attachment_ids:
-                yield _sse("error", {"error": "'message' or attachment_ids is required"})
-                return
-            # Same bounded worker pool as /api/chat - the heavy turn is
-            # queued when the engine is saturated, overflowing requests
-            # get the busy error instead of piling up, and the SSE stream
-            # still delivers the final reply progressively.
-            dbname = request.env.cr.dbname
             ok, result = get_chat_pool().submit(
-                lambda: _run_chat_detached(dbname, user.id, message, thread_id, attachment_ids)
+                lambda: _run_chat_detached(dbname, user_id, message, thread_id, attachment_ids)
             )
             if not ok:
                 yield _sse("busy", {"error": result})
