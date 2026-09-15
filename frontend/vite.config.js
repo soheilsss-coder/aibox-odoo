@@ -9,6 +9,12 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
+    // 0.0.0.0 + open host allowlist: required for remote/preview access
+    // (SSH tunnels, sandbox previews, LAN demos). Dev-only setting - the
+    // production build is static files served by nginx, see
+    // 17_setup_frontend.sh.
+    host: true,
+    allowedHosts: true,
     port: 5173,
     proxy: {
       "/api": {

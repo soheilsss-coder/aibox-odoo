@@ -1,5 +1,5 @@
-# Ignore Node.js dependencies
-/node_modules/
+# Ignore Node.js dependencies (any depth: root tooling, frontend/, etc.)
+node_modules/
 
 # Ignore generated files
 /*.pid

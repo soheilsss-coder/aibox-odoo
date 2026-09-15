@@ -1,6 +1,15 @@
-export function getApiKey() { return ""; }
-export function setApiKey(_key) {}
-export function clearApiKey() {}
+let apiKey = "";
+try { apiKey = sessionStorage.getItem("aibox.apiKey") || ""; } catch { /* storage can be blocked in iframes */ }
+
+export function getApiKey() { return apiKey; }
+export function setApiKey(key) {
+  apiKey = key || "";
+  try {
+    if (key) sessionStorage.setItem("aibox.apiKey", key);
+    else sessionStorage.removeItem("aibox.apiKey");
+  } catch { /* fall back to in-memory only */ }
+}
+export function clearApiKey() { setApiKey(""); }
 
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
@@ -8,6 +17,12 @@ export class ApiError extends Error {
 
 async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
   const headers = {};
+  // Cookie session is the primary auth path (same as production). The
+  // X-API-Key header - also natively accepted by ai_gateway's
+  // _authenticate() - is what keeps the session alive when the app is
+  // shown inside a third-party context (preview iframes) where browsers
+  // silently drop the ai_session cookie despite credentials: "include".
+  if (apiKey) headers["X-API-Key"] = apiKey;
   let fetchBody;
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
@@ -19,9 +34,19 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
   return data;
 }
 
-export const login = (loginId, password) => request("/api/login", { method: "POST", body: { login: loginId, password } });
+export async function login(loginId, password) {
+  const data = await request("/api/login", { method: "POST", body: { login: loginId, password } });
+  // Backends that hand back a key (or the dev mock) enable the header
+  // fallback; cookie-only backends simply don't send one and nothing
+  // changes compared to before.
+  if (data.api_key) setApiKey(data.api_key);
+  return data;
+}
 export const getMe = () => request("/api/me");
-export const logout = () => request("/api/logout", { method: "POST" });
+export function logout() {
+  clearApiKey();
+  return request("/api/logout", { method: "POST" });
+}
 export const getMyCapabilities = () => request("/api/me/capabilities");
 export const getWorkspace = () => request("/api/workspace");
 export const getDepartments = () => request("/api/departments");
@@ -36,9 +61,11 @@ export const sendChatMessage = (message, threadId) => request("/api/chat", { met
 
 export function streamChat(payload, handlers) {
   const { onThinking, onDelta, onDone, onError } = handlers || {};
+  const headers = { "Content-Type": "application/json" };
+  if (apiKey) headers["X-API-Key"] = apiKey;
   return fetch("/api/chat/stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
     credentials: "include",
   })

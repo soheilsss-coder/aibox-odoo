@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { login, setApiKey, clearApiKey, getMe, ApiError } from "../api/client.js";
+import { login, clearApiKey, getMe, ApiError } from "../api/client.js";
 import { Card, Input, Button, Alert } from "../components";
 
 // v24: this used to ask the user to paste in a raw API key ("get it
@@ -11,8 +11,12 @@ import { Card, Input, Button, Alert } from "../components";
 // hands back that same user's existing API key, which is then stored
 // exactly as before and used for every request after this one.
 export default function LoginPage({ onLoggedIn }) {
-  const [loginId, setLoginId] = useState("");
-  const [password, setPassword] = useState("");
+  // In `vite dev` (import.meta.env.DEV) the form is pre-filled with demo
+  // credentials - one click on «ورود» is enough. In production builds this
+  // compiles to the original empty form; nothing changes for real users.
+  const DEV = import.meta.env && import.meta.env.DEV;
+  const [loginId, setLoginId] = useState(DEV ? "sara@example.com" : "");
+  const [password, setPassword] = useState(DEV ? "demo" : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +26,6 @@ export default function LoginPage({ onLoggedIn }) {
     setLoading(true);
     try {
       await login(loginId.trim(), password);
-      setApiKey("");
       const user = await getMe();
       onLoggedIn(user);
     } catch (err) {
