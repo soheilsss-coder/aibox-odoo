@@ -1,19 +1,13 @@
 import React, { useState } from "react";
 import { login, clearApiKey, getMe, ApiError } from "../api/client.js";
-import { Card, Input, Button, Alert } from "../components";
+import { Alert, Button, Input } from "../components";
 
-// v24: this used to ask the user to paste in a raw API key ("get it
-// from your admin"). Every onboarded employee already has a normal
-// email + password (see onboarding/onboard_from_excel.py) - there is
-// no reason to make them separately handle a 48-character key by hand
-// day to day. This screen now takes login/password like any ordinary
-// app; /api/login (backend) checks the real Odoo credentials once and
-// hands back that same user's existing API key, which is then stored
-// exactly as before and used for every request after this one.
+// Login screen: the employee's front door. Trades email+password for a
+// session (cookie; the dev backend also returns an api_key the client then
+// sends as X-API-Key so auth survives third-party iframe previews).
+// In `vite dev` the form is pre-filled with demo credentials; production
+// builds compile to an empty form.
 export default function LoginPage({ onLoggedIn }) {
-  // In `vite dev` (import.meta.env.DEV) the form is pre-filled with demo
-  // credentials - one click on «ورود» is enough. In production builds this
-  // compiles to the original empty form; nothing changes for real users.
   const DEV = import.meta.env && import.meta.env.DEV;
   const [loginId, setLoginId] = useState(DEV ? "sara@example.com" : "");
   const [password, setPassword] = useState(DEV ? "demo" : "");
@@ -30,42 +24,53 @@ export default function LoginPage({ onLoggedIn }) {
       onLoggedIn(user);
     } catch (err) {
       clearApiKey();
-      setError(err instanceof ApiError ? err.message : "اتصال برقرار نشد");
+      setError(err instanceof ApiError ? err.message : "Could not connect.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="main" style={{ maxWidth: 380, margin: "80px auto" }}>
-      <Card>
-        <h1 style={{ fontSize: 20, marginTop: 0 }}>ورود</h1>
-        <p className="muted">
-          با ایمیل و رمز عبوری که هنگام راه‌اندازی برایتان ساخته شده وارد
-          شوید.
-        </p>
+    <div className="auth-wrap">
+      <span className="auth-blob b1" />
+      <span className="auth-blob b2" />
+      <span className="auth-blob b3" />
+
+      <div className="auth-card">
+        <div className="orb-glow" style={{ display: "inline-block" }}>
+          <span className="orb" />
+        </div>
+        <h1>Welcome back</h1>
+        <p className="sub">Sign in with the work email and password you were given at onboarding.</p>
+
         <form onSubmit={handleSubmit}>
           <Input
+            id="login-email"
             type="text"
-            placeholder="ایمیل"
+            label="Email"
+            placeholder="you@company.com"
             value={loginId}
             onChange={(e) => setLoginId(e.target.value)}
             autoFocus
             autoComplete="username"
           />
           <Input
+            id="login-password"
             type="password"
-            placeholder="رمز عبور"
+            label="Password"
+            placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
           />
           <Alert>{error}</Alert>
-          <Button type="submit" disabled={!loginId || !password} loading={loading}>
-            ورود
+          <Button variant="primary" size="lg" type="submit" className="btn-block" disabled={!loginId || !password} loading={loading}>
+            Sign in
           </Button>
         </form>
-      </Card>
+
+        <div className="auth-foot">Nova Enterprise · AI Operating System</div>
+      </div>
     </div>
   );
 }

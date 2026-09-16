@@ -1,15 +1,15 @@
 import React from "react";
 
-export default function Card({ title, actions, children, className = "", ...rest }) {
+export default function Card({ title, actions, children, className = "", hover = false, style }) {
   return (
-    <div className={`card ${className}`} {...rest}>
+    <section className={`card ${hover ? "card-hover" : ""} ${className}`} style={style}>
       {(title || actions) && (
-        <div className="ds-card-header">
-          {title && <h3 className="ds-card-title">{title}</h3>}
-          {actions && <div className="ds-card-actions">{actions}</div>}
-        </div>
+        <header className="card-head">
+          <h3>{title}</h3>
+          {actions ? <div className="h-stack">{actions}</div> : null}
+        </header>
       )}
       {children}
-    </div>
+    </section>
   );
 }
