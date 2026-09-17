@@ -9,6 +9,11 @@ try {
 // /api/* call through the in-browser mock engine (src/demo/backend.js)
 // instead of the network, so the exact production UI runs fully offline.
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1";
+// Hybrid deployment: the UI can be hosted anywhere (e.g. GitHub Pages) while
+// the real Odoo gateway lives elsewhere (e.g. Render). Set VITE_API_URL at
+// build time to the backend origin; requests then go cross-origin with the
+// stateless X-API-Key header path the gateway natively supports.
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 let demoBackendPromise = null;
 const demoBackend = () => (demoBackendPromise ??= import("../demo/backend.js"));
 
@@ -53,7 +58,7 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
   }
   const resp = DEMO_MODE
     ? await (await demoBackend()).demoRequest(path, { method, body, apiKey })
-    : await fetch(path, { method, headers, body: fetchBody, credentials: "include" });
+    : await fetch(API_BASE + path, { method, headers, body: fetchBody, credentials: "include" });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status);
   return data;
@@ -93,7 +98,7 @@ export function streamChat(payload, handlers) {
   if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
   const responsePromise = DEMO_MODE
     ? demoBackend().then((d) => d.demoStream(payload, apiKey))
-    : fetch("/api/chat/stream", {
+    : fetch(API_BASE + "/api/chat/stream", {
         method: "POST",
         headers,
         body: JSON.stringify(payload),

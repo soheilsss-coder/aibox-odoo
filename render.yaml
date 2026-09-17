@@ -25,3 +25,8 @@ services:
         value: "1"
       - key: AI_GATEWAY_ENV
         value: production
+      # The Nova UI served from GitHub Pages calls this backend cross-origin
+      # (hybrid deployment). The gateway rejects non-listed origins; without
+      # this var the production guard would refuse to boot.
+      - key: AI_GATEWAY_ALLOWED_ORIGINS
+        value: "https://soheilsss-coder.github.io"
