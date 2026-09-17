@@ -178,9 +178,8 @@ export default function ChatPage({ user, chatsOpen, onOpenChats }) {
   return (
     <div className="chat-page">
       {!chatsOpen && (
-        <button className="peek-chats" onClick={onOpenChats} aria-label="Show chats panel">
-          <Icon name="message" size={15} />
-          <span>Chats</span>
+        <button className="chat-toggle" onClick={onOpenChats} aria-label="Expand chats panel" title="Expand chats panel">
+          <Icon name="chevronsRight" size={17} />
         </button>
       )}
       <div className="chat-scroll" ref={scrollRef}>

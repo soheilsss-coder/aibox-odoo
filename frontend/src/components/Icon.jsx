@@ -34,6 +34,9 @@ const PATHS = {
   clock: <path d="M12 6v6l4 2m6-2a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z" />,
   copy: <path d="M9 9h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Zm-4 6H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />,
   arrowRight: <path d="M5 12h14m-6-6 6 6-6 6" />,
+  chevronsLeft: <path d="m11 17-5-5 5-5m7 10-5-5 5-5" />,
+  chevronsRight: <path d="m6 17 5-5-5-5m7 10 5-5-5-5" />,
+  panelLeft: <path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm6-2v18" />,
   users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2m22 0v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" />,
 
   inbox: <path d="M22 12h-6l-2 3h-4l-2-3H2m2-7.5L5.5 3h13L20 4.5M2 7v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7" />,

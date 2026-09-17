@@ -79,7 +79,7 @@ function ChatPanel({ threads, activeId, open, onClose, onNavigateThread }) {
     <aside className={`chat-panel ${open ? "open" : "closed"}`} aria-label="Chat conversations">
       <div className="chat-panel-head">
         <span className="chat-panel-title">Chats</span>
-        <IconButton icon="x" label="Hide chats panel" onClick={onClose} />
+        <IconButton icon="chevronsLeft" label="Collapse chats panel" className="panel-collapse-btn" onClick={onClose} />
       </div>
       <Link to="/" className="btn btn-primary btn-block new-chat-btn" onClick={onNavigateThread}>
         <Icon name="plus" size={16} /> New chat
