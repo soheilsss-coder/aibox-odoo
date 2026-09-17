@@ -104,3 +104,23 @@ batching unrelated big items together.
   one real pass: login → leaves → upload a document in each access
   level → semantic search → delete a document → (if admin) create and
   revoke an access grant → edit branding → chat round-trip.
+
+## Static GitHub Pages demo (`/docs`)
+
+`/docs` at the repo root is a **fully static, backend-free build** of this app,
+intended for GitHub Pages (source: branch `arena/01a0a69b-aibox-odoo`, folder `/docs`).
+It is built with:
+
+```bash
+cd frontend
+PAGES_BASE=/aibox-odoo/ VITE_DEMO_MODE=1 npx vite build --outDir ../docs
+cp ../docs/index.html ../docs/404.html
+touch ../docs/.nojekyll
+```
+
+In this mode every `/api/*` call is answered by the in-browser mock engine
+(`src/demo/*`) — login (any credentials), SSE chat streaming, documents,
+approvals and the admin console all work on plain static hosting. Demo state
+persists per tab via sessionStorage.
+
+Rebuild and commit `/docs` after any frontend change you want live on Pages.
