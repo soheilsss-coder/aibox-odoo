@@ -2,7 +2,7 @@
 # AIBOX single-file installer/launcher.
 #
 # One-line install/update example:
-#   curl -fsSL https://raw.githubusercontent.com/soheilsss-coder/aibox-odoo/arena/01a07ab5-aibox-odoo/install_aibox_onefile.sh | bash -s -- install
+#   curl -fsSL https://raw.githubusercontent.com/soheilsss-coder/aibox-odoo/arena/01a0a69b-aibox-odoo/install_aibox_onefile.sh | bash -s -- install
 #
 # Foreground launch examples (run in separate visible terminals):
 #   ./install_aibox_onefile.sh serve-vllm
@@ -21,7 +21,7 @@ CMD="${1:-install}"
 shift || true
 
 AIBOX_REPO="${AIBOX_REPO:-https://github.com/soheilsss-coder/aibox-odoo.git}"
-AIBOX_BRANCH="${AIBOX_BRANCH:-arena/01a07ab5-aibox-odoo}"
+AIBOX_BRANCH="${AIBOX_BRANCH:-arena/01a0a69b-aibox-odoo}"
 WS="${AIBOX_WORKSPACE:-$HOME/aibox-workspace}"
 APP="$WS/app/aibox-odoo"
 SRC="$WS/src"

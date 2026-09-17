@@ -1,5 +1,9 @@
 let apiKey = "";
-try { apiKey = sessionStorage.getItem("aibox.apiKey") || ""; } catch { /* storage can be blocked in iframes */ }
+let csrfToken = "";
+try {
+  apiKey = sessionStorage.getItem("aibox.apiKey") || "";
+  csrfToken = sessionStorage.getItem("aibox.csrf") || "";
+} catch { /* storage can be blocked in iframes */ }
 
 // Static-demo mode (GitHub Pages build): VITE_DEMO_MODE=1 routes every
 // /api/* call through the in-browser mock engine (src/demo/backend.js)
@@ -16,7 +20,14 @@ export function setApiKey(key) {
     else sessionStorage.removeItem("aibox.apiKey");
   } catch { /* fall back to in-memory only */ }
 }
-export function clearApiKey() { setApiKey(""); }
+function setCsrfToken(token) {
+  csrfToken = token || "";
+  try {
+    if (token) sessionStorage.setItem("aibox.csrf", token);
+    else sessionStorage.removeItem("aibox.csrf");
+  } catch { /* fall back to in-memory only */ }
+}
+export function clearApiKey() { setApiKey(""); setCsrfToken(""); }
 
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
@@ -30,6 +41,11 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
   // shown inside a third-party context (preview iframes) where browsers
   // silently drop the ai_session cookie despite credentials: "include".
   if (apiKey) headers["X-API-Key"] = apiKey;
+  // Production cookie sessions (ai_session) require a double-submit CSRF
+  // token on every mutating request; /api/login returns it in the JSON body
+  // (it also lands in the readable ai_csrf cookie). API-key clients are
+  // exempt server-side, and the demo engine ignores headers entirely.
+  if (csrfToken && String(method).toUpperCase() !== "GET") headers["X-CSRF-Token"] = csrfToken;
   let fetchBody;
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
@@ -47,8 +63,10 @@ export async function login(loginId, password) {
   const data = await request("/api/login", { method: "POST", body: { login: loginId, password } });
   // Backends that hand back a key (or the dev mock) enable the header
   // fallback; cookie-only backends simply don't send one and nothing
-  // changes compared to before.
+  // changes compared to before. The production gateway additionally
+  // returns a session-bound csrf_token every cookie-mode POST needs.
   if (data.api_key) setApiKey(data.api_key);
+  if (data.csrf_token) setCsrfToken(data.csrf_token);
   return data;
 }
 export const getMe = () => request("/api/me");
@@ -72,6 +90,7 @@ export function streamChat(payload, handlers) {
   const { onThinking, onDelta, onDone, onError } = handlers || {};
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["X-API-Key"] = apiKey;
+  if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
   const responsePromise = DEMO_MODE
     ? demoBackend().then((d) => d.demoStream(payload, apiKey))
     : fetch("/api/chat/stream", {
