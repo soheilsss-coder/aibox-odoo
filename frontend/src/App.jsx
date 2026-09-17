@@ -70,15 +70,73 @@ function Brand() {
   );
 }
 
+// Dedicated conversations menu — the chat page's own panel. It lives NEXT TO
+// the app navigation (Tasks, Approvals, ...) as a separate column, like the
+// history rail in ChatGPT/Claude: New chat + the user's conversation list.
+function ChatPanel({ threads, activeId, open, onClose, onNavigateThread }) {
+  const navigate = useNavigate();
+  return (
+    <aside className={`chat-panel ${open ? "open" : "closed"}`} aria-label="Chat conversations">
+      <div className="chat-panel-head">
+        <span className="chat-panel-title">Chats</span>
+        <IconButton icon="x" label="Hide chats panel" onClick={onClose} />
+      </div>
+      <Link to="/" className="btn btn-primary btn-block new-chat-btn" onClick={onNavigateThread}>
+        <Icon name="plus" size={16} /> New chat
+      </Link>
+      <div className="threads" aria-label="Recent chats">
+        {threads.length > 0 && <div className="nav-sec chat-panel-sec">Recent chats</div>}
+        <div className="threads-scroll">
+          {threads.map((t) => (
+            <Link
+              key={t.id}
+              to={`/chat/${t.id}`}
+              className={`thread-row ${activeId === t.id ? "active" : ""}`}
+              title={t.title || "New chat"}
+              onClick={onNavigateThread}
+            >
+              <Icon name="message" size={15} />
+              <span className="thread-title">{t.title || "New chat"}</span>
+              <span className="thread-date">{relDate(t.updatedAt)}</span>
+              <button
+                className="thread-del"
+                aria-label={`Delete chat ${t.title || ""}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  removeThread(t.id);
+                  if (activeId === t.id) navigate("/");
+                }}
+              >
+                <Icon name="trash" size={13} />
+              </button>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 function Shell({ user, onLogout }) {
   const [caps, setCaps] = useState([]);
   const [notifCount, setNotifCount] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const location = useLocation();
-  const navigate = useNavigate();
   const threads = useThreads();
   const activeThreadId = location.pathname.startsWith("/chat/") ? location.pathname.slice(6) : null;
+  const isChatRoute = location.pathname === "/" || location.pathname.startsWith("/chat/");
+  // The conversations panel is open by default; preference persists.
+  const [chatsOpen, setChatsOpen] = useState(() => {
+    try { return localStorage.getItem("nova.chatsPanel") !== "0"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("nova.chatsPanel", chatsOpen ? "1" : "0"); } catch { /* ignore */ }
+  }, [chatsOpen]);
+  const closePanelOnMobile = () => {
+    try { if (window.matchMedia("(max-width: 960px)").matches) setChatsOpen(false); } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     api.getMyCapabilities().then((x) => setCaps(x.capabilities || x || [])).catch(() => {});
@@ -119,9 +177,6 @@ function Shell({ user, onLogout }) {
 
       <aside className={`sidebar ${navOpen ? "open" : ""}`}>
         <Brand />
-        <Link to="/" className="btn btn-primary btn-block new-chat-btn">
-          <Icon name="plus" size={16} /> New chat
-        </Link>
 
         <nav className="nav" aria-label="Primary">
           {items.map((section) => (
@@ -139,37 +194,6 @@ function Shell({ user, onLogout }) {
                   {item.badge && notifCount > 0 && <span className="nav-badge">{notifCount}</span>}
                 </NavLink>
               ))}
-              {!section.section && (
-                <div className="threads" aria-label="Recent chats">
-                  {threads.length > 0 && <div className="nav-sec">Recent chats</div>}
-                  <div className="threads-scroll">
-                    {threads.slice(0, 14).map((t) => (
-                      <Link
-                        key={t.id}
-                        to={`/chat/${t.id}`}
-                        className={`thread-row ${activeThreadId === t.id ? "active" : ""}`}
-                        title={t.title || "New chat"}
-                      >
-                        <Icon name="message" size={15} />
-                        <span className="thread-title">{t.title || "New chat"}</span>
-                        <span className="thread-date">{relDate(t.updatedAt)}</span>
-                        <button
-                          className="thread-del"
-                          aria-label={`Delete chat ${t.title || ""}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            removeThread(t.id);
-                            if (activeThreadId === t.id) navigate("/");
-                          }}
-                        >
-                          <Icon name="trash" size={13} />
-                        </button>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
             </React.Fragment>
           ))}
         </nav>
@@ -198,11 +222,26 @@ function Shell({ user, onLogout }) {
         </div>
       </aside>
 
+      {/* Conversations menu — the chat page's own panel, separate from the
+          app navigation. Desktop: a fixed second column; mobile: a drawer. */}
+      {isChatRoute && (
+        <>
+          <ChatPanel
+            threads={threads}
+            activeId={activeThreadId}
+            open={chatsOpen}
+            onClose={() => setChatsOpen(false)}
+            onNavigateThread={closePanelOnMobile}
+          />
+          {chatsOpen && <div className="scrim panel-scrim" onClick={() => setChatsOpen(false)} />}
+        </>
+      )}
+
       <main className="main">
         <div className="route-enter" key={location.pathname}>
           <Routes location={location}>
-            <Route path="/" element={<ChatPage user={user} />} />
-            <Route path="/chat/:id" element={<ChatPage user={user} />} />
+            <Route path="/" element={<ChatPage user={user} chatsOpen={chatsOpen} onOpenChats={() => setChatsOpen(true)} />} />
+            <Route path="/chat/:id" element={<ChatPage user={user} chatsOpen={chatsOpen} onOpenChats={() => setChatsOpen(true)} />} />
             <Route path="/chat" element={<Navigate to="/" replace />} />
             <Route path="/tasks" element={<div className="page"><TasksPage /></div>} />
             <Route path="/approvals" element={<div className="page"><ApprovalsPage /></div>} />

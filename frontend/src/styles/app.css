@@ -274,7 +274,75 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-base);
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item.active { background: var(--accent-soft); color: var(--accent); }
 
-/* Recent chats (thread history, ChatGPT-style) */
+/* Recent chats (thread history, ChatGPT-style) — lives inside the chats
+   panel (.chat-panel), the chat page's own menu next to the app nav. */
+.chat-panel {
+  flex: 0 0 auto;
+  width: 264px;
+  /* The app sidebar is position:fixed (out of flow) — this panel reserves
+     its space with the same margin, like .main does. */
+  margin-left: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-5, 20px) var(--sp-4, 14px) var(--sp-4, 14px);
+  background: color-mix(in srgb, var(--bg-elev) 60%, transparent);
+  border-right: 1px solid var(--border);
+  animation: panelIn 220ms var(--ease-out);
+}
+@keyframes panelIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+.chat-panel-head { display: flex; align-items: center; justify-content: space-between; margin: 0 2px 10px; }
+.chat-panel-title { font-size: 13px; font-weight: var(--fw-bold); letter-spacing: 0.02em; color: var(--text-faint); text-transform: uppercase; }
+.chat-panel .new-chat-btn { margin: 0 2px 12px; }
+.chat-panel .threads { flex: 1 1 auto; min-height: 0; }
+.chat-panel .threads-scroll { max-height: none; flex: 1 1 auto; overflow-y: auto; }
+.chat-panel .nav-sec { padding: 6px 10px 6px; }
+.chat-panel .thread-date { flex: 0 0 auto; }
+
+/* Floating reopen affordance when the panel is hidden */
+.peek-chats {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 150ms, color 150ms, transform 150ms var(--ease-out);
+}
+.peek-chats:hover { color: var(--accent); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.chat-page { position: relative; }
+
+@media (min-width: 961px) {
+  .chat-panel.closed { display: none; }
+  .panel-scrim { display: none; }
+}
+@media (max-width: 960px) {
+  .chat-panel {
+    position: fixed;
+    inset-block: 0;
+    left: 0;
+    margin-left: 0;
+    z-index: 55;
+    transform: translateX(-103%);
+    transition: transform 240ms var(--ease-out);
+    background: var(--bg-elev);
+    box-shadow: none;
+    width: 284px;
+  }
+  .chat-panel.open { transform: none; box-shadow: var(--shadow-lg); }
+  .peek-chats { top: calc(var(--topbar-h) + 10px); left: 14px; }
+}
+
 .threads { display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
 .threads-scroll {
   flex: 0 0 auto;

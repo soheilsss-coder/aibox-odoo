@@ -11,7 +11,7 @@ const SUGGESTIONS = [
   { icon: "users", text: "Who is in the Sales department?" },
 ];
 
-export default function ChatPage({ user }) {
+export default function ChatPage({ user, chatsOpen, onOpenChats }) {
   const { id: routeThreadId } = useParams();
   const navigate = useNavigate();
   useThreads(); // re-render when the store changes
@@ -177,6 +177,12 @@ export default function ChatPage({ user }) {
 
   return (
     <div className="chat-page">
+      {!chatsOpen && (
+        <button className="peek-chats" onClick={onOpenChats} aria-label="Show chats panel">
+          <Icon name="message" size={15} />
+          <span>Chats</span>
+        </button>
+      )}
       <div className="chat-scroll" ref={scrollRef}>
         {empty ? (
           <div className="hero">
