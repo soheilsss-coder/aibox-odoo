@@ -69,4 +69,14 @@ echo "      login:  admin"
 echo "      pass :  admin"
 echo "=============================================================="
 echo "Live logs follow (Ctrl+C only stops the log view, not the app):"
+set +e
 docker logs -f --tail 50 "${IMAGE}"
+code=$(docker inspect -f '{{.State.ExitCode}}' "${IMAGE}" 2>/dev/null || echo 0)
+if [ "${code:-0}" != "0" ]; then
+  echo ""
+  echo "###############  BOOT FAILED (exit ${code})  ###############"
+  echo "Last 80 log lines (paste these back - or simply re-run the script, it RESUMES):"
+  echo "------------------------------------------------------------"
+  docker logs --tail 80 "${IMAGE}" 2>&1
+  echo "------------------------------------------------------------"
+fi
