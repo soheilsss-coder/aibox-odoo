@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Routes, Route, NavLink, Link, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import * as api from "./api/client.js";
 import { Icon, IconButton } from "./components";
+import { useThreads, relDate, removeThread } from "./hooks/useThreads.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
 import TasksPage from "./pages/TasksPage.jsx";
@@ -75,6 +76,9 @@ function Shell({ user, onLogout }) {
   const [navOpen, setNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
+  const threads = useThreads();
+  const activeThreadId = location.pathname.startsWith("/chat/") ? location.pathname.slice(6) : null;
 
   useEffect(() => {
     api.getMyCapabilities().then((x) => setCaps(x.capabilities || x || [])).catch(() => {});
@@ -115,7 +119,7 @@ function Shell({ user, onLogout }) {
 
       <aside className={`sidebar ${navOpen ? "open" : ""}`}>
         <Brand />
-        <Link to="/" state={{ t: Date.now() }} className="btn btn-primary btn-block new-chat-btn">
+        <Link to="/" className="btn btn-primary btn-block new-chat-btn">
           <Icon name="plus" size={16} /> New chat
         </Link>
 
@@ -128,7 +132,6 @@ function Shell({ user, onLogout }) {
                   key={item.to}
                   to={item.to}
                   end={item.end}
-                  state={item.to === "/" ? { t: Date.now() } : undefined}
                   className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
                 >
                   <Icon name={item.icon} size={18} />
@@ -136,6 +139,37 @@ function Shell({ user, onLogout }) {
                   {item.badge && notifCount > 0 && <span className="nav-badge">{notifCount}</span>}
                 </NavLink>
               ))}
+              {!section.section && (
+                <div className="threads" aria-label="Recent chats">
+                  {threads.length > 0 && <div className="nav-sec">Recent chats</div>}
+                  <div className="threads-scroll">
+                    {threads.slice(0, 14).map((t) => (
+                      <Link
+                        key={t.id}
+                        to={`/chat/${t.id}`}
+                        className={`thread-row ${activeThreadId === t.id ? "active" : ""}`}
+                        title={t.title || "New chat"}
+                      >
+                        <Icon name="message" size={15} />
+                        <span className="thread-title">{t.title || "New chat"}</span>
+                        <span className="thread-date">{relDate(t.updatedAt)}</span>
+                        <button
+                          className="thread-del"
+                          aria-label={`Delete chat ${t.title || ""}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            removeThread(t.id);
+                            if (activeThreadId === t.id) navigate("/");
+                          }}
+                        >
+                          <Icon name="trash" size={13} />
+                        </button>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </React.Fragment>
           ))}
         </nav>
@@ -168,6 +202,7 @@ function Shell({ user, onLogout }) {
         <div className="route-enter" key={location.pathname}>
           <Routes location={location}>
             <Route path="/" element={<ChatPage user={user} />} />
+            <Route path="/chat/:id" element={<ChatPage user={user} />} />
             <Route path="/chat" element={<Navigate to="/" replace />} />
             <Route path="/tasks" element={<div className="page"><TasksPage /></div>} />
             <Route path="/approvals" element={<div className="page"><ApprovalsPage /></div>} />

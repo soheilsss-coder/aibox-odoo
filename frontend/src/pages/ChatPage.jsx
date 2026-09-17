@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { streamChat, analyzeFile, ApiError } from "../api/client.js";
 import { Alert, Icon, IconButton } from "../components";
+import { createThread, getThread, addMessage, setServerId, useThreads } from "../hooks/useThreads.js";
 
 const SUGGESTIONS = [
   { icon: "clock", text: "Request time off for next week" },
@@ -11,15 +12,20 @@ const SUGGESTIONS = [
 ];
 
 export default function ChatPage({ user }) {
-  const location = useLocation();
-  const [messages, setMessages] = useState([]);
+  const { id: routeThreadId } = useParams();
+  const navigate = useNavigate();
+  useThreads(); // re-render when the store changes
+
+  const thread = routeThreadId ? getThread(routeThreadId) : null;
+  const messages = thread?.messages || [];
+
   const [input, setInput] = useState("");
-  const [threadId, setThreadId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [streamBuf, setStreamBuf] = useState("");
   const [file, setFile] = useState(null);
   const [recording, setRecording] = useState(false);
   const [lastPrompt, setLastPrompt] = useState(null);
@@ -28,24 +34,21 @@ export default function ChatPage({ user }) {
   const scrollRef = useRef(null);
   const taRef = useRef(null);
   const recRef = useRef(null);
+  // The stream writes into this target thread even if the user switches
+  // chats mid-stream; the buffer mirrors streamBuf so onDone can commit it.
+  const targetRef = useRef({ threadId: null, buf: "" });
 
-  const empty = messages.length === 0;
+  const empty = messages.length === 0 && !streamBuf;
 
-  // "New chat" from the sidebar navigates here with fresh state → reset.
-  useEffect(() => {
-    if (!location.state?.t) return;
-    setMessages([]);
-    setThreadId(null);
-    setError("");
-    setFile(null);
-    window.history.replaceState({}, document.title);
-  }, [location.state]);
+  // Switching chats: stop showing the previous stream buffer (it keeps
+  // streaming into its own thread in the background and is persisted).
+  useEffect(() => { setStreamBuf(""); setError(""); setFile(null); }, [routeThreadId]);
 
   // Auto-scroll to the latest token.
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, thinking]);
+  }, [messages.length, streamBuf, thinking, routeThreadId]);
 
   // Auto-resize the composer textarea.
   useEffect(() => {
@@ -56,14 +59,25 @@ export default function ChatPage({ user }) {
   }, [input]);
 
   // Focus the composer on mount / after sending.
-  useEffect(() => { if (!busy) taRef.current?.focus(); }, [busy, empty]);
+  useEffect(() => { if (!busy) taRef.current?.focus(); }, [busy, empty, routeThreadId]);
 
   async function send(rawText) {
     const text = (rawText ?? input).trim();
     if ((!text && !file) || busy) return;
     setInput("");
     setError("");
-    setMessages((m) => [...m, { role: "user", text: text || `Attached: ${file.name}` }]);
+
+    // First message of a fresh chat: create the thread and move the URL to
+    // /chat/<id> so the sidebar entry and the shareable location appear.
+    let activeId = routeThreadId;
+    if (!activeId || !getThread(activeId)) {
+      const t = createThread();
+      activeId = t.id;
+      navigate(`/chat/${t.id}`, { replace: true });
+    }
+    targetRef.current = { threadId: activeId, buf: "" };
+
+    addMessage(activeId, { role: "user", text: text || `Attached: ${file.name}` });
     setBusy(true);
     try {
       let effective = text;
@@ -83,33 +97,34 @@ export default function ChatPage({ user }) {
           question: text || "Analyze this file",
         }).finally(() => setAnalyzing(false));
         effective = `Consider the attached file ${current.name}. Extracted analysis:\n${analysis.analysis}\n\nUser request: ${text || "Analyze it"}`;
-        setMessages((m) => m.map((msg, i) => (i === m.length - 1 ? { ...msg, text: text || `Attached: ${current.name}` } : msg)));
       }
       setLastPrompt(effective);
       setThinking(true);
       setStreaming(true);
-      setMessages((m) => [...m, { role: "assistant", text: "" }]);
+      const serverId = getThread(activeId)?.serverId || null;
       await streamChat(
-        { message: effective, thread_id: threadId },
+        { message: effective, thread_id: serverId },
         {
           onThinking: () => setThinking(true),
-          onDelta: ({ text }) => {
+          onDelta: ({ text: delta }) => {
             setThinking(false);
-            setMessages((m) => {
-              const next = [...m];
-              next[next.length - 1] = { ...next[next.length - 1], text: (next[next.length - 1].text || "") + (text || "") };
-              return next;
-            });
+            targetRef.current.buf += delta || "";
+            if (targetRef.current.threadId === routeThreadId) setStreamBuf(targetRef.current.buf);
           },
           onDone: ({ thread_id }) => {
             setThinking(false);
             setStreaming(false);
-            setThreadId(thread_id);
+            const tgt = targetRef.current;
+            if (tgt.threadId && tgt.buf) addMessage(tgt.threadId, { role: "assistant", text: tgt.buf });
+            if (tgt.threadId && thread_id) setServerId(tgt.threadId, thread_id);
+            targetRef.current = { threadId: null, buf: "" };
+            setStreamBuf("");
           },
           onError: (parsed) => {
             setThinking(false);
             setStreaming(false);
-            setMessages((m) => m.filter((msg) => !(msg.role === "assistant" && msg.text === "")));
+            targetRef.current = { threadId: null, buf: "" };
+            setStreamBuf("");
             setError(parsed.error || "Failed to send the message.");
           },
         }
@@ -117,7 +132,8 @@ export default function ChatPage({ user }) {
     } catch (err) {
       setThinking(false);
       setStreaming(false);
-      setMessages((m) => m.filter((msg) => !(msg.role === "assistant" && msg.text === "")));
+      targetRef.current = { threadId: null, buf: "" };
+      setStreamBuf("");
       setError(err instanceof ApiError ? err.message : "Failed to send the message.");
     } finally {
       setBusy(false);
@@ -155,6 +171,9 @@ export default function ChatPage({ user }) {
   }
 
   const firstName = (user.name || "there").split(" ")[0];
+  const view = streamBuf
+    ? [...messages, { role: "assistant", text: streamBuf }]
+    : messages;
 
   return (
     <div className="chat-page">
@@ -174,7 +193,7 @@ export default function ChatPage({ user }) {
             </div>
           </div>
         ) : (
-          messages.map((msg, i) =>
+          view.map((msg, i) =>
             msg.role === "user" ? (
               <div className="msg user" key={i}>
                 <div className="msg-text">{msg.text}</div>
@@ -189,7 +208,7 @@ export default function ChatPage({ user }) {
                     {msg.text === "" && thinking && (
                       <span className="thinking"><i /><i /><i /></span>
                     )}
-                    {streaming && i === messages.length - 1 && msg.text !== "" && <span className="caret" />}
+                    {streamBuf && i === view.length - 1 && <span className="caret" />}
                   </div>
                 </div>
               </div>

@@ -273,6 +273,56 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-base);
 .nav-item svg { flex: 0 0 auto; opacity: 0.9; }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+
+/* Recent chats (thread history, ChatGPT-style) */
+.threads { display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
+.threads-scroll {
+  flex: 0 0 auto;
+  overflow-y: auto;
+  max-height: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+}
+.thread-row {
+  flex: 0 0 auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 30px 8px 12px;
+  margin: 0 2px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: var(--text-muted, var(--text-faint));
+  text-decoration: none;
+  transition: background 140ms ease-out, color 140ms ease-out;
+}
+.thread-row svg { flex: 0 0 auto; opacity: 0.8; }
+.thread-row:hover { background: var(--surface-2); color: var(--text); }
+.thread-row.active { background: var(--accent-soft); color: var(--accent); }
+.thread-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread-date { flex: 0 0 auto; font-size: 11px; color: var(--text-faint); }
+.thread-row:hover .thread-date { opacity: 0; }
+.thread-del {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 7px;
+  display: inline-flex;
+  transition: opacity 140ms ease-out, color 140ms ease-out, background 140ms ease-out;
+}
+.thread-row:hover .thread-del { opacity: 1; }
+.thread-del:hover { color: var(--err, #c0392b); background: rgba(220, 60, 60, 0.09); }
+.thread-del:focus-visible { opacity: 1; }
 .nav-item.active svg { opacity: 1; }
 .nav-badge { margin-left: auto; background: var(--grad-brand); color: #fff; font-size: 10.5px; font-weight: var(--fw-bold); border-radius: var(--r-full); min-width: 19px; height: 19px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; }
 
