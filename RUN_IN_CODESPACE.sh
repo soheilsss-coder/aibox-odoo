@@ -41,12 +41,11 @@ fi
 # Keep the machine awake while you work (no-op if the flag is unsupported).
 gh codespace edit --codespace "${CODESPACE_NAME}" --idle-timeout 240m >/dev/null 2>&1 || true
 
-if [ "$(docker image inspect "${IMAGE}" >/dev/null 2>&1 && echo yes)" != "yes" ]; then
-  echo "[1/4] Building the appliance image (first run only - grab a coffee)..."
-  docker build --pull -t "${IMAGE}" .
-else
-  echo "[1/4] Image already built - skipping."
-fi
+# ALWAYS rebuild: the boot-time scripts are baked into the image at COPY .,
+# so a stale image would silently keep OLD bugs even after a git pull. Docker
+# layer caching keeps this fast (the heavy apt/clone layers are reused).
+echo "[1/4] Building the appliance image (cached layers make re-runs quick)..."
+docker build -t "${IMAGE}" .
 
 echo "[2/4] (Re)starting the container..."
 docker rm -f "${IMAGE}" >/dev/null 2>&1 || true

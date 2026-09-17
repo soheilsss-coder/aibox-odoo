@@ -74,7 +74,13 @@ log()  { printf '\n\033[1m===== %s =====\033[0m\n' "$*"; }
 die()  { printf '\033[31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing command: $1"; }
 
-PG_INSTALL() { python3 -c "import pgserver,os;print(os.path.join(os.path.dirname(pgserver.__file__),'pginstall'))" 2>/dev/null; }
+# pgserver lives in the VENV (pip-installed at step 3/6). Using the system
+# python3 here worked on the authoring machine only because it happened to
+# have pgserver installed globally; inside a clean container it raised
+# ModuleNotFoundError *inside a command substitution*, which is silent
+# set -e death with no console output - the exact bug that killed step 4/6
+# with exit=1. Always resolve through the venv interpreter.
+PG_INSTALL() { "$VENV/bin/python" -c "import pgserver,os;print(os.path.join(os.path.dirname(pgserver.__file__),'pginstall'))" 2>/dev/null; }
 
 odoo_bin() { "$VENV/bin/python" "$SRC/odoo/odoo-bin" "$@"; }
 
@@ -195,6 +201,14 @@ cmd_install() {
       pgvector openai 'pydantic>=2' jsonschema markdown2 markdownify emoji PyMuPDF \
       'mcp<2' \
       authlib cryptography pyyaml jinja2
+  # Align the crypto pair: the un-pinned install above lets pip pull the newest
+  # cryptography (50.x) while odoo keeps its pyopenssl pin (24.x) - an
+  # import-time bomb that crashed odoo-bin with
+  #   AttributeError: module 'lib' has no attribute 'GEN_EMAIL'
+  # inside odoo/_monkeypatches/pyopenssl stepping into odoo 5/6.
+  # Pin the combo verified E2E against odoo 18's pyopenssl monkeypatch and
+  # authlib's cryptography>=45 requirement (plus idna for httpx2).
+  "$VENV/bin/pip" install -q 'cryptography==45.0.7' 'pyopenssl==25.1.0' 'idna>=3.18' 'urllib3>=2.2'
   "$VENV/lib/python3.11/site-packages" >/dev/null 2>&1 || true
   local sp; sp="$("$VENV/bin/python" -c 'import site;print(site.getsitepackages()[0])')"
   echo "$SRC/odoo" > "$sp/odoo-src.pth"
