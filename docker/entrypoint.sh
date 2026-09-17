@@ -40,6 +40,11 @@ if [ -z "${AI_GATEWAY_ALLOWED_ORIGIN:-}" ]; then
     export AI_GATEWAY_ALLOWED_ORIGIN="https://${RAILWAY_PUBLIC_DOMAIN}"
   elif [ -n "${RENDER_EXTERNAL_URL:-}" ]; then
     export AI_GATEWAY_ALLOWED_ORIGIN="${RENDER_EXTERNAL_URL}"
+  elif [ -n "${SPACE_ID:-}" ]; then
+    # Hugging Face Spaces publishes owner/name; the public URL is the slug.
+    hf_slug=$(printf '%s' "$SPACE_ID" | tr '/' '-')
+    export AI_GATEWAY_ALLOWED_ORIGIN="https://${hf_slug}.hf.space"
+    export AI_GATEWAY_ALLOWED_ORIGINS="https://${hf_slug}.hf.space,https://soheilsss-coder.github.io"
   fi
 fi
 if [ -n "${AI_GATEWAY_ALLOWED_ORIGIN:-}" ]; then
