@@ -23,7 +23,15 @@ const TABS = [
 function useLoad(fn, deps) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const load = () => fn().then(setData).catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load."));
+  const load = () => {
+    let alive = true;
+    Promise.resolve()
+      .then(fn)
+      .then((d) => { if (alive) setData(d); })
+      .catch((err) => { if (alive) setError(err instanceof ApiError ? err.message : "Failed to load."); });
+    return () => { alive = false; };
+  };
+  // Effect must return nothing (or a cleanup), never the loader's Promise.
   useEffect(load, deps);
   return [data, error, load];
 }

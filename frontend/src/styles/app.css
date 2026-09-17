@@ -320,7 +320,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-base);
 .icon-tile.grad { background: var(--grad-brand); color: #fff; box-shadow: var(--shadow-sm); }
 
 /* ---------------------------------------------------------------- orb (the AI signature) */
-.orb { position: relative; border-radius: 50%; background: var(--grad-orb); animation: spinSlow 14s linear infinite, breathe 5s ease-in-out infinite; flex: 0 0 auto; }
+.orb { display: inline-block; position: relative; border-radius: 50%; background: var(--grad-orb); animation: spinSlow 14s linear infinite, breathe 5s ease-in-out infinite; flex: 0 0 auto; width: 1em; height: 1em; }
 .orb::after { content: ""; position: absolute; inset: 22%; border-radius: 50%; background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 58%); }
 .orb-glow { position: relative; }
 .orb-glow::before { content: ""; position: absolute; inset: -32%; border-radius: 50%; background: var(--grad-orb); filter: blur(28px); opacity: 0.32; animation: breathe 5s ease-in-out infinite; z-index: -1; }
@@ -470,6 +470,9 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-base);
 
 /* ---------------------------------------------------------------- responsive */
 @media (max-width: 960px) {
+  /* The topbar must not be a flex-row sibling of .main (it would squeeze
+     the main column) — stack the shell vertically on small screens. */
+  .shell { display: block; }
   .sidebar { transform: translateX(-102%); box-shadow: none; }
   .sidebar.open { transform: none; box-shadow: var(--shadow-lg); }
   .main { margin-left: 0; }
