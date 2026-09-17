@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { streamChat, analyzeFile, ApiError } from "../api/client.js";
 import { Alert, Icon, IconButton } from "../components";
@@ -177,11 +178,15 @@ export default function ChatPage({ user, chatsOpen, onOpenChats }) {
 
   return (
     <div className="chat-page">
-      {!chatsOpen && (
-        <button className="chat-toggle" onClick={onOpenChats} aria-label="Expand chats panel" title="Expand chats panel">
-          <Icon name="chevronsRight" size={17} />
-        </button>
-      )}
+      {!chatsOpen &&
+        createPortal(
+          <button className="chat-toggle" onClick={onOpenChats} aria-label="Expand chats panel" title="Expand chats panel">
+            <Icon name="message" size={15} />
+            <span>Chats</span>
+            <Icon name="chevronsRight" size={14} />
+          </button>,
+          document.body,
+        )}
       <div className="chat-scroll" ref={scrollRef}>
         {empty ? (
           <div className="hero">

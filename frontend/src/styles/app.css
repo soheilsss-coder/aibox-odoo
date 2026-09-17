@@ -313,28 +313,37 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-base);
 .chat-panel .thread-date { flex: 0 0 auto; }
 
 /* Professional toggle that re-opens the collapsed chats panel (ChatGPT-style
-   chevrons: << collapse in the panel header, >> expand floating in content) */
+   chevrons: << collapse in the panel header, labelled dock tab to expand).
+   Rendered via portal and FIXED flush against the app's main sidebar so it
+   visibly belongs to it — message icon + "Chats" label make its meaning
+   unambiguous. (The chat content column itself is centered inside .main,
+   so an absolutely-positioned tab would end up mid-screen.) */
 .chat-toggle {
-  position: absolute;
+  position: fixed;
   top: 14px;
-  left: 18px;
-  z-index: 5;
-  width: 38px;
+  left: calc(var(--sidebar-w) + 6px);
+  z-index: 30;
   height: 38px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 0 14px 0 11px;
   border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 12px 12px 0;
   background: var(--bg-elev);
   color: var(--text-muted);
+  font-size: 13px;
+  font-weight: var(--fw-semi, 600);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 160ms, color 160ms, transform 160ms var(--ease-out), border-color 160ms;
+  transition: box-shadow 160ms, color 160ms, transform 160ms var(--ease-out), border-color 160ms, gap 160ms;
   animation: fadeUp 220ms var(--ease-out) both;
 }
-.chat-toggle:hover { color: var(--accent); border-color: var(--accent-soft, var(--accent)); box-shadow: var(--shadow-md); transform: translateX(2px); }
+.chat-toggle:hover { color: var(--accent); border-color: var(--accent-soft, var(--accent)); box-shadow: var(--shadow-md); transform: translateX(2px); gap: 10px; }
 .chat-toggle:active { transform: translateX(0); }
+.chat-toggle > svg:last-child { opacity: 0.6; }
+.chat-toggle:hover > svg:last-child { opacity: 1; }
 .chat-page { position: relative; }
 
 @media (min-width: 961px) {
@@ -364,7 +373,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-base);
     width: 284px;
   }
   .chat-panel.open { transform: none; box-shadow: var(--shadow-lg); }
-  .chat-toggle { top: calc(var(--topbar-h) + 10px); left: 14px; }
+  .chat-toggle { top: calc(var(--topbar-h) + 10px); left: 10px; z-index: 40; }
 }
 
 .threads { display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
