@@ -1,6 +1,13 @@
 let apiKey = "";
 try { apiKey = sessionStorage.getItem("aibox.apiKey") || ""; } catch { /* storage can be blocked in iframes */ }
 
+// Static-demo mode (GitHub Pages build): VITE_DEMO_MODE=1 routes every
+// /api/* call through the in-browser mock engine (src/demo/backend.js)
+// instead of the network, so the exact production UI runs fully offline.
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "1";
+let demoBackendPromise = null;
+const demoBackend = () => (demoBackendPromise ??= import("../demo/backend.js"));
+
 export function getApiKey() { return apiKey; }
 export function setApiKey(key) {
   apiKey = key || "";
@@ -28,7 +35,9 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
     headers["Content-Type"] = "application/json";
     fetchBody = JSON.stringify(body);
   }
-  const resp = await fetch(path, { method, headers, body: fetchBody, credentials: "include" });
+  const resp = DEMO_MODE
+    ? await (await demoBackend()).demoRequest(path, { method, body, apiKey })
+    : await fetch(path, { method, headers, body: fetchBody, credentials: "include" });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status);
   return data;
@@ -63,12 +72,15 @@ export function streamChat(payload, handlers) {
   const { onThinking, onDelta, onDone, onError } = handlers || {};
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["X-API-Key"] = apiKey;
-  return fetch("/api/chat/stream", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-    credentials: "include",
-  })
+  const responsePromise = DEMO_MODE
+    ? demoBackend().then((d) => d.demoStream(payload, apiKey))
+    : fetch("/api/chat/stream", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+  return responsePromise
     .then(async (resp) => {
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
@@ -121,6 +133,7 @@ export const adminListAgents = () => request("/api/admin/agents");
 export const adminGetBranding = () => request("/api/admin/branding");
 export const adminUpdateBranding = (payload) => request("/api/admin/branding", { method: "POST", body: payload });
 export const adminGetMetrics = () => request("/api/metrics");
+export const adminGetControlPlane = () => request("/api/admin/control-plane");
 export const getTelegramStatus = () => request("/api/integrations/telegram");
 export const generateTelegramCode = () => request("/api/integrations/telegram/code", { method: "POST" });
 export const unlinkTelegram = () => request("/api/integrations/telegram/unlink", { method: "POST" });

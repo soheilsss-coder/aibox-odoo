@@ -5,14 +5,15 @@ import { Alert, Button, Input } from "../components";
 // Login screen: the employee's front door. Trades email+password for a
 // session (cookie; the dev backend also returns an api_key the client then
 // sends as X-API-Key so auth survives third-party iframe previews).
-// In `vite dev` the form is pre-filled with demo credentials; production
-// builds compile to an empty form.
+// Forms are pre-filled in `vite dev` and in the static GitHub Pages demo
+// build (any credentials work there); real production builds stay empty.
 export default function LoginPage({ onLoggedIn }) {
-  const DEV = import.meta.env && import.meta.env.DEV;
-  const [loginId, setLoginId] = useState(DEV ? "sara@example.com" : "");
-  const [password, setPassword] = useState(DEV ? "demo" : "");
+  const DEMO = Boolean(import.meta.env && (import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === "1"));
+  const [loginId, setLoginId] = useState(DEMO ? "sara@example.com" : "");
+  const [password, setPassword] = useState(DEMO ? "demo" : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const STATIC_DEMO = import.meta.env.VITE_DEMO_MODE === "1";
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -69,7 +70,12 @@ export default function LoginPage({ onLoggedIn }) {
           </Button>
         </form>
 
-        <div className="auth-foot">Nova Enterprise · AI Operating System</div>
+        <div className="auth-foot">
+          Nova Enterprise · AI Operating System
+          {STATIC_DEMO && (
+            <div className="small muted mt-2">Static demo build — running fully in your browser, any credentials work.</div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   adminListRoles, adminListUsers, adminListAccessGrants, adminCreateAccessGrant,
   adminRevokeAccessGrant, adminListDocuments, adminListAgents, adminGetBranding,
-  adminUpdateBranding, adminGetMetrics, ApiError,
+  adminUpdateBranding, adminGetMetrics, adminGetControlPlane, ApiError,
 } from "../api/client.js";
 import { Alert, Badge, Button, Card, EmptyState, Icon, Input, Modal, Select, Spinner, Table, Tabs, TextArea } from "../components";
 
@@ -335,14 +335,7 @@ function Metric({ label, value }) {
 
 /* --- Control Plane ------------------------------------------------------ */
 function ControlPlaneTab() {
-  const [data, error] = useLoad(
-    () => fetch("/api/admin/control-plane", { credentials: "include" }).then(async (r) => {
-      const j = await r.json();
-      if (!r.ok) throw new ApiError(j.error || "Failed to load.", r.status);
-      return j;
-    }),
-    []
-  );
+  const [data, error] = useLoad(adminGetControlPlane, []);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Spinner />;
   return (
