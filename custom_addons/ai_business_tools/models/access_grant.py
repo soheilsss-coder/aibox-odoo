@@ -21,6 +21,7 @@ class AiGatewayAccessGrant(models.Model):
     _order = "create_date desc"
 
     to_user_id = fields.Many2one("res.users", required=True, string="Grant To", index=True, ondelete="cascade")
+    company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company, index=True, ondelete="restrict")
     group_id = fields.Many2one("res.groups", string="Role / Group", index=True, ondelete="restrict")
     capability_name = fields.Char(index=True, string="Capability")
     resource_model = fields.Char(index=True)
@@ -53,9 +54,13 @@ class AiGatewayAccessGrant(models.Model):
                 if rec.create_date and rec.create_date.date() >= fields.Date.context_today(rec):
                     raise ValidationError("A new grant cannot already be expired.")
 
-    @api.constrains("group_id", "capability_name", "resource_model", "resource_id", "grant_type", "delegated_from_id")
+    @api.constrains("company_id", "to_user_id", "delegated_from_id", "group_id", "capability_name", "resource_model", "resource_id", "grant_type")
     def _check_scope(self):
         for rec in self:
+            if rec.company_id and rec.to_user_id and rec.company_id not in rec.to_user_id.company_ids:
+                raise ValidationError("Grant recipient must belong to the grant company.")
+            if rec.company_id and rec.delegated_from_id and rec.company_id not in rec.delegated_from_id.company_ids:
+                raise ValidationError("Delegator must belong to the grant company.")
             if not rec.group_id and not rec.capability_name:
                 raise ValidationError("A grant must contain a group or capability.")
             if rec.resource_id and not rec.resource_model:
@@ -71,20 +76,25 @@ class AiGatewayAccessGrant(models.Model):
             if not rec.group_id:
                 continue
             module = getattr(rec.group_id, "module", "") or ""
-            xmlid = rec.group_id.get_external_id().get(rec.group_id.id, "")
+            xmlid = rec.group_id.get_external_id().get(rec.group_id.id, "") or ""
             if module != "ai_business_tools" and not xmlid.startswith("ai_business_tools."):
                 raise ValidationError("Only product-defined role groups may receive temporary/delegated access.")
 
     @api.model
-    def _active_grants_for(self, user, capability=None, record=None):
+    def _active_grants_for(self, user, capability=None, record=None, limit=1000):
         today = fields.Date.context_today(self)
         domain = [
-            ("to_user_id", "=", user.id), ("state", "=", "active"),
-            ("active", "=", True), ("start_date", "<=", today), ("expires_on", ">=", today),
+            ("to_user_id", "=", user.id), ("company_id", "=", self.env.company.id),
+            ("state", "=", "active"), ("active", "=", True),
+            ("start_date", "<=", today), ("expires_on", ">=", today),
         ]
         if capability:
             domain += ["|", ("capability_name", "=", capability), ("capability_name", "=", False)]
-        grants = self.sudo().search(domain)
+        try:
+            limit = max(1, min(int(limit), 5000))
+        except (TypeError, ValueError):
+            limit = 1000
+        grants = self.sudo().search(domain, limit=limit)
         if not record:
             return grants
         return grants.filtered(lambda g: not g.resource_id or (
@@ -140,7 +150,8 @@ class AiGatewayAccessGrant(models.Model):
             rec.write({"state": "revoked", "active": False})
             if "ai.gateway.audit.log" in self.env:
                 self.env["ai.gateway.audit.log"].sudo().log(
-                    user_id=self.env.user.id, source="authorization", action="access_grant_revoked",
+                    user_id=self.env.context.get("authorization_actor_id") or self.env.user.id,
+                    source="authorization", action="access_grant_revoked",
                     payload={"grant_id": rec.id, "user_id": rec.to_user_id.id,
                              "capability": rec.capability_name, "resource_model": rec.resource_model,
                              "resource_id": rec.resource_id},

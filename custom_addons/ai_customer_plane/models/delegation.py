@@ -37,9 +37,25 @@ class AiDelegation(models.Model):
             if "ai.gateway.audit.log" in self.env:
                 self.env["ai.gateway.audit.log"].sudo().log(user_id=self.env.user.id, source="customer_control_plane", action="delegation.created", payload={"delegation_id": rec.id, "delegator_id": rec.delegator_id.id, "delegatee_id": rec.delegatee_id.id, "capability": rec.capability, "resource_model": rec.resource_model, "resource_id": rec.resource_id, "expires_at": rec.expires_at})
             if "ai.control.authorization" in self.env:
+                # Keep delegation on the canonical authorization contract.  The
+                # old call passed the user positionally and unsupported
+                # ``model``/``res_id`` keywords, which made every constrained
+                # create fail with TypeError.  Resolve the optional target
+                # record first so the same object-level checks used at runtime
+                # also apply while creating the delegation.
+                target = False
+                if rec.resource_model:
+                    if rec.resource_model not in self.env:
+                        raise AccessError("Delegation target model is not available.")
+                    if rec.resource_id:
+                        target = self.env[rec.resource_model].browse(rec.resource_id).exists()
+                        if not target:
+                            raise AccessError("Delegation target record was not found.")
                 allowed = self.env["ai.control.authorization"].sudo().check_capability(
-                    rec.delegator_id, rec.capability,
-                    model=rec.resource_model, res_id=rec.resource_id,
+                    rec.capability,
+                    user=rec.delegator_id,
+                    record=target or None,
+                    action="execute",
                 )
                 if not allowed:
                     raise AccessError("Delegator does not currently hold the capability being delegated.")
@@ -61,7 +77,10 @@ class AiDelegation(models.Model):
     @api.model
     def effective_for(self, user, capability, model=None, res_id=None):
         domain = [
-            ("delegatee_id", "=", user.id), ("capability", "=", capability),
+            ("delegatee_id", "=", user.id),
+            ("delegator_id.company_ids", "in", self.env.company.id),
+            ("delegatee_id.company_ids", "in", self.env.company.id),
+            ("capability", "=", capability),
             ("active", "=", True), ("revoked_at", "=", False),
             ("starts_at", "<=", fields.Datetime.now()),
             ("expires_at", ">=", fields.Datetime.now()),

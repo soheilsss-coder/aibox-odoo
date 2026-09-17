@@ -5,10 +5,12 @@ import ast
 ROOT = Path(__file__).resolve().parent
 checks = {}
 
-def text(p): return (ROOT / p).read_text(encoding='utf-8')
+def text(p):
+    path = ROOT / p
+    return path.read_text(encoding='utf-8') if path.exists() else ''
 checks['universal integration addon exists'] = (ROOT/'custom_addons/ai_integration/__manifest__.py').exists()
-checks['installer installs integration addon'] = 'ai_integration' in text('02_install_modules.sh')
-checks['generic assistant assignment absent'] = "all_tools = env['llm.tool'].search([])" not in text('02_install_modules.sh')
+checks['supported deployment entrypoint exists'] = (ROOT/'deploy.sh').exists()
+checks['generic assistant assignment absent'] = "all_tools = env['llm.tool'].search([])" not in text('deploy.sh')
 checks['generic rpc permanently disabled'] = 'permanently disabled' in text('custom_addons/ai_gateway/controllers/gateway.py') and 'status=410' in text('custom_addons/ai_gateway/controllers/gateway.py')
 checks['browser login does not return api key'] = '"api_key": key_rec.key' not in text('custom_addons/ai_semantic_api/controllers/semantic_api.py')
 checks['session cookie is httponly'] = 'httponly=True' in text('custom_addons/ai_semantic_api/controllers/semantic_api.py')

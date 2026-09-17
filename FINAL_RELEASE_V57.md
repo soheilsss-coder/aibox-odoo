@@ -39,16 +39,15 @@ v56 was checked against:
    before associating an attachment with a user-owned thread.
 6. RAG model routing: embedding requests now go through the benchmark-
    certified Model Router and reject embedding-dimension mismatches.
-7. Deployment: Redis provisioned/enabled by the base installer; vLLM
-   installation requires an explicit validated `VLLM_VERSION` (fail-closed,
+7. Deployment: Redis is installed by the native base installer and
+   enabled/health-checked by the native start gate; vLLM installation requires
+   an explicit validated `VLLM_VERSION` (fail-closed,
    not a silent default); `faster-whisper` pinned.
 8. **Release integrity (this pass):** `SHA256MANIFEST.json` regenerated
-   from the actual current source tree (372 pre-existing entries rehashed,
-   5 real source files that were missing from the manifest added:
-   `59_v57_hardening_audit.py`, `RELEASE_CANDIDATE_VERSION.txt`,
-   `V57_HARDENING_NOTES.md`, `custom_addons/ai_integration/models/generic_read.py`,
-   `custom_addons/ai_workflow/data/default_workflows.xml` - 377 entries
-   total, independently reverified against disk with zero mismatches).
+   from the actual current source tree (392 entries, missing historical
+   entries removed, current native install scripts, migration hook, upload
+   policy, output firewall and contract tests included), independently
+   reverified against disk with zero mismatches).
 9. **Release metadata (this pass):** this document created so
    `RELEASE_CANDIDATE_VERSION.txt` (`v57`), `FINAL_RELEASE_STATUS.md`, and
    the canonical final-release document now agree - see the previous
@@ -65,9 +64,10 @@ adds the direct-source hardening checks above. Current result:
 
 - **94/94 PASS** (`FINAL_EXHAUSTIVE_SOURCE_AUDIT.py`)
 - **21/21 PASS** (`FINAL_PRODUCTION_GATE.py`)
-- **PASS** (`59_v57_hardening_audit.py`, new in this release)
+- **13/13 PASS** (`tests/test_upgrade_contracts.py`)
+- **PASS** (`59_v57_hardening_audit.py`)
 - Python AST/syntax: PASS · XML parse: PASS · Shell syntax: PASS
-- SHA256MANIFEST.json: PASS (377/377, zero mismatch, reverified this pass)
+- SHA256MANIFEST.json: PASS (392/392, zero mismatch, reverified this pass)
 - No active generic ORM assistant assignment
 - `/api/rpc`: permanent HTTP 410 tombstone
 - Central Capability → Tool → Policy → Risk → Approval → Commit-Time → Gateway path

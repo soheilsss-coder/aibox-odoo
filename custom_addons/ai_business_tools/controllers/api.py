@@ -6,6 +6,7 @@ from odoo.http import request
 from odoo.addons.ai_gateway.controllers.gateway import (
     _authenticate,
     _check_rate_limit,
+    _scoped_user_env,
     _cors_preflight_response,
     _json_response,
 )
@@ -28,10 +29,11 @@ class AiBusinessToolsPublicApi(http.Controller):
             return _json_response({"error": "invalid or missing API key"}, status=401)
         if not _check_rate_limit(api_key):
             return _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
-        if "ai.schedule.rule" not in request.env:
+        env = _scoped_user_env(user)
+        if "ai.schedule.rule" not in env:
             return _json_response({"error": "ai_business_tools is not installed"}, status=501)
 
-        rules = request.env["ai.schedule.rule"].sudo().search([])
+        rules = env["ai.schedule.rule"].sudo().search([])
         visible = rules.filtered(
             lambda r: r.user_id.id == user.id or user.has_group("base.group_system"))
         return _json_response({"schedules": [
@@ -53,7 +55,8 @@ class AiBusinessToolsPublicApi(http.Controller):
             return _json_response({"error": "invalid or missing API key"}, status=401)
         if not _check_rate_limit(api_key):
             return _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
-        if "ai.schedule.rule" not in request.env:
+        env = _scoped_user_env(user)
+        if "ai.schedule.rule" not in env:
             return _json_response({"error": "ai_business_tools is not installed"}, status=501)
 
         try:
@@ -64,7 +67,7 @@ class AiBusinessToolsPublicApi(http.Controller):
         active = bool(body.get("active"))
         if not rule_id or not str(rule_id).isdigit():
             return _json_response({"error": "'id' is required"}, status=400)
-        rule = request.env["ai.schedule.rule"].sudo().browse(int(rule_id)).exists()
+        rule = env["ai.schedule.rule"].sudo().browse(int(rule_id)).exists()
         if not rule:
             return _json_response({"error": "schedule not found"}, status=404)
         if rule.user_id.id != user.id and not user.has_group("base.group_system"):

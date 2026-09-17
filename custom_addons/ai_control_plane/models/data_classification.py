@@ -35,7 +35,7 @@ class AiDataClassification(models.Model):
             if "company_id" not in record._fields:
                 return False
             company = record.company_id
-            return bool(company and company.id in user.company_ids.ids)
+            return bool(company and company.id == self.env.company.id)
         if self.tenant_scope == "personal":
             for field_name in ("user_id", "owner_id", "employee_id"):
                 if field_name in record._fields:

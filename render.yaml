@@ -1,0 +1,27 @@
+# Render Blueprint. In the Render dashboard: New + > Blueprint > pick this
+# repository. Render reads this file and creates the service with the right
+# build command, port and environment.
+#
+# The free instance type spins down after ~15 minutes idle and has no persistent
+# disk, which means every cold start re-installs the Odoo modules (several
+# minutes). Paid instances can attach a disk mounted at /data/pgdata to skip it.
+services:
+  - type: web
+    name: aibox
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /healthz
+    # Odoo needs a long grace period on a first boot with an empty database.
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8080
+      # Leave AIBOX_START_MOCK_LLM at 1 to explore the product immediately with
+      # the bundled stand-in, then set these to a real vendor (or paste a key in
+      # Admin > "مدل زبانی", which needs no redeploy).
+      - key: AIBOX_START_MOCK_LLM
+        value: "1"
+      - key: AI_GATEWAY_ENV
+        value: production

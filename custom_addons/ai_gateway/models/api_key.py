@@ -68,6 +68,11 @@ class AiGatewayApiKey(models.Model):
                 self.env["ai.gateway.api.key.history"].sudo().create({"api_key_id": rec.id, "token_id": rec.token_id, "user_id": rec.user_id.id, "key_hash": rec.key_hash, "event": "expired", "event_at": fields.Datetime.now()})
             rec.write({"active": False, "revoked_at": fields.Datetime.now()})
             return self.browse()
+        if rec and not rec.user_id.active:
+            # Deprovisioning must invalidate both browser sessions and
+            # stateless credentials.  Never let a valid old key revive an
+            # inactive identity.
+            return self.browse()
         if rec:
             rec.sudo().write({"last_used_at": fields.Datetime.now()})
         return rec

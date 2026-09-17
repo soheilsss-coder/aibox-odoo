@@ -5,10 +5,10 @@ set -euo pipefail
 DB="${1:?database required}"
 COMPANY="${2:?company name required}"
 TZ="${3:-UTC}"
-ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
-ODOO_CONF="${ODOO_CONF:-/opt/odoo.conf}"
-source /opt/odoo-venv/bin/activate 2>/dev/null || true
-"$ODOO_BIN" shell -c "$ODOO_CONF" -d "$DB" <<PY
+ODOO_BIN="${ODOO_BIN:-/opt/odoo/src/odoo/odoo-bin}"
+ODOO_PYTHON="${ODOO_PYTHON:-/opt/odoo/venv/bin/python}"
+ODOO_CONF="${ODOO_CONF:-/etc/odoo/odoo.conf}"
+"$ODOO_PYTHON" "$ODOO_BIN" shell -c "$ODOO_CONF" -d "$DB" <<PY
 from odoo import api, SUPERUSER_ID
 env = api.Environment(cr, SUPERUSER_ID, {})
 company = env['res.company'].search([], limit=1)

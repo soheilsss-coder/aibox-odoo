@@ -72,6 +72,21 @@ def test_parallel_drain():
           sorted(r["value"] for _, r in results) == list(range(8)))
 
 
+def test_burst_admission_100():
+    """A 100-request burst must be admitted and drained by the app queue.
+
+    This proves admission/backpressure mechanics only; it is deliberately not
+    a claim about tokens/sec on a DGX. The native serving benchmark provides
+    that evidence separately.
+    """
+    pool = BoundedWorkerPool(concurrency=8, max_waiters=128, job_timeout=10)
+    results = run_parallel([lambda i=i: pool.submit(slow(0.01, i)) for i in range(100)])
+    check("100-request burst: every request admitted", all(ok for ok, _ in results))
+    check("100-request burst: all results completed", all(result.get("ok") for _, result in results))
+    check("100-request burst: queue drained", pool.pending == 0 and pool.active == 0)
+    check("100-request burst: results preserved", sorted(result["value"] for _, result in results) == list(range(100)))
+
+
 def test_fifo_fairness():
     pool = BoundedWorkerPool(concurrency=1, max_waiters=64)
     order = []
@@ -135,6 +150,7 @@ def test_worker_failure_resilience():
 
 def main():
     test_parallel_drain()
+    test_burst_admission_100()
     test_fifo_fairness()
     test_overflow_fast_fail()
     test_worker_failure_resilience()

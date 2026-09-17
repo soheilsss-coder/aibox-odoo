@@ -1,4 +1,4 @@
-# frontend (roadmap #43-47 — Phase 7 complete)
+# frontend (roadmap #43-47 — appliance module flow added)
 
 A standalone React app (Vite) that talks ONLY to the Odoo box's
 `/api/*` endpoints — never a raw Odoo model name, never the Odoo web
@@ -37,14 +37,13 @@ API base instead if you deploy this frontend on a different domain
 
 ## Login
 
-The login screen asks for an API key — the same kind created in
-`ai.gateway.api.key` (Settings, see `ai_gateway` module) that the
-`/api/rpc` and `/api/chat` endpoints already use. There is no separate
-frontend-only auth system. `GET /api/me` now also returns `is_admin`
-(true for System Admin/Executive/Security roles — the same privileged
-set `/api/metrics` already used) so the app knows whether to show the
-Admin Console nav link; the backend re-checks this independently on
-every `/api/admin/*` call regardless.
+The login screen uses the customer's normal username/password once at
+`/api/login`, which issues the short-lived HttpOnly product session. There is
+no separate frontend-only user database. Machine clients may still use the
+existing API-key header contract. `GET /api/me` returns `is_admin` (true for
+System Admin/Executive/Security roles — the same privileged set `/api/metrics`
+already uses) so the app knows whether to show the Admin Console nav link; the
+backend re-checks this independently on every `/api/admin/*` call regardless.
 
 ## Pages (phase 7 status)
 
@@ -53,7 +52,8 @@ every `/api/admin/*` call regardless.
 | Leaves | `/leaves` | — | unchanged since phase 6 |
 | Document Center | `/documents` | #47 | **done this round** — browse by access level (tabs), semantic search, upload (with department/group picker scoped to what the caller is actually allowed to restrict to), delete own/admin-owned documents |
 | Chat | `/chat` | — | unchanged, restyled with the component library |
-| Admin Console | `/admin` (privileged only) | #46 | **done this round** — Roles, Access Grants (create/revoke), org-wide Documents overview, Agents (tool registry + risk + model info), Branding, Observability |
+| Admin Console | `/admin` (privileged only) | #46 | **done this round** — Roles, Access Grants (create/revoke), org-wide Documents overview, Agents (tool registry + risk + model info), Branding, Observability, and Business Apps installation |
+| Module workspace | `/modules/:id` and `/modules/:id/menus/:menuId` | appliance flow | **source-complete** — installed application menus are filtered by native groups and safe window actions open a read-only workspace over real records; mutations remain on reviewed adapters |
 
 Design System (#45): `src/components/` — see its own README for the
 component list, the styling convention (`ds-*` classes in
@@ -61,18 +61,34 @@ component list, the styling convention (`ds-*` classes in
 limits (no Storybook, no accessibility audit, `Table`/`Modal` are
 intentionally minimal for this app's current data volume).
 
-## What's still NOT covered
+## Module tools are connected to the agent
 
-Still only reachable via `/api/rpc` with a raw model name, which is
-exactly the thing item 44 says a frontend shouldn't do:
-- Tasks/projects, timesheets, attendance, anything in `account`
+After an application is installed, automatic onboarding creates a durable
+connection between that application and the one Company Assistant agent. The
+agent's tool catalog is refreshed from installed, explicitly owned tool and
+operation contracts. Each chat thread narrows that catalog again by the
+current user's capability, native ACL, risk, and approval state. The UI shows
+whether the module is connected and how many registered tools/operations it
+has.
 
-Extending coverage is mechanical: add one semantic endpoint per domain
-in `ai_semantic_api/controllers/semantic_api.py` (copy the
-`hr/leaves` or `documents` pattern), add the matching function to
-`client.js`, add a page. Each new domain is its own small, low-risk
-unit of work — same reasoning the roadmap uses elsewhere for not
-batching unrelated big items together.
+This is not a blanket permission grant and it is not a fake module screen. A
+module with only automatic discovery is connected with no invented mutation
+tools; an uninstalled module's tools are removed from the agent catalog and
+rejected by the execution gate.
+
+## What's still intentionally limited
+
+The Business Apps flow can install the real application, discover its native
+menus, and provide a safe generic read workspace. It does **not** invent a
+full custom clone of every application's form and workflow. Create/update/
+delete/approve operations are exposed only through named, reviewed adapters
+and the AI capability/risk/approval gate. A newly installed application with
+no reviewed adapter therefore remains read/audit/event baseline only.
+
+Adding a new operational domain is mechanical but still needs review: add a
+semantic endpoint or reviewed adapter, register its capability/risk contract,
+add the matching function/page, and run live certification on the target
+appliance. Source presence alone is not a production claim.
 
 ## Honest limits of this round's #46/#47 work
 
