@@ -49,6 +49,16 @@ if [ -n "${AI_GATEWAY_ALLOWED_ORIGIN:-}" ]; then
 else
   export AI_GATEWAY_ENV="${AI_GATEWAY_ENV:-development}"
 fi
+# Hybrid deployment: the UI may be hosted on GitHub Pages (explicit
+# AI_GATEWAY_ALLOWED_ORIGINS) while this service keeps its own Render origin
+# functional. The gateway prefers the comma list when present, so merge the
+# auto-derived platform origin into it instead of dropping one of them.
+if [ -n "${AI_GATEWAY_ALLOWED_ORIGINS:-}" ] && [ -n "${AI_GATEWAY_ALLOWED_ORIGIN:-}" ]; then
+  case ",${AI_GATEWAY_ALLOWED_ORIGINS}," in
+    *",${AI_GATEWAY_ALLOWED_ORIGIN},"*) : ;; # already listed
+    *) export AI_GATEWAY_ALLOWED_ORIGINS="${AI_GATEWAY_ALLOWED_ORIGINS},${AI_GATEWAY_ALLOWED_ORIGIN}" ;;
+  esac
+fi
 export AI_GATEWAY_REDIS_URL="${AI_GATEWAY_REDIS_URL:-redis://127.0.0.1:${REDIS_PORT}/0}"
 export AIBOX_REPO="$REPO"
 export PYTHONWARNINGS=ignore
