@@ -1,61 +1,299 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Routes, Route, NavLink, Navigate } from "react-router-dom";
+import { Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import * as api from "./api/client.js";
+import { Icon, IconButton } from "./components";
+import { useThreads, relDate, removeThread } from "./hooks/useThreads.js";
 import LoginPage from "./pages/LoginPage.jsx";
-import LeavesPage from "./pages/LeavesPage.jsx";
-import DocumentCenterPage from "./pages/DocumentCenterPage.jsx";
-import AdminPage from "./pages/AdminPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
+import TasksPage from "./pages/TasksPage.jsx";
+import ApprovalsPage from "./pages/ApprovalsPage.jsx";
+import LeavesPage from "./pages/LeavesPage.jsx";
+import CalendarPage from "./pages/CalendarPage.jsx";
+import DepartmentsPage from "./pages/DepartmentsPage.jsx";
+import DocumentCenterPage from "./pages/DocumentCenterPage.jsx";
+import KnowledgePage from "./pages/KnowledgePage.jsx";
+import AgentsPage from "./pages/AgentsPage.jsx";
+import NotificationsPage from "./pages/NotificationsPage.jsx";
 import IntegrationsPage from "./pages/IntegrationsPage.jsx";
+import AdminPage from "./pages/AdminPage.jsx";
 
 const NAV = [
-  ["/", "خانه", "⌂"], ["/chat", "AI Workspace", "✦"], ["/tasks", "کارها", "✓"],
-  ["/calendar", "تقویم", "◷"], ["/departments", "دپارتمان‌ها", "▦"], ["/documents", "اسناد", "▤"],
-  ["/knowledge", "Knowledge", "◇"], ["/approvals", "تأییدها", "◆"], ["/agents", "Agents", "◈"],
-  ["/notifications", "اعلان‌ها", "●"], ["/integrations", "اتصالات", "↔"],
+  {
+    section: null,
+    items: [{ to: "/", label: "AI Chat", icon: "spark", end: true }],
+  },
+  {
+    section: "Work",
+    items: [
+      { to: "/tasks", label: "Tasks", icon: "tasks" },
+      { to: "/approvals", label: "Approvals", icon: "shield" },
+      { to: "/leaves", label: "Leave", icon: "clock" },
+      { to: "/calendar", label: "Calendar", icon: "calendar" },
+    ],
+  },
+  {
+    section: "Organization",
+    items: [
+      { to: "/departments", label: "Departments", icon: "building" },
+      { to: "/documents", label: "Documents", icon: "file" },
+      { to: "/knowledge", label: "Knowledge", icon: "database" },
+      { to: "/agents", label: "Agents", icon: "bot" },
+    ],
+  },
+  {
+    section: "System",
+    items: [
+      { to: "/integrations", label: "Integrations", icon: "plug" },
+      { to: "/notifications", label: "Notifications", icon: "bell", badge: true },
+    ],
+  },
 ];
+
+function useTheme() {
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "light");
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem("nova.theme", theme); } catch { /* ignore */ }
+  }, [theme]);
+  return [theme, () => setTheme((t) => (t === "light" ? "dark" : "light"))];
+}
+
+function Brand() {
+  return (
+    <Link to="/" className="brand" aria-label="Nova home">
+      <span className="orb" style={{ width: 34, height: 34 }} />
+      <span>
+        <span className="brand-name">Nova Enterprise</span>
+        <span className="brand-sub" style={{ display: "block" }}>AI Operating System</span>
+      </span>
+    </Link>
+  );
+}
+
+// Dedicated conversations menu — the chat page's own panel. It lives NEXT TO
+// the app navigation (Tasks, Approvals, ...) as a separate column, like the
+// history rail in ChatGPT/Claude: New chat + the user's conversation list.
+function ChatPanel({ threads, activeId, open, onClose, onNavigateThread }) {
+  const navigate = useNavigate();
+  return (
+    <aside className={`chat-panel ${open ? "open" : "closed"}`} aria-label="Chat conversations">
+      <div className="chat-panel-head">
+        <span className="chat-panel-title">Chats</span>
+        <IconButton icon="chevronsLeft" label="Collapse chats panel" className="panel-collapse-btn" onClick={onClose} />
+      </div>
+      <Link to="/" className="btn btn-primary btn-block new-chat-btn" onClick={onNavigateThread}>
+        <Icon name="plus" size={16} /> New chat
+      </Link>
+      <div className="threads" aria-label="Recent chats">
+        {threads.length > 0 && <div className="nav-sec chat-panel-sec">Recent chats</div>}
+        <div className="threads-scroll">
+          {threads.map((t) => (
+            <Link
+              key={t.id}
+              to={`/chat/${t.id}`}
+              className={`thread-row ${activeId === t.id ? "active" : ""}`}
+              title={t.title || "New chat"}
+              onClick={onNavigateThread}
+            >
+              <Icon name="message" size={15} />
+              <span className="thread-title">{t.title || "New chat"}</span>
+              <span className="thread-date">{relDate(t.updatedAt)}</span>
+              <button
+                className="thread-del"
+                aria-label={`Delete chat ${t.title || ""}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  removeThread(t.id);
+                  if (activeId === t.id) navigate("/");
+                }}
+              >
+                <Icon name="trash" size={13} />
+              </button>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
 
 function Shell({ user, onLogout }) {
   const [caps, setCaps] = useState([]);
   const [notifCount, setNotifCount] = useState(0);
-  useEffect(() => { api.getMyCapabilities().then(x => setCaps(x.capabilities || x || [])).catch(() => {}); api.getNotifications().then(x => setNotifCount((x.notifications || []).filter(n => !n.is_read).length)).catch(() => {}); }, []);
-  const capabilitySet = useMemo(() => new Set(caps.map(c => typeof c === "string" ? c : c.name)), [caps]);
-  return <div className="product-shell">
-    <aside className="product-sidebar">
-      <div className="brand"><div className="brand-mark">✦</div><div><strong>Nova Enterprise</strong><span>AI Operating System</span></div></div>
-      <div className="user-card"><div className="avatar">{(user.name || "U").slice(0,1)}</div><div><strong>{user.name}</strong><span>{user.company || "سازمان"}</span></div></div>
-      <nav className="product-nav">{NAV.map(([to,label,icon]) => <NavLink key={to} to={to} end={to === "/"} className={({isActive}) => `nav-item ${isActive ? "active" : ""}`}><i>{icon}</i><span>{label}</span>{label === "اعلان‌ها" && notifCount > 0 && <b>{notifCount}</b>}</NavLink>)}</nav>
-      <div className="sidebar-bottom"><NavLink to="/admin" className="nav-item"><i>⚙</i><span>مدیریت</span></NavLink><button className="nav-item logout" onClick={() => { api.logout().catch(()=>{}); onLogout(); }}><i>↪</i><span>خروج</span></button></div>
-    </aside>
-    <main className="product-main"><Routes>
-      <Route path="/" element={<Dashboard user={user} />} />
-      <Route path="/chat" element={<ChatPage user={user} />} />
-      <Route path="/tasks" element={<TasksPage />} /><Route path="/calendar" element={<CalendarPage />} />
-      <Route path="/departments" element={<DepartmentsPage />} /><Route path="/documents" element={<DocumentCenterPage user={user} />} />
-      <Route path="/knowledge" element={<KnowledgePage />} /><Route path="/approvals" element={<ApprovalsPage />} />
-      <Route path="/agents" element={<AgentsPage />} /><Route path="/notifications" element={<NotificationsPage />} />
-      <Route path="/integrations" element={<IntegrationsPage />} /><Route path="/leaves" element={<LeavesPage />} />
-      <Route path="/admin" element={capabilitySet.has("admin.console.read") ? <AdminPage /> : <AccessDenied />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes></main>
-  </div>;
+  const [navOpen, setNavOpen] = useState(false);
+  const [theme, toggleTheme] = useTheme();
+  const location = useLocation();
+  const threads = useThreads();
+  const activeThreadId = location.pathname.startsWith("/chat/") ? location.pathname.slice(6) : null;
+  const isChatRoute = location.pathname === "/" || location.pathname.startsWith("/chat/");
+  // The conversations panel is open by default; preference persists.
+  const [chatsOpen, setChatsOpen] = useState(() => {
+    try { return localStorage.getItem("nova.chatsPanel") !== "0"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("nova.chatsPanel", chatsOpen ? "1" : "0"); } catch { /* ignore */ }
+  }, [chatsOpen]);
+  const closePanelOnMobile = () => {
+    try { if (window.matchMedia("(max-width: 960px)").matches) setChatsOpen(false); } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    api.getMyCapabilities().then((x) => setCaps(x.capabilities || x || [])).catch(() => {});
+    api.getNotifications()
+      .then((x) => setNotifCount((x.notifications || []).filter((n) => !n.is_read).length))
+      .catch(() => {});
+  }, []);
+
+  // Close the mobile drawer on every navigation.
+  useEffect(() => { setNavOpen(false); }, [location.pathname]);
+
+  const capabilitySet = useMemo(
+    () => new Set(caps.map((c) => (typeof c === "string" ? c : c.name))),
+    [caps]
+  );
+  const isAdmin = capabilitySet.has("admin.console.read");
+
+  const items = useMemo(() => {
+    const sections = NAV.map((s) => ({ ...s, items: [...s.items] }));
+    if (isAdmin) {
+      sections.push({
+        section: "Administration",
+        items: [{ to: "/admin", label: "Admin Console", icon: "cog" }],
+      });
+    }
+    return sections;
+  }, [isAdmin]);
+
+  return (
+    <div className="shell">
+      <div className="topbar">
+        <IconButton icon="menu" label="Open menu" onClick={() => setNavOpen(true)} />
+        <span className="orb" style={{ width: 26, height: 26 }} />
+        <strong className="brand-name" style={{ fontSize: 15 }}>Nova Enterprise</strong>
+      </div>
+
+      {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
+
+      <aside className={`sidebar ${navOpen ? "open" : ""}`}>
+        <Brand />
+
+        <nav className="nav" aria-label="Primary">
+          {items.map((section) => (
+            <React.Fragment key={section.section ?? "home"}>
+              {section.section && <div className="nav-sec">{section.section}</div>}
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+                >
+                  <Icon name={item.icon} size={18} />
+                  <span>{item.label}</span>
+                  {item.badge && notifCount > 0 && <span className="nav-badge">{notifCount}</span>}
+                </NavLink>
+              ))}
+            </React.Fragment>
+          ))}
+        </nav>
+
+        <div className="sidebar-foot">
+          <div className="user-card">
+            <div className="avatar">{(user.name || "U").slice(0, 1).toUpperCase()}</div>
+            <div className="who">
+              <strong>{user.name}</strong>
+              <span>{user.company || "Organization"}</span>
+            </div>
+          </div>
+          <div className="h-stack" style={{ padding: "2px 4px 0" }}>
+            <IconButton
+              icon={theme === "light" ? "moon" : "sun"}
+              label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+              onClick={toggleTheme}
+            />
+            <span className="grow" />
+            <IconButton
+              icon="logout"
+              label="Log out"
+              onClick={() => { api.logout().catch(() => {}); onLogout(); }}
+            />
+          </div>
+        </div>
+      </aside>
+
+      {/* Conversations menu — the chat page's own panel, separate from the
+          app navigation. Desktop: a fixed second column; mobile: a drawer. */}
+      {isChatRoute && (
+        <>
+          <ChatPanel
+            threads={threads}
+            activeId={activeThreadId}
+            open={chatsOpen}
+            onClose={() => setChatsOpen(false)}
+            onNavigateThread={closePanelOnMobile}
+          />
+          {chatsOpen && <div className="scrim panel-scrim" onClick={() => setChatsOpen(false)} />}
+        </>
+      )}
+
+      <main className="main">
+        <div className="route-enter" key={location.pathname}>
+          <Routes location={location}>
+            <Route path="/" element={<ChatPage user={user} chatsOpen={chatsOpen} onOpenChats={() => setChatsOpen(true)} />} />
+            <Route path="/chat/:id" element={<ChatPage user={user} chatsOpen={chatsOpen} onOpenChats={() => setChatsOpen(true)} />} />
+            <Route path="/chat" element={<Navigate to="/" replace />} />
+            <Route path="/tasks" element={<div className="page"><TasksPage /></div>} />
+            <Route path="/approvals" element={<div className="page"><ApprovalsPage /></div>} />
+            <Route path="/leaves" element={<div className="page"><LeavesPage /></div>} />
+            <Route path="/calendar" element={<div className="page"><CalendarPage /></div>} />
+            <Route path="/departments" element={<div className="page"><DepartmentsPage /></div>} />
+            <Route path="/documents" element={<div className="page"><DocumentCenterPage user={user} /></div>} />
+            <Route path="/knowledge" element={<div className="page"><KnowledgePage /></div>} />
+            <Route path="/agents" element={<div className="page"><AgentsPage /></div>} />
+            <Route path="/notifications" element={<div className="page"><NotificationsPage /></div>} />
+            <Route path="/integrations" element={<div className="page"><IntegrationsPage /></div>} />
+            <Route
+              path="/admin"
+              element={
+                isAdmin ? <div className="page"><AdminPage /></div> : <div className="page"><AccessDenied /></div>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </main>
+    </div>
+  );
 }
 
-const Card = ({children, className=""}) => <section className={`x-card ${className}`}>{children}</section>;
-const Pill = ({children, tone="neutral"}) => <span className={`pill pill-${tone}`}>{children}</span>;
-function PageHead({eyebrow,title,subtitle,action}) { return <header className="page-head"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{action}</header>; }
+function AccessDenied() {
+  return (
+    <div className="card" style={{ textAlign: "center", padding: 48 }}>
+      <div className="empty-icon" style={{ margin: "0 auto 12px" }}>
+        <Icon name="shield" size={24} />
+      </div>
+      <h2 style={{ fontSize: 20 }}>Access restricted</h2>
+      <p className="muted" style={{ marginTop: 8 }}>This area is only available to privileged roles.</p>
+    </div>
+  );
+}
 
-function Dashboard({user}) { const [data,setData]=useState({}); useEffect(()=>{api.getWorkspace().then(setData).catch(()=>{})},[]); return <><PageHead eyebrow="CONTROL CENTER" title={`سلام ${user.name.split(" ")[0]} 👋`} subtitle="تمام عملیات سازمان، AI و اتوماسیون از یک فضای واحد مدیریت می‌شوند." action={<NavLink className="primary-btn" to="/chat">✦ شروع گفتگو</NavLink>} /><div className="hero-grid"><Card className="hero-card"><div className="hero-glow"/><Pill tone="success">AI Online</Pill><h2>دستیار سازمانی شما آماده است.</h2><p>درخواست را طبیعی بنویسید؛ سیستم هویت، نقش، دسترسی، ریسک و Workflow را قبل از اجرا بررسی می‌کند.</p><NavLink className="primary-btn" to="/chat">گفتگو با Agent من →</NavLink></Card><Card><div className="metric"><span>Role</span><strong>{data.department?.name || "سازمان"}</strong><small>Effective access</small></div><div className="metric"><span>AI</span><strong>Active</strong><small>Model Router ready</small></div><div className="metric"><span>Security</span><strong>Protected</strong><small>Policy + ACL + FGA</small></div></Card></div><div className="section-title">دسترسی سریع</div><div className="quick-grid">{[["/chat","AI Workspace","هر کاری را با زبان طبیعی انجام بده"],["/documents","Documents","فایل‌ها و Knowledge با ACL"],["/approvals","Approvals","تأییدهای در انتظار شما"],["/agents","Role Agents","Agent متناسب با نقش شما"]].map(x=><NavLink className="quick-card" to={x[0]} key={x[0]}><strong>{x[1]}</strong><span>{x[2]}</span><b>→</b></NavLink>)}</div></>; }
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-function TasksPage(){const [tasks,setTasks]=useState([]);const [name,setName]=useState("");const load=()=>api.getTasks().then(x=>setTasks(x.tasks||[])).catch(()=>{});useEffect(load,[]);return <><PageHead eyebrow="WORK MANAGEMENT" title="کارها" subtitle="Task، مسئول، موعد و اتوماسیون در یک جا." action={<button className="primary-btn" onClick={async()=>{if(!name)return;await api.createTask({name});setName("");load()}}>+ کار جدید</button>}/><Card><div className="inline-form"><input value={name} onChange={e=>setName(e.target.value)} placeholder="عنوان تسک را بنویسید…"/><button className="primary-btn" onClick={async()=>{if(!name)return;await api.createTask({name});setName("");load()}}>ایجاد</button></div></Card><Card><Table headers={["تسک","وضعیت","عملیات"]} rows={tasks.map(t=>[<strong key={t.id}>{t.name}</strong>,<Pill tone="info">{t.state||"Open"}</Pill>,<button className="ghost-btn">مشاهده</button>])}/></Card></>;}
-function CalendarPage(){return <><PageHead eyebrow="TIME" title="تقویم سازمانی" subtitle="مرخصی، جلسات و تسک‌ها در یک نمای زمانی."/><Card className="calendar-card"><div className="calendar-head"><strong>August 2026</strong><span>امروز • 19</span></div><div className="calendar-grid">{Array.from({length:35},(_,i)=><div className={`day ${i===18?"today":""}`} key={i}>{(i%31)+1}{i===18&&<small>Today</small>}</div>)}</div></Card></>}
-function DepartmentsPage(){const [items,setItems]=useState([]);useEffect(()=>{api.getDepartments().then(x=>setItems(x.departments||[])).catch(()=>{})},[]);return <><PageHead eyebrow="ORGANIZATION" title="دپارتمان‌ها" subtitle="هر دپارتمان می‌تواند Chat، Agent، فایل، Knowledge و Workflow خودش را داشته باشد."/><div className="dept-grid">{items.map(d=><Card key={d.id}><div className="dept-icon">▦</div><h3>{d.name}</h3><p>{d.member_count} عضو</p><div className="dept-links"><button>Chat</button><button>Agent</button><button>Documents</button></div></Card>)}{!items.length&&<Card><Empty text="دپارتمان قابل نمایش پیدا نشد."/></Card>}</div></>}
-function KnowledgePage(){return <><PageHead eyebrow="KNOWLEDGE" title="Knowledge" subtitle="دانش سازمانی با همان ACL فایل‌ها؛ AI فقط چیزهایی را می‌بیند که کاربر مجاز است."/><Card><div className="knowledge-hero"><div><Pill tone="success">ACL Protected</Pill><h2>دانش قابل اعتماد سازمان</h2><p>فایل‌های شخصی، تیمی، دپارتمانی و شرکتی می‌توانند جداگانه وارد Knowledge شوند.</p></div><NavLink className="primary-btn" to="/documents">مدیریت فایل‌ها</NavLink></div></Card></>}
-function ApprovalsPage(){const [items,setItems]=useState([]);useEffect(()=>{api.getApprovals().then(x=>setItems(x.approvals||[])).catch(()=>{})},[]);return <><PageHead eyebrow="CONTROL" title="تأییدها" subtitle="عملیات حساس قبل از اجرا، طبق Policy و Role بررسی می‌شوند."/><Card><Table headers={["درخواست","درخواست‌کننده","Risk","وضعیت"]} rows={items.map(a=>[a.name,a.requester,<Pill tone={a.risk>70?"danger":"warning"}>{a.risk||0}</Pill>,<Pill tone="info">{a.state||"Pending"}</Pill>])}/></Card></>}
-function AgentsPage(){const [items,setItems]=useState([]);useEffect(()=>{api.getAgents().then(x=>setItems(x.agents||[])).catch(()=>{})},[]);return <><PageHead eyebrow="AI AGENTS" title="Agents" subtitle="Agent هر نقش، فقط در محدوده Capabilityهای همان کاربر عمل می‌کند."/><div className="agent-grid">{items.map(a=><Card key={a.id}><div className="agent-orb">✦</div><h3>{a.name}</h3><p>{a.description||"Role-aware enterprise agent"}</p><div><Pill>{a.tools} tools</Pill><Pill tone="success">Policy bound</Pill></div></Card>)}{!items.length&&<Card><Empty text="Agentی ثبت نشده است."/></Card>}</div></>}
-function NotificationsPage(){const [items,setItems]=useState([]);useEffect(()=>{api.getNotifications().then(x=>setItems(x.notifications||[])).catch(()=>{})},[]);return <><PageHead eyebrow="INBOX" title="اعلان‌ها" subtitle="رویدادهای Task، Approval، Document، Security و AI."/><Card><div className="notification-list">{items.map(n=><div className="notification" key={n.id}><div className="notif-dot"/><div><strong>{n.subject||"اعلان جدید"}</strong><p dangerouslySetInnerHTML={{__html:n.body||""}}/><small>{n.date}</small></div></div>)}{!items.length&&<Empty text="اعلان جدیدی ندارید."/>}</div></Card></>}
-function AccessDenied(){return <Card><h2>دسترسی مجاز نیست</h2><p>این بخش فقط برای نقش‌های مجاز در دسترس است.</p></Card>}
-function Empty({text}){return <div className="empty">{text}</div>}
-function Table({headers,rows}){return <div className="table-wrap"><table><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody></table></div>}
+  useEffect(() => {
+    api.getMe().then(setUser).catch(() => setUser(null)).finally(() => setLoading(false));
+  }, []);
 
-export default function App(){const [user,setUser]=useState(null);const [loading,setLoading]=useState(true);useEffect(()=>{api.getMe().then(setUser).catch(()=>setUser(null)).finally(()=>setLoading(false))},[]);if(loading)return <div className="boot">✦</div>;if(!user)return <LoginPage onLoggedIn={setUser}/>;return <Shell user={user} onLogout={()=>setUser(null)}/>;}
+  if (loading) {
+    return (
+      <div className="boot">
+        <span className="orb" />
+      </div>
+    );
+  }
+  if (!user) return <LoginPage onLoggedIn={setUser} />;
+  return <Shell user={user} onLogout={() => setUser(null)} />;
+}

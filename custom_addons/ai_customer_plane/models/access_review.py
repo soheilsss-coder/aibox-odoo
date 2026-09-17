@@ -60,15 +60,18 @@ class AiAccessReviewLine(models.Model):
                 Grant = self.env["ai.gateway.access.grant"].sudo()
                 grants = Grant.search([
                     ("to_user_id", "=", line.user_id.id),
+                    ("company_id", "=", self.env.company.id),
                     ("capability_name", "=", line.capability),
                     ("active", "=", True),
                 ])
                 for grant in grants:
-                    grant.action_revoke_now()
+                    grant.with_context(authorization_actor_id=self.env.user.id).action_revoke_now()
                 Delegation = self.env["ai.customer.delegation"] if "ai.customer.delegation" in self.env else None
                 if Delegation:
                     delegations = Delegation.sudo().search([
                         ("delegatee_id", "=", line.user_id.id),
+                        ("delegator_id.company_ids", "in", self.env.company.id),
+                        ("delegatee_id.company_ids", "in", self.env.company.id),
                         ("capability", "=", line.capability),
                         ("active", "=", True),
                     ])

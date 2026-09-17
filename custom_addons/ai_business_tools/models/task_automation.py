@@ -6,6 +6,17 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 
+class ProjectTaskTypeAutomation(models.Model):
+    _inherit = "project.task.type"
+
+    is_closed = fields.Boolean(
+        string="Closed Stage",
+        default=False,
+        index=True,
+        help="Compatibility flag used by the AI task dependency and escalation rules on Odoo 18.",
+    )
+
+
 class ProjectTaskAutomation(models.Model):
     """Roadmap فاز ۵ (اتوماسیون), items #30 (Events), #32 (Task System -
     dependency) and #35 (Escalation) - all three layered directly onto
@@ -193,11 +204,14 @@ class ProjectTaskAutomation(models.Model):
 
         overdue = self.env["project.task"].sudo().search([
             ("date_deadline", "<", today),
-            ("stage_id.is_closed", "=", False),
+            "|", ("stage_id", "=", False), ("stage_id.is_closed", "=", False),
         ])
         escalated = 0
         for task in overdue:
-            days_late = (today - task.date_deadline).days
+            deadline_date = fields.Date.to_date(task.date_deadline)
+            if not deadline_date:
+                continue
+            days_late = (today - deadline_date).days
             target_level = 0
             for level in (3, 2, 1):
                 if days_late >= level_days[level]:

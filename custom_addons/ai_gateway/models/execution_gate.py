@@ -29,15 +29,14 @@ class AiGatewayExecutionGate(models.AbstractModel):
         # the Capability→Tool→Risk contract. The legacy risk registry remains
         # for compatibility but may not define an executable tool by itself.
         if "ai.integration.unified.registry" in self.env:
-            try:
-                return self.env["ai.integration.unified.registry"].execution_contract(tool_name)
-            except AccessError:
-                # Native llm.tool methods (memory, file reading, internet
-                # search, etc.) are first-class product tools too, but they do
-                # not all mutate ERP records and therefore do not need a
-                # Business Adapter handler. They still MUST have a central
-                # risk-registry entry; unknown tools remain denied.
-                pass
+            registry = self.env["ai.integration.unified.registry"]
+            # Only fall back to the native-tool risk registry when the tool is
+            # not a reviewed business operation. A registered operation with
+            # a missing/mismatched risk or capability contract must fail closed;
+            # treating its AccessError as a native-tool fallback would bypass
+            # the unified contract.
+            if registry.resolve(tool_name):
+                return registry.execution_contract(tool_name)
         if "ai.gateway.tool.risk" not in self.env:
             return None
         risk = self.env["ai.gateway.tool.risk"].sudo().search(
@@ -48,6 +47,66 @@ class AiGatewayExecutionGate(models.AbstractModel):
         return (None, risk, None)
 
     @api.model
+    def _profile_allows_tool(self, tool_name, capability=None):
+        """Apply the active customer's compiled tool policy at execution time."""
+        if "ai.customer.configuration.profile" not in self.env:
+            return True
+        profile = self.env["ai.customer.configuration.profile"].active_for_company(self.env.company)
+        if not profile:
+            return True
+        runtime = profile.runtime_config().get("sections", {})
+        policy = runtime.get("tools", {})
+        features = runtime.get("features", {})
+        allowed = policy.get("allowed_tools", policy.get("allow", []))
+        denied = policy.get("denied_tools", policy.get("deny", []))
+        enabled_features = features.get("enabled_features", [])
+        disabled_features = features.get("disabled_features", [])
+        if isinstance(allowed, list) and allowed and tool_name not in {str(item) for item in allowed}:
+            return False
+        if isinstance(denied, list) and tool_name in {str(item) for item in denied}:
+            return False
+        enabled = {str(item) for item in enabled_features} if isinstance(enabled_features, list) else set()
+        disabled = {str(item) for item in disabled_features} if isinstance(disabled_features, list) else set()
+        if enabled and tool_name not in enabled and (not capability or capability not in enabled):
+            return False
+        if tool_name in disabled or (capability and capability in disabled):
+            return False
+        return True
+
+    @api.model
+    def _profile_requires_approval(self, tool_name, risk):
+        if "ai.customer.configuration.profile" not in self.env:
+            return False
+        profile = self.env["ai.customer.configuration.profile"].active_for_company(self.env.company)
+        if not profile:
+            return False
+        policy = profile.runtime_config().get("sections", {}).get("approval_matrix", {})
+        forced = policy.get("force_approval_tools", policy.get("approval_required_tools", []))
+        threshold = policy.get("risk_threshold", policy.get("minimum_risk", 99))
+        try:
+            threshold = int(threshold)
+        except (TypeError, ValueError):
+            threshold = 99
+        return (isinstance(forced, list) and tool_name in {str(item) for item in forced}) or risk >= threshold
+
+    @api.model
+    def _profile_approver_group(self, tool_name):
+        if "ai.customer.configuration.profile" not in self.env:
+            return False
+        profile = self.env["ai.customer.configuration.profile"].active_for_company(self.env.company)
+        if not profile:
+            return False
+        policy = profile.runtime_config().get("sections", {}).get("approval_matrix", {})
+        mapping = policy.get("approver_groups", {})
+        xmlid = mapping.get(tool_name) or policy.get("approver_group_xmlid")
+        if not xmlid:
+            return False
+        group = self.env.ref(str(xmlid), raise_if_not_found=False)
+        if not group or group._name != "res.groups":
+            raise AccessError("approval matrix references an unknown approver group")
+        return group
+
+    @api.model
     def _audit(self, action, payload, success=True, error_message=None):
         if "ai.gateway.audit.log" in self.env:
             self.env["ai.gateway.audit.log"].sudo().log(
@@ -56,9 +115,10 @@ class AiGatewayExecutionGate(models.AbstractModel):
             )
 
     @api.model
-    def _approval_key(self, tool_name, args, user_id):
+    def _approval_key(self, tool_name, args, user_id, company_id=None):
         raw = json.dumps(
-            {"tool": tool_name, "args": args or {}, "user": user_id},
+            {"tool": tool_name, "args": args or {}, "user": user_id,
+             "company": company_id or self.env.company.id},
             sort_keys=True, default=str, ensure_ascii=False
         )
         return hashlib.sha256(raw.encode()).hexdigest()
@@ -109,6 +169,24 @@ class AiGatewayExecutionGate(models.AbstractModel):
             raise AccessError("access_denied: AI tool is not registered in the central risk registry")
 
         operation, rec, cap = contract
+        contract_capability = operation.capability_name if operation else rec.capability_name
+        if not self._profile_allows_tool(tool_name, capability=contract_capability):
+            self._audit(tool_name, {"reason": "customer_profile_tool_policy"}, False, "customer_profile_tool_policy")
+            raise AccessError("access_denied: this tool is disabled by the active customer configuration profile")
+        # Risk rows for optional tools are durable metadata, not proof that the
+        # owning official addon is installed in this database. Reject stale
+        # direct-tool calls here as well as in the assistant catalog.
+        owner = getattr(rec, "module_name", False) if rec else getattr(operation, "module_name", False)
+        if rec and not operation and not owner:
+            self._audit(tool_name, {"reason": "tool_owner_missing"}, False, "tool_owner_missing")
+            raise AccessError("access_denied: AI tool has no owning module connection")
+        if owner and "ir.module.module" in self.env:
+            installed = self.env["ir.module.module"].sudo().search([
+                ("name", "=", owner), ("state", "=", "installed"),
+            ], limit=1)
+            if not installed:
+                self._audit(tool_name, {"reason": "owner_module_not_installed", "module": owner}, False, "owner_module_not_installed")
+                raise AccessError("access_denied: the owning module is not installed")
         # The binding is the single runtime join between Capability, Tool,
         # Risk and Approval. Older releases accidentally referenced a
         # non-existent local variable here, which made every gate call fail
@@ -144,7 +222,12 @@ class AiGatewayExecutionGate(models.AbstractModel):
             valid_state = approval.state == "approved" or (approval.state == "executing" and self.env.context.get("approval_action"))
             if not approval.exists() or not valid_state or approval.executed_at or approval.decided_by_id.id != self.env.user.id:
                 raise AccessError("approval token is invalid, expired or already executed")
-            if approval.tool_name != tool_name or approval.requested_by_id.id != self.env.user.id:
+            if approval.company_id != self.env.company:
+                raise AccessError("approval token belongs to another company")
+            # The approver executes the already-approved action. Requiring
+            # requested_by_id here would make every legitimate approval fail
+            # because self-approval is explicitly forbidden.
+            if approval.tool_name != tool_name or approval.decided_by_id.id != self.env.user.id:
                 raise AccessError("approval token does not match this tool invocation")
             try:
                 approved_args = json.loads(approval.tool_args or "{}")
@@ -160,16 +243,21 @@ class AiGatewayExecutionGate(models.AbstractModel):
             self.env["ai.control.authorization"].require(capability, record=record)
 
         # High-impact AI actions must stop before the business method.
-        if not approved and risk >= 3:
+        profile_requires_approval = self._profile_requires_approval(tool_name, risk)
+        if not approved and (risk >= 3 or profile_requires_approval):
             if not create_approval or "ai.gateway.approval" not in self.env:
                 raise AccessError("approval_required: this AI action requires human approval")
             Approval = self.env["ai.gateway.approval"].sudo()
-            key = self._approval_key(tool_name, args, self.env.user.id)
-            existing = Approval.search([("approval_key", "=", key), ("state", "=", "pending")], limit=1)
+            key = self._approval_key(tool_name, args, self.env.user.id, self.env.company.id)
+            existing = Approval.search([
+                ("approval_key", "=", key), ("company_id", "=", self.env.company.id),
+                ("state", "=", "pending"),
+            ], limit=1)
             if existing:
                 approval = existing
             else:
-                group = binding.approval_group_id if binding and binding.approval_group_id else rec.approver_group_id
+                group = self._profile_approver_group(tool_name)
+                group = group or (binding.approval_group_id if binding and binding.approval_group_id else rec.approver_group_id)
                 if not group:
                     raise AccessError("approval_required: no approver group is configured for this tool")
                 approval = Approval.create({

@@ -29,6 +29,26 @@ class AiAuthorizationEngine(models.AbstractModel):
     @api.model
     def decide(self, capability, user=None, record=None, action="execute"):
         user = user or self.env.user
+        # An activated customer profile is a runtime policy, not just a
+        # deployment document. Keep this check inside the central
+        # authorization engine so API, chat, workflow and approval replay
+        # all observe the same company-scoped capability allow/deny list.
+        if "ai.customer.configuration.profile" in self.env:
+            profile = self.env["ai.customer.configuration.profile"].active_for_company(self.env.company)
+            policy = profile.runtime_config().get("sections", {}).get("capability_policy", {}) if profile else {}
+            allowed = policy.get("allowed_capabilities", policy.get("allow", []))
+            denied = policy.get("denied_capabilities", policy.get("deny", []))
+            features = profile.runtime_config().get("sections", {}).get("features", {}) if profile else {}
+            enabled_features = features.get("enabled_features", [])
+            disabled_features = features.get("disabled_features", [])
+            if isinstance(allowed, list) and allowed and capability not in {str(item) for item in allowed}:
+                return False
+            if isinstance(denied, list) and capability in {str(item) for item in denied}:
+                return False
+            if isinstance(enabled_features, list) and enabled_features and capability not in {str(item) for item in enabled_features}:
+                return False
+            if isinstance(disabled_features, list) and capability in {str(item) for item in disabled_features}:
+                return False
         Cap = self.env["ai.control.capability"].sudo()
         cap = Cap.search([("name", "=", capability), ("active", "=", True)], limit=1)
         if not cap:
@@ -36,11 +56,11 @@ class AiAuthorizationEngine(models.AbstractModel):
         permanent_groups = user.groups_id
         grant_model = self.env["ai.gateway.access.grant"].sudo() if "ai.gateway.access.grant" in self.env else None
         assignment_model = self.env["ai.customer.role.assignment"].sudo() if "ai.customer.role.assignment" in self.env else None
-        assigned_groups = assignment_model.groups_for_user(user) if assignment_model else self.env["res.groups"].browse()
+        assigned_groups = assignment_model.groups_for_user(user) if assignment_model is not None else self.env["res.groups"].browse()
         effective_groups = permanent_groups | assigned_groups
-        if grant_model:
+        if grant_model is not None:
             effective_groups |= grant_model.effective_groups(user)
-        grant_allows = grant_model.grant_allows(user, capability, record=record) if grant_model else False
+        grant_allows = grant_model.grant_allows(user, capability, record=record) if grant_model is not None else False
         delegation_allows = False
         if "ai.customer.delegation" in self.env:
             delegation_allows = bool(self.env["ai.customer.delegation"].sudo().effective_for(
@@ -72,9 +92,9 @@ class AiAuthorizationEngine(models.AbstractModel):
                        (hasattr(record, "user_id") and record.user_id and record.user_id.id == user.id))
                 if own: return True
             elif policy.scope == "company" and "company_id" in record._fields:
-                if not record.company_id or record.company_id.id == user.company_id.id: return True
+                if record.company_id and record.company_id.id == self.env.company.id: return True
             elif policy.scope == "branch" and "branch_id" in record._fields:
-                if record.branch_id and record.branch_id.id == user.company_id.id: return True
+                if record.branch_id and record.branch_id.id == self.env.company.id: return True
             elif policy.scope == "project" and "ai.control.relation" in self.env:
                 if any(self.env["ai.control.relation"].allows(user, rel, record) for rel in ("owner", "manager", "member", "viewer", "editor", "delegate")): return True
             elif policy.scope == "folder" and "ai.control.relation" in self.env:

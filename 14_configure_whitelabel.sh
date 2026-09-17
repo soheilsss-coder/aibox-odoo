@@ -38,14 +38,15 @@ if [ -z "$BRAND_NAME" ] || [ -z "$BRAND_DOMAIN" ]; then
   exit 1
 fi
 
-ODOO_BIN="${ODOO_BIN:-/opt/odoo/odoo-bin}"
-ODOO_CONF="${ODOO_CONF:-/opt/odoo.conf}"
+ODOO_BIN="${ODOO_BIN:-/opt/odoo/src/odoo/odoo-bin}"
+ODOO_PYTHON="${ODOO_PYTHON:-/opt/odoo/venv/bin/python}"
+ODOO_CONF="${ODOO_CONF:-/etc/odoo/odoo.conf}"
 ODOO_DB="${ODOO_DB:-company_ai}"
 ADDONS_DIR="${ADDONS_DIR:-/opt/odoo-custom-addons}"
 DEBRAND_JS="${ADDONS_DIR}/ai_debrand/static/src/js/debrand.js"
 
 echo "=== [1/3] Setting brand name/domain in the database (ir.config_parameter + res.company) ==="
-"$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" <<PYEOF
+"$ODOO_PYTHON" "$ODOO_BIN" shell -c "$ODOO_CONF" -d "$ODOO_DB" <<PYEOF
 brand_name = ${BRAND_NAME@Q}
 brand_domain = ${BRAND_DOMAIN@Q}
 

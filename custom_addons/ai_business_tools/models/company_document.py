@@ -21,6 +21,11 @@ class CompanyDocument(models.Model):
     _order = "create_date desc"
 
     name = fields.Char(required=True)
+    company_id = fields.Many2one(
+        "res.company", required=True, index=True, ondelete="restrict",
+        default=lambda self: self.env.company,
+        help="Tenant boundary for every document and its derived chunks.",
+    )
     file = fields.Binary(attachment=True)
     file_name = fields.Char()
     description = fields.Text()
@@ -68,7 +73,12 @@ class LLMToolDocument(models.Model):
             query: Optional text to filter by document name.
         """
         domain = [("name", "ilike", query)] if query else []
-        docs = self.env["company.document"].search(domain)
+        try:
+            docs = self.env["company.document"].search(domain)
+        except AccessError as exc:
+            _audit(self.env, "list_documents", {"query": query},
+                   success=False, error_message=str(exc))
+            return {"error": "access_denied", "count": 0, "documents": []}
         result = {"count": len(docs), "documents": [
             {"id": d.id, "name": d.name, "access_level": d.access_level,
              "description": d.description or ""}

@@ -7,8 +7,15 @@ import react from "@vitejs/plugin-react";
 // explicitly if the frontend is deployed separately (e.g. Vercel/Netlify
 // pointing at a different domain for the Odoo box).
 export default defineConfig({
+  base: process.env.PAGES_BASE || "/",
   plugins: [react()],
   server: {
+    // 0.0.0.0 + open host allowlist: required for remote/preview access
+    // (SSH tunnels, sandbox previews, LAN demos). Dev-only setting - the
+    // production build is static files served by nginx, see
+    // 17_setup_frontend.sh.
+    host: true,
+    allowedHosts: true,
     port: 5173,
     proxy: {
       "/api": {

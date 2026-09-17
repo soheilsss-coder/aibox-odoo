@@ -77,13 +77,20 @@ class LLMToolHrLeave(models.Model):
         # this were ever mis-registered at RISK_5. The real permission
         # logic for THIS tool is still the self-approval guard below -
         # this call does not replace it.
-        self.env["ai.gateway.execution.gate"].authorize(action_label)
+        payload = {"employee_name": employee_name, "leave_id": leave_id}
+        try:
+            self.env["ai.gateway.execution.gate"].authorize(action_label, args=payload)
+        except AccessError as exc:
+            _audit(self.env, action_label, payload, success=False, error_message=str(exc))
+            return {"error": "access_denied: %s" % exc}
+        except UserError as exc:
+            _audit(self.env, action_label, payload, success=False, error_message=str(exc))
+            return {"error": str(exc)}
 
         cached = self.env["ai.gateway.idempotency"].get_cached(self.env.user.id, idempotency_key)
         if cached is not None:
             return cached
 
-        payload = {"employee_name": employee_name, "leave_id": leave_id}
         if not employee_name and not leave_id:
             return {"error": "missing_required_field", "missing_fields": ["employee_name or leave_id"],
                     "hint": "از کاربر بپرس درخواست مرخصی کدوم کارمند."}

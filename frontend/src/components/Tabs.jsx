@@ -1,18 +1,18 @@
 import React from "react";
 
-// tabs: [{ key, label }]
-export default function Tabs({ tabs, active, onChange }) {
+// tabs: [{ key, label }] — segmented-control look.
+export default function Tabs({ tabs = [], active, onChange }) {
   return (
-    <div className="ds-tabs" role="tablist">
-      {tabs.map((tab) => (
+    <div className="tabs" role="tablist">
+      {tabs.map((t) => (
         <button
-          key={tab.key}
+          key={t.key}
           role="tab"
-          aria-selected={active === tab.key}
-          className={`ds-tab ${active === tab.key ? "ds-tab-active" : ""}`}
-          onClick={() => onChange(tab.key)}
+          aria-selected={active === t.key}
+          className={`tab ${active === t.key ? "active" : ""}`}
+          onClick={() => onChange(t.key)}
         >
-          {tab.label}
+          {t.label}
         </button>
       ))}
     </div>

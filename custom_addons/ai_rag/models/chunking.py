@@ -1,14 +1,30 @@
 import re
+import unicodedata
 
-# Deliberately NOT the naive fixed-offset char slicer already used in
-# company_ai_demo/models/file_reader.py's chunk_text() (which just cuts
-# every 800 chars regardless of word/sentence boundaries - fine for a
-# one-off "rank 4 excerpts from THIS attachment" use case, not accurate
-# enough to be the actual persistent search index for the whole
-# document library). This one respects paragraph boundaries first and
-# only falls back to a hard cut for a single paragraph that is itself
-# bigger than one chunk (e.g. a wall-of-text scanned document with no
-# real paragraph breaks).
+
+_PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
+_ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+
+
+def normalize_search_text(text):
+    """Normalize searchable text without changing the cited original.
+
+    Persian/Arabic documents commonly mix ي/ی, ك/ک, Arabic and Persian
+    digits, zero-width non-joiners and compatibility forms.  Embeddings keep
+    the original text; this representation is only for deterministic lexical
+    search and trigram matching.
+    """
+    value = unicodedata.normalize("NFKC", str(text or ""))
+    value = value.translate(str.maketrans({"ي": "ی", "ى": "ی", "ك": "ک", "ۀ": "ه", "ة": "ه"}))
+    value = value.translate(_PERSIAN_DIGITS).translate(_ARABIC_DIGITS)
+    value = value.replace("\u200c", " ").replace("\u200d", " ")
+    return re.sub(r"\s+", " ", value).strip()
+
+# This shared chunker respects paragraph boundaries first and only falls
+# back to a hard cut for a single paragraph that is itself bigger than one
+# chunk (e.g. a wall-of-text scanned document with no real paragraph breaks).
+# The ad-hoc attachment reader delegates here when ai_rag is installed so
+# persistent indexing and one-off relevance selection use the same boundaries.
 
 _DEFAULT_CHUNK_SIZE = 1000
 _DEFAULT_OVERLAP = 150
@@ -53,6 +69,11 @@ def chunk_text(text, chunk_size=_DEFAULT_CHUNK_SIZE, overlap=_DEFAULT_OVERLAP):
     boundary is still findable from either side), and only break a
     single oversized paragraph internally (sentence-aware, see
     _split_long_paragraph)."""
+    try:
+        chunk_size = max(128, int(chunk_size))
+        overlap = max(0, min(int(overlap), chunk_size // 2))
+    except (TypeError, ValueError):
+        chunk_size, overlap = _DEFAULT_CHUNK_SIZE, _DEFAULT_OVERLAP
     paragraphs = _split_paragraphs(text)
     if not paragraphs:
         return []
@@ -86,3 +107,61 @@ def chunk_text(text, chunk_size=_DEFAULT_CHUNK_SIZE, overlap=_DEFAULT_OVERLAP):
         tail = chunk[-overlap:] if len(chunk) > overlap else chunk
 
     return [c for c in overlapped if c.strip()]
+
+
+def chunk_blocks(blocks, chunk_size=_DEFAULT_CHUNK_SIZE, overlap=_DEFAULT_OVERLAP):
+    """Chunk canonical extractor blocks while retaining source provenance.
+
+    Blocks are packed only when their page/section/type metadata is the same;
+    this keeps a citation attached to the right page or table instead of
+    flattening the entire document before indexing.  The existing plain-text
+    ``chunk_text`` contract remains unchanged for callers that have no
+    structured extractor output.
+    """
+    try:
+        chunk_size = max(128, int(chunk_size))
+        overlap = max(0, min(int(overlap), chunk_size // 2))
+    except (TypeError, ValueError):
+        chunk_size, overlap = _DEFAULT_CHUNK_SIZE, _DEFAULT_OVERLAP
+
+    result = []
+    current_text = ""
+    current_meta = None
+
+    def flush():
+        nonlocal current_text, current_meta
+        if current_text.strip():
+            result.append({"text": current_text.strip(), **(current_meta or {})})
+        current_text = ""
+        current_meta = None
+
+    for block in blocks or []:
+        text = str((block or {}).get("text") or "").strip()
+        if not text:
+            continue
+        meta = {
+            key: (block or {}).get(key)
+            for key in (
+                "page", "section", "content_type", "coordinates",
+                "table", "sheet", "slide",
+            )
+            if (block or {}).get(key) not in (None, "")
+        }
+        same_source = current_meta == meta or current_meta is None
+        candidate = f"{current_text}\n\n{text}".strip() if current_text else text
+        if current_text and (not same_source or len(candidate) > chunk_size):
+            flush()
+            candidate = text
+        if len(candidate) <= chunk_size:
+            current_text = candidate
+            current_meta = meta
+            continue
+        # A single source block is larger than the limit. Reuse the tested
+        # sentence-aware splitter and attach the same provenance to each part.
+        for piece in _split_long_paragraph(text, chunk_size, overlap):
+            if current_text:
+                flush()
+            result.append({"text": piece.strip(), **meta})
+
+    flush()
+    return [item for item in result if item["text"]]

@@ -1,5 +1,5 @@
 import json
-from odoo import api, models
+from odoo import api, fields, models
 
 
 class _SubscriberBase(models.AbstractModel):
@@ -61,6 +61,52 @@ class AiCalendarSubscriber(_SubscriberBase):
     def _handle_event(self, event, payload): return self._delegate("calendar", event, payload)
 
 
+class AiActivitySubscriber(_SubscriberBase):
+    _name = "ai.integration.activity.subscriber"
+    _description = "Workflow Activity Request Subscriber"
+
+    def _handle_event(self, event, payload):
+        model_name = payload.get("model")
+        record_id = payload.get("record_id")
+        if not model_name or not record_id:
+            return {"status": "skipped", "reason": "missing activity target"}
+        if model_name not in self.env:
+            return {"status": "skipped", "reason": "model not installed"}
+        try:
+            record_id = int(record_id)
+        except (TypeError, ValueError):
+            return {"status": "skipped", "reason": "invalid record id"}
+        record = self.env[model_name].sudo().browse(record_id).exists()
+        if not record:
+            return {"status": "skipped", "reason": "record not found"}
+        summary = payload.get("summary") or event.event_type
+        note = payload.get("note") or payload.get("message") or "Workflow activity request"
+        deadline = payload.get("date_deadline") or fields.Date.context_today(self)
+        user_id = payload.get("user_id") or payload.get("notify_user_id") or (event.user_id.id if event.user_id else self.env.user.id)
+        user_id = int(user_id) if str(user_id or "").isdigit() else self.env.user.id
+        if hasattr(record, "activity_schedule"):
+            record.activity_schedule(
+                "mail.mail_activity_data_todo",
+                summary=summary,
+                note=note,
+                date_deadline=deadline,
+                user_id=user_id,
+            )
+            return {"status": "activity_scheduled", "model": model_name, "record_id": record.id, "user_id": user_id}
+        activity_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        model = self.env["ir.model"].sudo()._get(model_name)
+        self.env["mail.activity"].sudo().create({
+            "activity_type_id": activity_type.id if activity_type else False,
+            "summary": summary,
+            "note": note,
+            "date_deadline": deadline,
+            "user_id": user_id,
+            "res_model_id": model.id,
+            "res_id": record.id,
+        })
+        return {"status": "activity_created", "model": model_name, "record_id": record.id, "user_id": user_id}
+
+
 class AiModelSubscriber(_SubscriberBase):
     _name = "ai.integration.ai.subscriber"
     _description = "AI Event Subscriber"
@@ -78,8 +124,8 @@ class AiModelSubscriber(_SubscriberBase):
 class AiEventForAi(models.Model):
     _name = "ai.integration.ai.event"
     _description = "Durable AI Event Subscriber Queue"
-    event_id = models.Many2one("ai.control.event", required=True, ondelete="cascade", index=True)
-    event_type = models.Char(required=True, index=True)
-    payload_json = models.Text(default="{}", required=True)
-    user_id = models.Many2one("res.users", ondelete="set null", index=True)
-    state = models.Selection([("queued","Queued"),("consumed","Consumed"),("failed","Failed")], default="queued", index=True)
+    event_id = fields.Many2one("ai.control.event", required=True, ondelete="cascade", index=True)
+    event_type = fields.Char(required=True, index=True)
+    payload_json = fields.Text(default="{}", required=True)
+    user_id = fields.Many2one("res.users", ondelete="set null", index=True)
+    state = fields.Selection([("queued","Queued"),("consumed","Consumed"),("failed","Failed")], default="queued", index=True)

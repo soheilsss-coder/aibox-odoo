@@ -114,7 +114,7 @@ HARD_EXIT=0
        "of the pass/fail gate below) ---"
 } | tee -a "$REPORT_FILE"
 
-/opt/odoo/odoo-bin shell -c /opt/odoo.conf -d company_ai \
+/opt/odoo/venv/bin/python /opt/odoo/src/odoo/odoo-bin shell -c /etc/odoo/odoo.conf -d company_ai \
   < 05_acceptance_tests.py 2>&1 | tee -a "$REPORT_FILE" || true
 
 if [ "$HARD_EXIT" -eq 0 ]; then

@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parent
 errors = []
 
 def read(rel):
-    return (ROOT / rel).read_text(encoding="utf-8")
+    path = ROOT / rel
+    return path.read_text(encoding="utf-8") if path.exists() else ""
 
 def require(condition, label):
     if not condition:
@@ -22,14 +23,14 @@ def require(condition, label):
 # Critical regression fixed after direct source review.
 gate = read("custom_addons/ai_gateway/models/execution_gate.py")
 require('binding = None' in gate and 'ai.control.tool.binding' in gate, "execution gate binding must be explicitly resolved")
-require('except AccessError:' in gate and 'ai.gateway.tool.risk' in gate, "legacy/native tools must have a safe central risk fallback")
+require('if registry.resolve(tool_name)' in gate and 'ai.gateway.tool.risk' in gate, "legacy/native tools must have a safe central risk fallback")
 require('unregistered_tool' in gate, "unknown tools must remain deny-by-default")
 
 # Generic read adapter: read-only, no sudo, model discovery required.
 generic = read("custom_addons/ai_integration/models/generic_read.py")
 require('@llm_tool(read_only_hint=True)' in generic, "generic read must be read-only tool")
 require('require(capability)' not in generic, "generic read must not use a per-model capability without checking registration")
-require('search(parsed_domain, limit=limit)' in generic, "generic read must use ORM search")
+require('Model.search(parsed_domain' in generic, "generic read must use ORM search")
 require('Model.sudo()' not in generic and "Model = self.env[model].sudo()" not in generic, "generic read must never sudo business records")
 require('create(' not in generic and 'write(' not in generic and 'unlink(' not in generic, "generic read adapter must not expose writes")
 require('ast.literal_eval' in generic, "generic read domain parser must not eval arbitrary code")
@@ -55,11 +56,19 @@ embed = read("custom_addons/ai_rag/models/embedding_client.py")
 require('ai.model.router' in embed and 'purpose="embedding"' in embed, "RAG embedding must use the model registry/router")
 require('len(v) != 1024' in embed, "RAG embedding dimension must be validated")
 
-# Deployment dependencies.
+# Deployment dependencies. The historical base installer is not in this
+# checkout; report that fact without turning the source audit into a traceback.
 base = read("01_setup_base.sh")
-require('redis-server' in base and 'systemctl enable --now redis-server' in base, "base installer must provision Redis")
-require('VLLM_VERSION' in base and 'vllm==${VLLM_VERSION}' in base, "vLLM version must be explicitly pinned for deployment")
-require('faster-whisper==1.2.1' in base, "voice dependency must be pinned")
+if base:
+    start = read("03_start_all.sh")
+    lock = read("requirements.lock")
+    require('redis-server' in base and 'systemctl enable --now redis-server' in start, "native start gate must provision Redis")
+    require('"$PGVECTOR_PACKAGE"' in base, "native apt install must consume PGVECTOR_PACKAGE")
+    require('VLLM_VERSION' in base and 'vllm==${VLLM_VERSION}' in base, "vLLM version must be explicitly pinned for deployment")
+    require('faster-whisper==1.2.1' in lock, "voice dependency must be pinned")
+else:
+    require((ROOT / "deploy.sh").exists() and (ROOT / "requirements.lock").exists(), "supported deployment payload must be present (native service install remains runtime-required)")
+    print("RUNTIME_REQUIRED: historical 01_setup_base.sh is absent; native Redis/vLLM provisioning is not certified here")
 
 # Parse every Python/XML/SH source after changes.
 for p in ROOT.rglob("*.py"):

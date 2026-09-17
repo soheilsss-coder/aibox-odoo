@@ -11,15 +11,24 @@ class LLMThreadAllowUploads(models.Model):
     # already OCR them, but the attachment never reached it because
     # the upload itself was rejected first with "This model does not
     # support images".
+    # The canonical policy lives in ai_gateway, which depends on this module.
+    # Resolve it lazily to avoid a manifest dependency cycle during registry
+    # bootstrap; the fallback keeps a partial installation fail-closed.
     _ALLOWED_EXTENSIONS = (
-        ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt",
-        ".csv", ".txt", ".html", ".htm",
-        ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif",
+        ".txt", ".md", ".csv", ".json", ".html", ".htm", ".pdf",
+        ".docx", ".xlsx", ".pptx", ".png", ".jpg", ".jpeg", ".webp",
+        ".bmp", ".tif", ".tiff",
     )
 
     def _check_unsupported_attachments(self, message=None):
         unsupported = super()._check_unsupported_attachments(message)
+        allowed = self._ALLOWED_EXTENSIONS
+        try:
+            from odoo.addons.ai_gateway.controllers.file_policy import ALLOWED_EXTENSIONS
+            allowed = tuple(sorted(ALLOWED_EXTENSIONS))
+        except (ImportError, AttributeError):
+            pass
         return [
             u for u in unsupported
-            if not u.get("name", "").lower().endswith(self._ALLOWED_EXTENSIONS)
+            if not u.get("name", "").lower().endswith(allowed)
         ]

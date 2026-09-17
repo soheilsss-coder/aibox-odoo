@@ -1,16 +1,12 @@
 import React from "react";
 
-export default function TextArea({ label, error, id, className = "", ...rest }) {
-  const inputId = id || rest.name;
+export default function TextArea({ label, className = "", id, ...rest }) {
+  const el = <textarea id={id} className={`textarea ${className}`} {...rest} />;
+  if (!label) return el;
   return (
-    <div className="ds-field">
-      {label && (
-        <label className="ds-label" htmlFor={inputId}>
-          {label}
-        </label>
-      )}
-      <textarea id={inputId} className={`ds-input ${className}`} {...rest} />
-      {error && <p className="ds-field-error">{error}</p>}
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      {el}
     </div>
   );
 }

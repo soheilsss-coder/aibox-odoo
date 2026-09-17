@@ -22,12 +22,18 @@ class AiIntegrationTestRunner(models.AbstractModel):
         checks=[]
         mod=self.env["ai.control.module"].sudo().search([("technical_name","=",module_name)],limit=1)
         checks.append({"name":"module_discovered","pass":bool(mod)})
+        binding = self.env["ai.integration.agent.module"].sudo().binding_for_module(module_name) if "ai.integration.agent.module" in self.env else False
+        checks.append({
+            "name": "agent_connection",
+            "pass": bool(binding and binding.state in ("connected", "connected_no_tools")),
+        })
         adapter=self.env["ai.integration.adapter"].sudo().for_module(module_name)
         checks.append({"name":"reviewed_adapter_or_discovery","pass":bool(adapter or (mod and mod.discovered_models))})
         caps=self.env["ai.control.capability"].sudo().search([("module_name","=",module_name),("active","=",True)])
         checks.append({"name":"capabilities_registered","pass":bool(caps)})
         ops=self.env["ai.integration.operation"].sudo().search([("module_name","=",module_name),("active","=",True)])
-        checks.append({"name":"business_adapters","pass":bool(ops or module_name not in ("hr","account","stock","purchase","sale","crm","project","mrp","documents","calendar"))})
+        reviewed_ops = ops.filtered(lambda op: op.source == "reviewed" and op.coverage == "reviewed_operational")
+        checks.append({"name":"business_adapters_or_explicit_read_only","pass":bool(reviewed_ops or (ops and all(op.coverage in ("discovered_read", "reviewed_read") for op in ops)))})
         for op in ops:
             risk=self.env["ai.gateway.tool.risk"].sudo().search([("tool_name","=",op.tool_name)],limit=1)
             cap=self.env["ai.control.capability"].sudo().search([("name","=",op.capability_name),("active","=",True)],limit=1)
@@ -40,6 +46,9 @@ class AiIntegrationTestRunner(models.AbstractModel):
         subs=self.env["ai.integration.subscription"].sudo().search([("active","=",True)])
         targets=set(subs.mapped("target"))
         checks.append({"name":"event_subscribers","pass":set(["workflow","ai","notification","calendar","buzz","telegram","memory","audit","rag"]).issubset(targets)})
+        mappings = self.env["ai.integration.event.mapping"].sudo().search([("module_name", "=", module_name), ("active", "=", True)]) if "ai.integration.event.mapping" in self.env else None
+        checks.append({"name":"event_mapping_baseline","pass":bool(mappings or not mod or not mod.discovered_models)})
+        checks.append({"name":"change_outbox","pass":"ai.integration.change.outbox" in self.env})
         checks.append({"name":"frontend_capabilities","pass":"ai.control.capability" in self.env})
         checks.append({"name":"audit","pass":"ai.gateway.audit.log" in self.env})
         checks.append({"name":"rag_acl","pass":"ai.document.index.job" in self.env and "ai.document.chunk" in self.env})

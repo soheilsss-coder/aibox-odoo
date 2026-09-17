@@ -36,14 +36,21 @@ def allow(key, limit, window=60, prefix="ai:rl", consume=True):
     if r is not None:
         bucket = f"{prefix}:{key}"
         now = time.time()
-        pipe = r.pipeline()
-        pipe.zremrangebyscore(bucket, 0, now - window)
-        pipe.zcard(bucket)
-        if consume:
-            pipe.zadd(bucket, {f"{now}:{os.getpid()}:{time.time_ns()}": now})
-            pipe.expire(bucket, window + 5)
-        _, count, *_ = pipe.execute()
-        return int(count) < int(limit)
+        try:
+            pipe = r.pipeline()
+            pipe.zremrangebyscore(bucket, 0, now - window)
+            pipe.zcard(bucket)
+            if consume:
+                pipe.zadd(bucket, {f"{now}:{os.getpid()}:{time.time_ns()}": now})
+                pipe.expire(bucket, window + 5)
+            _, count, *_ = pipe.execute()
+            return int(count) < int(limit)
+        except Exception:
+            # A distributed limiter outage must not become an authentication
+            # or provisioning bypass in production. Development can opt into
+            # the explicit local fallback below for offline work.
+            if _production():
+                return False
 
     if _production():
         return False

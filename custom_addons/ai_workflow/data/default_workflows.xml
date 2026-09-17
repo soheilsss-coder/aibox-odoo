@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
   <!--
-    Default workflow: Task Deadline -> Reminder -> Escalation
+    Default workflow: Task Deadline -> re-read status -> Reminder -> Escalation
     (roadmap #9, "Calendar Integration": Deadline -> Reminder -> Escalation).
 
     Wiring note: create_task already publishes a "task.created" event with
@@ -13,15 +13,10 @@
     Notification/Buzz/Telegram subscriber (or a future one) has something
     to react to.
 
-    Known, explicit limitation (documented rather than hidden): the
-    workflow DSL currently has no "re-read the record" step type, so this
-    cannot check whether the task was already completed before the
-    deadline arrived - it fires the reminder/escalation unconditionally
-    once the deadline timestamp passes. If per-task "already done, skip
-    the reminder" behaviour is required, add a dedicated read-only tool
-    (e.g. "get_task_status") and a "tool" + "condition" step pair once
-    that tool exists; the engine already supports that pattern (see the
-    "tool" step type in ai_workflow/models/workflow.py).
+    The workflow re-reads status through the dedicated read-only
+    "get_task_status" tool after the deadline. Completed tasks skip both
+    reminder and escalation; missing/inaccessible tasks remain fail-closed
+    and follow the escalation path rather than being silently considered done.
   -->
   <record id="workflow_task_deadline_escalation" model="ai.workflow">
     <field name="name">Task Deadline Reminder + Escalation</field>
@@ -32,9 +27,12 @@
     <field name="lock_timeout_seconds">300</field>
     <field name="definition_json"><![CDATA[
 {
+  "schema_version": 1,
   "steps": [
-    {"action": "branch", "if": {"value": "$deadline", "operator": "truthy"}, "then": 1, "else": 4},
+    {"action": "branch", "if": {"value": "$deadline", "operator": "truthy"}, "then": 1, "else": 6},
     {"action": "wait_until", "datetime": "$deadline", "reason": "waiting for task deadline"},
+    {"action": "tool", "tool": "get_task_status", "args": {"task_id": "$task_id"}},
+    {"action": "branch", "if": {"value": "$last_tool_result.done", "operator": "truthy"}, "then": 6, "else": 4},
     {"action": "notify", "summary": "یادآوری ددلاین تسک", "message": "موعد ددلاین این تسک رسیده است - لطفاً وضعیت را بررسی کنید."},
     {"action": "escalate", "event_type": "task.deadline_reached", "reason": "ددلاین تسک رسید و نیاز به بررسی/تشدید دارد."},
     {"action": "noop"}
