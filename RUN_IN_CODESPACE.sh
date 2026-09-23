@@ -49,25 +49,42 @@ fi
 gh codespace edit --codespace "${CODESPACE_NAME}" --idle-timeout 240m >/dev/null 2>&1 || true
 
 if [ "$(docker image inspect "${IMAGE}" >/dev/null 2>&1 && echo yes)" != "yes" ]; then
-  echo "[1/4] Building the appliance image (first run only - grab a coffee)..."
+  echo "[1/5] Building the appliance image (first run only - grab a coffee)..."
   docker build --pull -t "${IMAGE}" .
 else
-  echo "[1/4] Image already built - skipping."
+  echo "[1/5] Image already built - skipping."
 fi
 
-echo "[2/4] (Re)starting the container..."
+echo "[2/5] Background services..."
 docker rm -f "${IMAGE}" >/dev/null 2>&1 || true
+
+# Real, tiny, FREE local LLM (llama.cpp + Qwen2.5-1.5B, no API key/card) on
+# the codespace host - HF is reachable from codespace egress even when other
+# sandboxes block it. Fallback: the bundled deterministic mock chat server.
+LLM_ARGS=()
+if [ "${AIBOX_LOCAL_LLM:-1}" = "1" ]; then
+  echo "      starting tiny local LLM (llama.cpp, Qwen2.5-1.5B) on :8010 ..."
+  nohup bash runtime_workers/local_llm_server.sh > /workspaces/aibox-odoo/local-llm.log 2>&1 &
+  LLM_ARGS+=(
+    --add-host=host.docker.internal:host-gateway
+    -e "AI_LLM_API_BASE=http://host.docker.internal:8010/v1"
+    -e "AI_LLM_MODEL=${AIBOX_LOCAL_LLM_MODEL:-qwen2.5-1.5b-instruct-q4_k_m.gguf}"
+  )
+fi
+
+echo "[3/5] (Re)starting the appliance container..."
 docker run -d --name "${IMAGE}" --restart unless-stopped \
   -e PORT=8080 \
   -e AI_GATEWAY_ALLOWED_ORIGIN="${URL}" \
   -e AI_GATEWAY_ALLOWED_ORIGINS="${URL},https://soheilsss-coder.github.io" \
+  "${LLM_ARGS[@]}" \
   -p 8080:8080 \
   "${IMAGE}"
 
 echo "[3/4] Making port 8080 public..."
 gh codespace ports visibility 8080:public --codespace "${CODESPACE_NAME}" >/dev/null 2>&1 || true
 
-echo "[4/4] First boot is installing Odoo modules into the database;"
+echo "[5/5] First boot is installing Odoo modules into the database;"
 echo "      give it several minutes and then open:"
 echo ""
 echo "      ${URL}"

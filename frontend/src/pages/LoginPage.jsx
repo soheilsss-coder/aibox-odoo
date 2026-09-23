@@ -9,11 +9,16 @@ import { Alert, Button, Input } from "../components";
 // build (any credentials work there); real production builds stay empty.
 export default function LoginPage({ onLoggedIn }) {
   const DEMO = Boolean(import.meta.env && (import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === "1"));
-  const [loginId, setLoginId] = useState(DEMO ? "sara@example.com" : "");
-  const [password, setPassword] = useState(DEMO ? "demo" : "");
+  const STATIC_DEMO = import.meta.env.VITE_DEMO_MODE === "1";
+  // Dev-server runs talk to the REAL appliance (sandbox/codespaces): its
+  // bootstrap account is admin/admin. The static GitHub Pages demo keeps the
+  // fictional sara@example.com persona. Pre-filling the WRONG defaults here
+  // made people hit "invalid email or password" on a working appliance.
+  const APPLIANCE_CREDS = STATIC_DEMO ? ["sara@example.com", "demo"] : ["admin", "admin"];
+  const [loginId, setLoginId] = useState(DEMO ? APPLIANCE_CREDS[0] : "");
+  const [password, setPassword] = useState(DEMO ? APPLIANCE_CREDS[1] : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const STATIC_DEMO = import.meta.env.VITE_DEMO_MODE === "1";
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -74,6 +79,11 @@ export default function LoginPage({ onLoggedIn }) {
           Nova Enterprise · AI Operating System
           {STATIC_DEMO && (
             <div className="small muted mt-2">Static demo build — running fully in your browser, any credentials work.</div>
+          )}
+          {!STATIC_DEMO && DEMO && (
+            <div className="small muted mt-2">
+              Appliance demo — bootstrap admin <b>admin / admin</b>, seeded staff <b>demo.*@yourbrand.example / demo</b>
+            </div>
           )}
         </div>
       </div>
