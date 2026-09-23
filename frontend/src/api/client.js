@@ -157,6 +157,8 @@ export const adminListAgents = () => request("/api/admin/agents");
 export const adminGetBranding = () => request("/api/admin/branding");
 export const adminUpdateBranding = (payload) => request("/api/admin/branding", { method: "POST", body: payload });
 export const adminGetMetrics = () => request("/api/metrics");
+export const adminGetLlm = () => request("/api/admin/llm");
+export const adminSetLlm = (payload) => request("/api/admin/llm", { method: "POST", body: payload });
 export const adminGetControlPlane = () => request("/api/admin/control-plane");
 export const getTelegramStatus = () => request("/api/integrations/telegram");
 export const generateTelegramCode = () => request("/api/integrations/telegram/code", { method: "POST" });

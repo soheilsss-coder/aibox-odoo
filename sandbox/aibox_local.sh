@@ -258,11 +258,21 @@ cmd_start() {
   pg_up
   redis_up
   if [ "$MOCK_LLM" = "1" ]; then
-    log "mock LLM API (offline stand-in for the real vendor)"
-    nohup "$VENV/bin/python" "$REPO/runtime_workers/mock_llm_server.py" \
-        --port "$MOCK_CHAT_PORT" --served-model "$AI_LLM_MODEL" \
-        --embedding-dim "$AI_RAG_EMBEDDING_DIM" --latency-ms 120 \
-        >"$LOGS/mock-chat.log" 2>&1 &
+    if [ "${AIBOX_CHAT_BRAIN:-1}" = "1" ]; then
+      # Nova local brain: speaks the OpenAI dialect AND emits real tool_calls,
+      # so odoo-llm executes the actual business tools (records really get
+      # created). Set AIBOX_CHAT_BRAIN=0 to fall back to the passive double.
+      log "Nova local brain (OpenAI dialect + real tool calling)"
+      nohup "$VENV/bin/python" "$REPO/runtime_workers/nova_brain_server.py" \
+          --port "$MOCK_CHAT_PORT" --served-model "$AI_LLM_MODEL" \
+          >"$LOGS/mock-chat.log" 2>&1 &
+    else
+      log "mock LLM API (offline stand-in for the real vendor)"
+      nohup "$VENV/bin/python" "$REPO/runtime_workers/mock_llm_server.py" \
+          --port "$MOCK_CHAT_PORT" --served-model "$AI_LLM_MODEL" \
+          --embedding-dim "$AI_RAG_EMBEDDING_DIM" --latency-ms 120 \
+          >"$LOGS/mock-chat.log" 2>&1 &
+    fi
     nohup "$VENV/bin/python" "$REPO/runtime_workers/mock_llm_server.py" \
         --port "$MOCK_EMB_PORT" --served-model "$AI_EMBEDDING_MODEL" \
         --embedding-model "$AI_EMBEDDING_MODEL" --embedding-dim "$AI_RAG_EMBEDDING_DIM" \

@@ -357,6 +357,164 @@ class AiControlPlaneController(http.Controller):
                 _logger.exception("Could not persist failed module request for %s", module.name)
             return _json_response({"error": "module installation failed; inspect the admin audit log"}, status=409)
 
+    # ------------------------------------------------------------------
+    # AI model wiring (Admin -> AI Models): view, rewire and probe the
+    # OpenAI-compatible endpoints the assistant and RAG pipeline talk to.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _provider_state(provider, model_name=None):
+        key = (provider.api_key or "") if provider else ""
+        if not key:
+            fingerprint = "(none)"
+        elif len(key) > 8:
+            fingerprint = "%s...%s" % (key[:4], key[-4:])
+        else:
+            fingerprint = "%d chars" % len(key)
+        return {
+            "provider_id": provider.id if provider else None,
+            "name": provider.name if provider else None,
+            "service": provider.service if provider else None,
+            "api_base": provider.api_base if provider else None,
+            "key_fingerprint": fingerprint,
+            "model": model_name,
+            "active": bool(provider.active) if provider else False,
+        }
+
+    @staticmethod
+    def _probe_api_base(api_base, api_key):
+        """GET {api_base}/models - proves the wiring lives, from the appliance."""
+        import urllib.request
+
+        base = (api_base or "").strip().rstrip("/")
+        if not base:
+            return {"ok": False, "error": "api_base is empty"}
+        url = base + "/models" if base.endswith("/v1") else base + "/v1/models"
+        try:
+            req = urllib.request.Request(url)
+            if api_key:
+                req.add_header("Authorization", "Bearer %s" % api_key)
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                body = json.loads((resp.read() or b"{}").decode("utf-8"))
+                ids = [m.get("id") for m in (body.get("data") or []) if m.get("id")][:8]
+                return {"ok": True, "url": url, "models": ids}
+        except Exception as exc:  # noqa: BLE001 - report, never raise
+            return {"ok": False, "url": url, "error": str(exc)[:200]}
+
+    @http.route("/api/admin/llm", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def admin_llm_get(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = self._auth_response()
+        if err:
+            return err
+        if not _is_privileged(env, env.user):
+            return _json_response({"error": "access denied"}, status=403)
+        assistant = env["llm.assistant"].sudo().search(
+            [("name", "=", "Company Assistant")], limit=1)
+        assistant = assistant or env["llm.assistant"].sudo().search([], limit=1)
+        chat_provider = assistant.provider_id if assistant else None
+        chat_model = assistant.model_id.name if assistant and assistant.model_id else None
+        emb_model = env["llm.model"].sudo().search(
+            [("model_use", "=", "embedding"), ("active", "=", True)], limit=1)
+        emb_provider = emb_model.provider_id if emb_model else None
+        return _json_response({
+            "chat": self._provider_state(chat_provider, chat_model),
+            "embedding": self._provider_state(emb_provider, emb_model.name if emb_model else None),
+            "hints": {
+                "api_base_examples": [
+                    "https://openrouter.ai/api/v1  (free models available)",
+                    "https://api.groq.com/openai/v1  (free tier)",
+                    "https://api.openai.com/v1",
+                    "http://127.0.0.1:8010/v1  (local llama.cpp, no key)",
+                ],
+                "note": "Any OpenAI-compatible base works. Saving applies "
+                        "immediately - no restart. Use Test to verify reachability.",
+            },
+        })
+
+    @http.route("/api/admin/llm", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def admin_llm_set(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _cors_preflight_response()
+        env, err = self._auth_response()
+        if err:
+            return err
+        if not _is_privileged(env, env.user):
+            return _json_response({"error": "access denied"}, status=403)
+        try:
+            payload = json.loads(request.httprequest.data or b"{}")
+        except (TypeError, ValueError):
+            return _json_response({"error": "invalid JSON body"}, status=400)
+        chat = payload.get("chat") or {}
+        if not isinstance(chat, dict) or not (chat.get("api_base") or "").strip():
+            return _json_response({"error": "chat.api_base is required"}, status=400)
+
+        assistant = env["llm.assistant"].sudo().search(
+            [("name", "=", "Company Assistant")], limit=1)
+        if not assistant:
+            assistant = env["llm.assistant"].sudo().create({
+                "name": "Company Assistant", "res_model": "res.users",
+            })
+        provider = assistant.provider_id or env["llm.provider"].sudo().create({
+            "name": "AI API (custom)", "service": "openai",
+        })
+        provider.sudo().write({
+            "service": "openai",
+            "api_base": chat["api_base"].strip(),
+        })
+        new_key = (chat.get("api_key") or "").strip()
+        if new_key and new_key != "********":
+            provider.sudo().api_key = new_key
+        provider.sudo().active = True
+
+        model_name = (chat.get("model") or "").strip() or "gpt-4o-mini"
+        model = env["llm.model"].sudo().search([("name", "=", model_name)], limit=1)
+        if not model:
+            model = env["llm.model"].sudo().create({
+                "name": model_name, "model_use": "chat",
+                "provider_id": provider.id,
+            })
+        else:
+            model.sudo().write({"provider_id": provider.id, "active": True})
+        assistant.sudo().write({"provider_id": provider.id, "model_id": model.id})
+        _audit(env, env.user.id, "control_plane", "admin.llm.updated",
+               {"api_base": provider.api_base, "model": model.name})
+
+        embedding = payload.get("embedding") or {}
+        emb_state = None
+        if isinstance(embedding, dict) and (embedding.get("api_base") or "").strip():
+            emb_base = embedding["api_base"].strip()
+            emb_provider = env["llm.provider"].sudo().search(
+                [("api_base", "=", emb_base), ("name", "ilike", "embedding")], limit=1)
+            if not emb_provider:
+                emb_provider = env["llm.provider"].sudo().create({
+                    "name": "AI API embeddings (custom)", "service": "openai",
+                    "api_base": emb_base,
+                })
+            emb_provider.sudo().api_base = emb_base
+            emb_key = (embedding.get("api_key") or "").strip()
+            if emb_key and emb_key != "********":
+                emb_provider.sudo().api_key = emb_key
+            emb_name = (embedding.get("model") or "").strip() or "text-embedding-3-small"
+            emb_model = env["llm.model"].sudo().search([("name", "=", emb_name)], limit=1)
+            if not emb_model:
+                emb_model = env["llm.model"].sudo().create({
+                    "name": emb_name, "model_use": "embedding",
+                    "provider_id": emb_provider.id,
+                })
+            else:
+                emb_model.sudo().write({"provider_id": emb_provider.id, "active": True})
+            emb_state = self._provider_state(emb_provider, emb_model.name)
+
+        probe = self._probe_api_base(provider.api_base, provider.api_key)
+        return _json_response({
+            "ok": True, "probe": probe,
+            "chat": self._provider_state(provider, model.name),
+            "embedding": emb_state,
+        })
+
     @http.route("/api/modules/navigation", type="http", auth="none", csrf=False,
                 methods=["GET", "OPTIONS"])
     def module_navigation(self, **kwargs):

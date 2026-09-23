@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import {
   adminListRoles, adminListUsers, adminListAccessGrants, adminCreateAccessGrant,
   adminRevokeAccessGrant, adminListDocuments, adminListAgents, adminGetBranding,
-  adminUpdateBranding, adminGetMetrics, adminGetControlPlane, ApiError,
+  adminUpdateBranding, adminGetMetrics, adminGetControlPlane, adminGetLlm,
+  adminSetLlm, ApiError,
 } from "../api/client.js";
 import { Alert, Badge, Button, Card, EmptyState, Icon, Input, Modal, Select, Spinner, Table, Tabs, TextArea } from "../components";
 
@@ -18,6 +19,7 @@ const TABS = [
   { key: "branding", label: "Branding" },
   { key: "observability", label: "Monitoring" },
   { key: "control", label: "Control Plane" },
+  { key: "aimodels", label: "AI Models" },
 ];
 
 function useLoad(fn, deps) {
@@ -54,6 +56,7 @@ export default function AdminPage() {
       {tab === "agents" && <AgentsTab />}
       {tab === "branding" && <BrandingTab />}
       {tab === "observability" && <ObservabilityTab />}
+      {tab === "aimodels" && <AiModelsTab />}
       {tab === "control" && <ControlPlaneTab />}
     </>
   );
