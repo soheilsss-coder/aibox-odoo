@@ -62,6 +62,116 @@ export default function AdminPage() {
   );
 }
 
+/* --- AI Models ---------------------------------------------------------- */
+// Connect any OpenAI-compatible LLM endpoint (cloud free tier or local
+// llama.cpp) to the assistant - no redeploy, takes effect on save.
+function AiModelsTab() {
+  const [state, setState] = useState(null);
+  const [chat, setChat] = useState({ api_base: "", model: "", api_key: "" });
+  const [embedding, setEmbedding] = useState({ api_base: "", model: "", api_key: "" });
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(null);
+  const [probe, setProbe] = useState(null);
+
+  const load = async () => {
+    try {
+      const data = await adminGetLlm();
+      setState(data);
+      setChat({
+        api_base: (data.chat && data.chat.api_base) || "",
+        model: (data.chat && data.chat.model) || "",
+        api_key: "",
+      });
+      setEmbedding({
+        api_base: (data.embedding && data.embedding.api_base) || "",
+        model: (data.embedding && data.embedding.model) || "",
+        api_key: "",
+      });
+    } catch (e) {
+      setNote({ tone: "err", text: e.message || String(e) });
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  async function save() {
+    setBusy(true); setNote(null); setProbe(null);
+    try {
+      const payload = { chat: { ...chat } };
+      if (embedding.api_base) payload.embedding = { ...embedding };
+      const data = await adminSetLlm(payload);
+      setProbe(data.probe);
+      setNote({
+        tone: data.probe && data.probe.ok ? "ok" : "warn",
+        text: data.probe && data.probe.ok
+          ? "Saved and verified - the appliance reached the endpoint. Nova answers through it immediately."
+          : "Saved, but the endpoint check failed: " + ((data.probe && data.probe.error) || "unknown"),
+      });
+      await load();
+    } catch (e) {
+      setNote({ tone: "err", text: e.message || String(e) });
+    } finally { setBusy(false); }
+  }
+
+  if (!state) return <Spinner />;
+  return (
+    <div className="stack">
+      {note && <Alert tone={note.tone === "ok" ? "success" : note.tone === "warn" ? "warning" : "danger"}>{note.text}</Alert>}
+      <Card title="Chat model (Nova's brain)">
+        <div className="grid grid-2 gap-3">
+          <label className="stack-sm">API base (OpenAI-compatible)
+            <Input value={chat.api_base} onChange={(e) => setChat({ ...chat, api_base: e.target.value })} placeholder="https://openrouter.ai/api/v1" />
+          </label>
+          <label className="stack-sm">Model name
+            <Input value={chat.model} onChange={(e) => setChat({ ...chat, model: e.target.value })} placeholder="meta-llama/llama-3.3-70b-instruct:free" />
+          </label>
+          <label className="stack-sm">API key (blank = keep current: {state.chat && state.chat.key_fingerprint})
+            <Input type="password" value={chat.api_key} onChange={(e) => setChat({ ...chat, api_key: e.target.value })} placeholder="sk-..." />
+          </label>
+        </div>
+        {state.hints && <p className="small muted mt-2">{state.hints.note} Examples: {(state.hints.api_base_examples || []).join(" · ")}</p>}
+      </Card>
+      <Card title="Embedding model (semantic search / RAG)">
+        <div className="grid grid-2 gap-3">
+          <label className="stack-sm">API base
+            <Input value={embedding.api_base} onChange={(e) => setEmbedding({ ...embedding, api_base: e.target.value })} placeholder="https://api.openai.com/v1" />
+          </label>
+          <label className="stack-sm">Model
+            <Input value={embedding.model} onChange={(e) => setEmbedding({ ...embedding, model: e.target.value })} placeholder="text-embedding-3-small" />
+          </label>
+          <label className="stack-sm">API key (blank = keep current: {state.embedding && state.embedding.key_fingerprint})
+            <Input type="password" value={embedding.api_key} onChange={(e) => setEmbedding({ ...embedding, api_key: e.target.value })} placeholder="sk-..." />
+          </label>
+        </div>
+        <p className="small muted mt-2">Leave empty to keep the current embedding setup.</p>
+      </Card>
+      <div>
+        <Button onClick={save} disabled={busy || !chat.api_base}>{busy ? "Saving..." : "Save & test connection"}</Button>
+        {probe && (
+          <div className="small muted mt-2">
+            Probe {probe.url}: {probe.ok ? "OK — models: " + (probe.models || []).join(", ") : "failed — " + probe.error}
+          </div>
+        )}
+      </div>
+      <Card title="Currently active">
+        <Table
+          emptyText="Nothing configured."
+          columns={[
+            { key: "use", header: "Use", width: 110 },
+            { key: "name", header: "Provider" },
+            { key: "api_base", header: "API base" },
+            { key: "model", header: "Model" },
+            { key: "key", header: "Key" },
+          ]}
+          rows={[
+            { use: "Chat", name: (state.chat && state.chat.name) || "—", api_base: (state.chat && state.chat.api_base) || "—", model: (state.chat && state.chat.model) || "—", key: (state.chat && state.chat.key_fingerprint) || "—" },
+            { use: "Embedding", name: (state.embedding && state.embedding.name) || "—", api_base: (state.embedding && state.embedding.api_base) || "—", model: (state.embedding && state.embedding.model) || "—", key: (state.embedding && state.embedding.key_fingerprint) || "—" },
+          ]}
+        />
+      </Card>
+    </div>
+  );
+}
+
 /* --- Roles ------------------------------------------------------------ */
 function RolesTab() {
   const [data, error] = useLoad(adminListRoles, []);

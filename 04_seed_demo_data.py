@@ -192,6 +192,18 @@ else:
     print(f"Pending HR decree approval: {decree_res.get('status')}")
     print(f"Temporary access grant: {grant_res.get('status')}")
 
+    # -----------------------------------------------------------------
+    # 8. The bootstrap admin owns the system-admin role, so the Admin
+    #    Console (admin.console.read) is visible and reachable on a real
+    #    appliance, not only in the static demo.
+    # -----------------------------------------------------------------
+    admin_user = env["res.users"].search([("login", "=", "admin")], limit=1)
+    if admin_user:
+        sys_role = env.ref("ai_business_tools.role_system_admin", raise_if_not_found=False)
+        if sys_role and sys_role not in admin_user.groups_id:
+            admin_user.groups_id = [(4, sys_role.id)]
+            print("Granted ai_business_tools.role_system_admin to admin.")
+
     env.cr.commit()
     print("\n=== Demo data seeded and committed. ===")
     print("Log in as any of these (password reset needed on first login, "

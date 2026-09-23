@@ -120,6 +120,7 @@ function ChatPanel({ threads, activeId, open, onClose, onNavigateThread }) {
 
 function Shell({ user, onLogout }) {
   const [caps, setCaps] = useState([]);
+  const [adminFlag, setAdminFlag] = useState(false);
   const [notifCount, setNotifCount] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
@@ -139,7 +140,12 @@ function Shell({ user, onLogout }) {
   };
 
   useEffect(() => {
-    api.getMyCapabilities().then((x) => setCaps(x.capabilities || x || [])).catch(() => {});
+    api.getMyCapabilities()
+      .then((x) => {
+        setCaps(x.capabilities || x || []);
+        setAdminFlag(Boolean(x.is_admin));
+      })
+      .catch(() => {});
     api.getNotifications()
       .then((x) => setNotifCount((x.notifications || []).filter((n) => !n.is_read).length))
       .catch(() => {});
@@ -152,7 +158,7 @@ function Shell({ user, onLogout }) {
     () => new Set(caps.map((c) => (typeof c === "string" ? c : c.name))),
     [caps]
   );
-  const isAdmin = capabilitySet.has("admin.console.read");
+  const isAdmin = capabilitySet.has("admin.console.read") || adminFlag;
 
   const items = useMemo(() => {
     const sections = NAV.map((s) => ({ ...s, items: [...s.items] }));

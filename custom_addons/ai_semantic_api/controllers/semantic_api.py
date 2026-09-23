@@ -241,8 +241,16 @@ def _read_json_body():
 
 
 def _public_capabilities(capabilities):
-    """Expose product-level facts, never internal capability/model names."""
+    """Expose product-level facts for UI gating.
+
+    The static demo contract returns capability names (the frontend gates
+    whole features such as the Admin Console on ``admin.console.read``), so
+    the appliance must speak the same dialect. Internal model/record names
+    stay unpublished - only the capability's public name, operation and
+    risk level are exposed.
+    """
     return [{
+        "name": capability.name,
         "operation": capability.operation,
         "risk_level": capability.risk_level,
     } for capability in capabilities]
