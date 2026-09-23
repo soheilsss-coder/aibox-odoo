@@ -81,7 +81,7 @@ docker run -d --name "${IMAGE}" --restart unless-stopped \
   -p 8080:8080 \
   "${IMAGE}"
 
-echo "[3/4] Making port 8080 public..."
+echo "[4/5] Making port 8080 public..."
 gh codespace ports visibility 8080:public --codespace "${CODESPACE_NAME}" >/dev/null 2>&1 || true
 
 echo "[5/5] First boot is installing Odoo modules into the database;"
