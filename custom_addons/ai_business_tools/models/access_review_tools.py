@@ -28,9 +28,7 @@ class LLMToolAccessGrant(models.Model):
             expires_on: Date the access should automatically end, YYYY-MM-DD.
             reason: Optional short reason.
         """
-        risk = self.env["ai.gateway.tool.risk"].sudo().search([("tool_name", "=", "grant_temporary_access")], limit=1) if "ai.gateway.tool.risk" in self.env else False
-        if risk and int(risk.risk_level or 0) >= 5:
-            return {"error": "access_denied: RISK_5 tools are human-only"}
+        self.env["ai.gateway.execution.gate"].authorize("grant_temporary_access")
 
         missing = [n for n, v in (
             ("user_name", user_name), ("role_name", role_name), ("expires_on", expires_on)
@@ -39,9 +37,7 @@ class LLMToolAccessGrant(models.Model):
             return {"error": "missing_required_field", "missing_fields": missing,
                     "hint": "دقیقاً همین فیلد(های) گم‌شده را از کاربر بپرس."}
 
-        target_users = self.env["res.users"].search([
-            ("name", "ilike", user_name), ("company_ids", "in", self.env.company.id),
-        ])
+        target_users = self.env["res.users"].search([("name", "ilike", user_name)])
         if len(target_users) > 1:
             return {"error": "ambiguous_user", "message": "چند کاربر پیدا شد؛ ایمیل یا شناسه کارمند را مشخص کنید.", "candidates": target_users.mapped("name")}
         target_user = target_users[:1]
@@ -65,15 +61,12 @@ class LLMToolAccessGrant(models.Model):
         if not is_privileged and group not in self.env.user.groups_id:
             return {"error": "access_denied: شما فقط می‌توانید نقشی را که خودتان دارید موقتاً تفویض کنید."}
 
-        if self.env.company not in target_user.company_ids:
-            return {"error": "access_denied: کاربر مقصد در شرکت جاری نیست."}
         grant = self.env["ai.gateway.access.grant"].sudo().create({
-            "company_id": self.env.company.id,
             "to_user_id": target_user.id,
             "group_id": group.id,
             "delegated_from_id": self.env.user.id if group in self.env.user.groups_id else False,
             "expires_on": expires_on,
-            "reason": reason or "Temporary delegated access",
+            "reason": reason or "",
             "granted_by_id": self.env.user.id,
         })
         if "ai.gateway.audit.log" in self.env:
@@ -112,12 +105,11 @@ class LLMToolAccessGrant(models.Model):
             group = self.env.ref(xmlid, raise_if_not_found=False)
             if not group:
                 continue
-            for user in group.users.filtered(lambda u: self.env.company in u.company_ids):
+            for user in group.users:
                 holders.append({"user": user.name, "role": group.name})
 
         active_grants = self.env["ai.gateway.access.grant"].sudo().search(
-            [("company_id", "=", self.env.company.id),
-             ("state", "in", ("scheduled", "active"))]
+            [("state", "in", ("scheduled", "active"))]
         )
         return {
             "elevated_role_holders": holders,

@@ -1,19 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { listLeaves, createLeave, cancelLeave, ApiError } from "../api/client.js";
-import { Alert, Badge, Button, Card, EmptyState, Icon, Input, Spinner, TextArea } from "../components";
+import { Card, Input, TextArea, Button, Badge, Alert, EmptyState, Spinner } from "../components";
 
 const STATUS_LABEL = {
-  draft: "Draft",
-  pending_approval: "Pending approval",
-  approved: "Approved",
-  rejected: "Rejected",
-  cancelled: "Cancelled",
+  draft: "پیش‌نویس",
+  pending_approval: "در انتظار تایید",
+  approved: "تایید شده",
+  rejected: "رد شده",
+  cancelled: "لغو شده",
 };
+
 const STATUS_TONE = {
   draft: "neutral",
-  pending_approval: "warn",
-  approved: "ok",
-  rejected: "err",
+  pending_approval: "warning",
+  approved: "success",
+  rejected: "danger",
   cancelled: "neutral",
 };
 
@@ -26,9 +27,10 @@ export default function LeavesPage() {
   function refresh() {
     listLeaves()
       .then((data) => setLeaves(data.leaves))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load."));
+      .catch((err) => setError(err instanceof ApiError ? err.message : "خطا در بارگذاری"));
   }
-  useEffect(() => { refresh(); }, []);
+
+  useEffect(refresh, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -39,7 +41,7 @@ export default function LeavesPage() {
       setForm({ date_from: "", date_to: "", reason: "" });
       refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not submit the request.");
+      setError(err instanceof ApiError ? err.message : "ثبت درخواست ناموفق بود");
     } finally {
       setSubmitting(false);
     }
@@ -50,64 +52,57 @@ export default function LeavesPage() {
       await cancelLeave(leaveId);
       refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not cancel.");
+      setError(err instanceof ApiError ? err.message : "لغو ناموفق بود");
     }
   }
 
   return (
-    <>
-      <header className="page-head">
-        <div>
-          <div className="eyebrow">HR</div>
-          <h1>My leave</h1>
-          <p>Request time off — it flows through Odoo's own approval to your manager.</p>
-        </div>
-      </header>
+    <div>
+      <h2>مرخصی‌های من</h2>
 
-      <Card title="New request">
+      <Card title="درخواست جدید">
         <form onSubmit={handleSubmit}>
-          <div className="h-stack wrap" style={{ alignItems: "flex-start" }}>
-            <div className="grow" style={{ minWidth: 170 }}>
-              <Input id="lv-from" type="date" required label="From" value={form.date_from}
-                onChange={(e) => setForm({ ...form, date_from: e.target.value })} />
-            </div>
-            <div className="grow" style={{ minWidth: 170 }}>
-              <Input id="lv-to" type="date" required label="To" value={form.date_to}
-                onChange={(e) => setForm({ ...form, date_to: e.target.value })} />
-            </div>
-          </div>
-          <TextArea id="lv-reason" rows={2} label="Reason (optional)" value={form.reason}
-            onChange={(e) => setForm({ ...form, reason: e.target.value })} />
-          <Button variant="primary" type="submit" loading={submitting}>Submit request</Button>
+          <Input
+            type="date" required value={form.date_from} label="از تاریخ"
+            onChange={(e) => setForm({ ...form, date_from: e.target.value })}
+          />
+          <Input
+            type="date" required value={form.date_to} label="تا تاریخ"
+            onChange={(e) => setForm({ ...form, date_to: e.target.value })}
+          />
+          <TextArea
+            rows={2} placeholder="دلیل (اختیاری)" value={form.reason} label="دلیل"
+            onChange={(e) => setForm({ ...form, reason: e.target.value })}
+          />
+          <Button type="submit" loading={submitting}>ثبت درخواست</Button>
         </form>
       </Card>
 
-      <Alert onDismiss={() => setError("")}>{error}</Alert>
+      <Alert>{error}</Alert>
 
-      {leaves === null && !error && <Spinner />}
-      {leaves && leaves.length === 0 && (
-        <Card><EmptyState icon="clock" title="No requests" text="You have not submitted a leave request yet." /></Card>
-      )}
+      {leaves === null && <Spinner />}
+      {leaves && leaves.length === 0 && <EmptyState text="درخواستی ثبت نشده." />}
 
-      {leaves && leaves.length > 0 && (
-        <Card style={{ padding: "8px 14px" }}>
-          {leaves.map((leave) => (
-            <div className="list-row" key={leave.id}>
-              <div className="icon-tile"><Icon name="clock" size={18} /></div>
-              <div className="grow">
-                <div className="strong">{leave.date_from?.slice(0, 10)} → {leave.date_to?.slice(0, 10)}</div>
-                <div className="muted small">{leave.leave_type}{leave.reason ? ` — ${leave.reason}` : ""}</div>
-              </div>
-              <Badge tone={STATUS_TONE[leave.status] || "neutral"} dot>
+      {leaves && leaves.map((leave) => (
+        <Card key={leave.id}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <strong>{leave.date_from?.slice(0, 10)} تا {leave.date_to?.slice(0, 10)}</strong>
+              <div className="muted">{leave.leave_type}{leave.reason ? ` — ${leave.reason}` : ""}</div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <Badge tone={STATUS_TONE[leave.status] || "neutral"}>
                 {STATUS_LABEL[leave.status] || leave.status}
               </Badge>
               {(leave.status === "draft" || leave.status === "pending_approval") && (
-                <Button variant="danger" size="sm" onClick={() => handleCancel(leave.id)}>Cancel</Button>
+                <Button variant="danger" size="sm" onClick={() => handleCancel(leave.id)}>
+                  لغو
+                </Button>
               )}
             </div>
-          ))}
+          </div>
         </Card>
-      )}
-    </>
+      ))}
+    </div>
   );
 }

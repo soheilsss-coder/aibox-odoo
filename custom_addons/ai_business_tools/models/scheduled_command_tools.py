@@ -45,7 +45,6 @@ class AiScheduleRule(models.Model):
     last_run_datetime = fields.Datetime(string="Last run", readonly=True)
     last_result = fields.Text(string="Last result", readonly=True)
     last_error = fields.Text(string="Last error", readonly=True)
-    active = fields.Boolean(default=True, index=True)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -96,8 +95,8 @@ class AiScheduleRule(models.Model):
             return False
         owner_env = self.env(user=rule.user_id.id)
         # Same env-based chat core the /api/chat and Telegram paths use.
-        from odoo.addons.ai_gateway.controllers.gateway import _run_chat_bounded  # noqa: PLC0415,E402
-        result = _run_chat_bounded(owner_env, rule.prompt_text)
+        from custom_addons.ai_gateway.controllers.gateway import _run_chat_env  # noqa: PLC0415,E402
+        result = _run_chat_env(owner_env, rule.prompt_text)
         ok = "error" not in result
         rule.sudo().write({
             "last_run_datetime": fields.Datetime.now(),

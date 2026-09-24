@@ -1,11 +1,6 @@
 import React from "react";
 
-// tones: neutral | info | ok | warn | err | accent
-export default function Badge({ tone = "neutral", dot = false, children }) {
-  return (
-    <span className={`bgd ${tone !== "neutral" ? `bgd-${tone}` : ""}`}>
-      {dot && <span className="bgd-dot" />}
-      {children}
-    </span>
-  );
+// tone: "neutral" (default) | "success" | "danger" | "warning" | "info"
+export default function Badge({ tone = "neutral", children, className = "" }) {
+  return <span className={`ds-badge ds-badge-${tone} ${className}`}>{children}</span>;
 }

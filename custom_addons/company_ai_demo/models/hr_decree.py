@@ -113,9 +113,7 @@ class LLMToolHrDecree(models.Model):
         # flow below, it's a generic net that also stamps risk_level
         # into the audit trail.
         if "ai.gateway.tool.risk" in self.env:
-            risk = self.env["ai.gateway.tool.risk"].sudo().search([("tool_name", "=", "generate_hr_decree")], limit=1)
-            if risk and int(risk.risk_level or 0) >= 5:
-                return {"error": "access_denied: RISK_5 tools are human-only"}
+            self.env["ai.gateway.execution.gate"].authorize("generate_hr_decree")
 
         employee = self.env["hr.employee"].search(
             [("name", "ilike", employee_name)], limit=1

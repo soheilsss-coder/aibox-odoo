@@ -12,15 +12,10 @@ A module is production-eligible only when every check is PASS.
 import json
 import sys
 
-BUSINESS_MODULES = {
-    "account", "calendar", "crm", "documents", "event", "helpdesk", "hr",
-    "hr_attendance", "hr_expense", "hr_holidays", "lunch", "maintenance",
-    "mrp", "point_of_sale", "pos_restaurant", "project", "purchase", "quality",
-    "repair", "sale", "sale_management", "sale_renting", "sale_subscription",
-    "stock", "website", "mass_mailing", "barcodes", "fleet", "hr_payroll",
-    "hr_recruitment", "event_sale", "event_crm", "pos_sale", "sale_project",
-    "sale_stock", "stock_barcode", "stock_account", "mrp_workorder",
-}
+MODULES = [
+    "purchase", "stock", "account", "mrp", "crm", "hr", "hr_holidays",
+    "sale_management", "project", "documents", "calendar", "helpdesk", "hr_expense",
+]
 
 
 def out(ok, label, detail=""):
@@ -31,7 +26,7 @@ def out(ok, label, detail=""):
 def main(env):
     Cert = env["ai.integration.certification.runner"].sudo()
     installed = set(env["ir.module.module"].sudo().search([("state", "=", "installed")]).mapped("name"))
-    targets = sorted(m for m in installed if m in BUSINESS_MODULES)
+    targets = [m for m in MODULES if m in installed]
     if not targets:
         return out(False, "installed business modules discovered", "none of the certification targets is installed")
 

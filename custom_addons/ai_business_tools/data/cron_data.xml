@@ -10,7 +10,7 @@
         <field name="login">ai-automation@service.local</field>
         <field name="email">ai-automation@service.local</field>
         <field name="active">True</field>
-        <field name="groups_id" eval="[(6, 0, [ref('base.group_user'), ref('group_ai_automation_service')])]"/>
+        <field name="groups_id" eval="[(6, 0, [ref('base.group_user')])]"/>
     </record>
 
     <record id="cron_notify_overdue_tasks" model="ir.cron">
@@ -42,17 +42,6 @@
         <field name="code">model.cron_apply_and_expire_grants()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="user_id" ref="ai_automation_service_user"/>
-        <field name="active">True</field>
-    </record>
-
-    <record id="cron_expire_ai_approvals" model="ir.cron">
-        <field name="name">AI: Expire pending approvals</field>
-        <field name="model_id" ref="model_ai_gateway_approval"/>
-        <field name="state">code</field>
-        <field name="code">model.cron_expire_pending()</field>
-        <field name="interval_number">15</field>
-        <field name="interval_type">minutes</field>
         <field name="user_id" ref="ai_automation_service_user"/>
         <field name="active">True</field>
     </record>

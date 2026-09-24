@@ -1,10 +1,10 @@
 {
-  "release": "v58-source-verified",
+  "release": "v57-source-complete",
   "errors": [],
   "checks": {
     "P0-1 generic-tool-deny": {
       "pass": true,
-      "evidence": "deploy.sh + central tool policy + hard-disabled generic RPC"
+      "evidence": "02_install_modules.sh"
     },
     "P0-2 gateway-level-risk": {
       "pass": true,
@@ -230,15 +230,7 @@
       "pass": true,
       "evidence": "gateway/control-plane architecture"
     },
-    "DEPLOY-ai_business_tools": {
-      "pass": true,
-      "evidence": "deployment copies all custom_addons"
-    },
     "DEPLOY-ai_collaboration": {
-      "pass": true,
-      "evidence": "deployment copies all custom_addons"
-    },
-    "DEPLOY-ai_control_plane": {
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
@@ -246,23 +238,7 @@
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
-    "DEPLOY-ai_customer_plane": {
-      "pass": true,
-      "evidence": "deployment copies all custom_addons"
-    },
-    "DEPLOY-ai_debrand": {
-      "pass": true,
-      "evidence": "deployment copies all custom_addons"
-    },
-    "DEPLOY-ai_document_intelligence": {
-      "pass": true,
-      "evidence": "deployment copies all custom_addons"
-    },
-    "DEPLOY-ai_experience": {
-      "pass": true,
-      "evidence": "deployment copies all custom_addons"
-    },
-    "DEPLOY-ai_gateway": {
+    "DEPLOY-ai_workflow": {
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
@@ -270,11 +246,19 @@
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
+    "DEPLOY-ai_debrand": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
     "DEPLOY-ai_production": {
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
-    "DEPLOY-ai_rag": {
+    "DEPLOY-ai_experience": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_control_plane": {
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
@@ -282,15 +266,31 @@
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
+    "DEPLOY-ai_rag": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_document_intelligence": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
     "DEPLOY-ai_telegram_bridge": {
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
-    "DEPLOY-ai_workflow": {
+    "DEPLOY-company_ai_demo": {
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },
-    "DEPLOY-company_ai_demo": {
+    "DEPLOY-ai_business_tools": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_customer_plane": {
+      "pass": true,
+      "evidence": "deployment copies all custom_addons"
+    },
+    "DEPLOY-ai_gateway": {
       "pass": true,
       "evidence": "deployment copies all custom_addons"
     },

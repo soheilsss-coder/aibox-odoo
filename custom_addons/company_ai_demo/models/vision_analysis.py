@@ -7,8 +7,9 @@ from odoo.addons.llm_tool.decorators import llm_tool
 
 _logger = logging.getLogger(__name__)
 
-# Separate native serving unit running a vision-capable model on a
-# different port so it does not compete with the main text process.
+# Separate vLLM instance running a vision-capable model, started with
+# start_vllm_vision.sh (see setup script) on a different port so it
+# doesn't compete with the main text model process.
 #
 # Roadmap item #17 (Model Registry): this used to be the only place
 # the vision endpoint was defined, which meant changing it required a
@@ -67,12 +68,10 @@ class LLMToolVisionAnalysis(models.Model):
         mimetype = attachment.mimetype or "image/png"
 
         try:
-            profile = self.env["ai.model.router"].route(purpose="vision")
-            base = profile.endpoint or self._vision_api_base()
             resp = requests.post(
-                f"{base.rstrip('/')}/chat/completions",
+                f"{self._vision_api_base()}/chat/completions",
                 json={
-                    "model": profile.model_id,
+                    "model": self.env["ai.model.router"].route(purpose="vision").model_id,
                     "messages": [
                         {
                             "role": "user",
@@ -96,7 +95,10 @@ class LLMToolVisionAnalysis(models.Model):
             answer = data["choices"][0]["message"]["content"]
             return {"filename": attachment.name, "analysis": answer}
         except requests.exceptions.ConnectionError:
-            return {"error": "تحلیل تصویر موقتاً در دسترس نیست. لطفاً بعداً دوباره تلاش کنید."}
+            return {
+                "error": "Vision model is not running. Start it with "
+                         "/opt/start_vllm_vision.sh on the server first."
+            }
         except Exception as exc:  # noqa: BLE001
             _logger.warning("Vision analysis failed: %s", exc)
             return {"error": "Vision analysis failed, try again shortly"}

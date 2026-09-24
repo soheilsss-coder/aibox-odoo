@@ -4,29 +4,45 @@ import {
   getDocumentOptions, ApiError,
 } from "../api/client.js";
 import {
-  Alert, Badge, Button, Card, EmptyState, Icon, Input, Modal,
-  Select, Spinner, Tabs, TextArea,
+  Card, Input, TextArea, Select, Button, Badge, Modal, Tabs, Alert,
+  EmptyState, Spinner,
 } from "../components";
 
-// Document Center — browse / search / upload / delete over the same
-// company/department/group/personal ACL the AI tools enforce. The delete
-// button mirrors the backend rule: own documents, or any document when the
-// user holds the document.admin.manage capability.
-const ACCESS_LABEL = { company: "Company-wide", department: "Department", group: "Restricted group", personal: "Personal" };
-const ACCESS_TONE = { company: "info", department: "warn", group: "neutral", personal: "ok" };
+// Document Center (roadmap #47) — replaces the old first-pass
+// DocumentsPage.jsx. Same three-tier (actually four: company/
+// department/group/personal, see company_document.py) access model
+// the AI tools and /api/rpc already enforce; this page just gives a
+// human a dedicated place to browse AND upload/delete by that same
+// model, instead of going into the Odoo backend for anything beyond
+// read-only browsing (the old page's only capability).
+
+const ACCESS_LABEL = {
+  company: "کل سازمان",
+  department: "دپارتمان",
+  group: "گروه محدود",
+  personal: "شخصی",
+};
+
+const ACCESS_TONE = {
+  company: "info",
+  department: "warning",
+  group: "neutral",
+  personal: "success",
+};
+
 const TABS = [
-  { key: "", label: "All" },
-  { key: "company", label: "Company" },
-  { key: "department", label: "Department" },
-  { key: "group", label: "Group" },
-  { key: "personal", label: "Personal" },
+  { key: "", label: "همه" },
+  { key: "company", label: "کل سازمان" },
+  { key: "department", label: "دپارتمانی" },
+  { key: "group", label: "گروهی" },
+  { key: "personal", label: "شخصی" },
 ];
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
-    reader.onerror = () => reject(new Error("Could not read the file."));
+    reader.onerror = () => reject(new Error("خواندن فایل ناموفق بود"));
     reader.readAsDataURL(file);
   });
 }
@@ -43,20 +59,19 @@ export default function DocumentCenterPage({ user }) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [options, setOptions] = useState(null);
   const [uploadForm, setUploadForm] = useState({
-    name: "", description: "", access_level: "personal", department_id: "", group_id: "", file: null,
+    name: "", description: "", access_level: "personal",
+    department_id: "", group_id: "", file: null,
   });
   const [uploading, setUploading] = useState(false);
-
-  const capabilities = (user && user.capabilities) || [];
-  const isAdmin = capabilities.includes("document.admin.manage");
 
   function refresh() {
     setDocuments(null);
     listDocuments("", tab)
       .then((data) => setDocuments(data.documents))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load."));
+      .catch((err) => setError(err instanceof ApiError ? err.message : "خطا در بارگذاری"));
   }
-  useEffect(() => { refresh(); }, [tab]);
+
+  useEffect(refresh, [tab]);
 
   async function handleSemanticSearch(e) {
     e.preventDefault();
@@ -67,7 +82,7 @@ export default function DocumentCenterPage({ user }) {
       const data = await searchDocuments(semanticQuery, 5);
       setSemanticResults(data.results);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Search failed.");
+      setError(err instanceof ApiError ? err.message : "جستجو ناموفق بود");
       setSemanticResults(null);
     } finally {
       setSearching(false);
@@ -108,7 +123,7 @@ export default function DocumentCenterPage({ user }) {
       setUploadForm({ name: "", description: "", access_level: "personal", department_id: "", group_id: "", file: null });
       refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Upload failed.");
+      setError(err instanceof ApiError ? err.message : "آپلود ناموفق بود");
     } finally {
       setUploading(false);
     }
@@ -119,130 +134,125 @@ export default function DocumentCenterPage({ user }) {
       await deleteDocument(documentId);
       refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Delete failed.");
+      setError(err instanceof ApiError ? err.message : "حذف ناموفق بود");
     }
   }
 
   return (
-    <>
-      <header className="page-head">
-        <div>
-          <div className="eyebrow">Documents</div>
-          <h1>Document Center</h1>
-          <p>Browse, upload and manage documents within your access scopes.</p>
-        </div>
-        <Button variant="primary" icon="plus" onClick={openUpload}>New document</Button>
-      </header>
+    <div>
+      <div className="ds-card-header" style={{ marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>مرکز اسناد</h2>
+        <Button size="sm" onClick={openUpload}>+ سند جدید</Button>
+      </div>
 
-      <Card title="Semantic search">
-        <p className="muted small" style={{ marginBottom: 12 }}>
-          Ask a question, not just keywords — e.g. “what is the policy on unused leave days?”
-        </p>
-        <form onSubmit={handleSemanticSearch} className="h-stack">
+      <Card title="جستجوی معنایی">
+        <p className="muted">سوال بپرسید، نه فقط کلیدواژه - مثلاً «سیاست مرخصی برای روزهای استفاده‌نشده چیست»</p>
+        <form onSubmit={handleSemanticSearch}>
           <Input
-            placeholder="Ask across the documents you can see…"
             value={semanticQuery}
             onChange={(e) => setSemanticQuery(e.target.value)}
-            aria-label="Semantic search"
+            placeholder="سوال خود را بنویسید..."
           />
-          <Button variant="primary" icon="search" type="submit" loading={searching}>Search</Button>
+          <Button type="submit" loading={searching}>جستجو</Button>
         </form>
       </Card>
 
-      <Alert onDismiss={() => setError("")}>{error}</Alert>
+      <Alert>{error}</Alert>
 
       {semanticResults && (
-        <Card title="Results">
-          {semanticResults.length === 0 && <EmptyState icon="search" text="No matching documents found." />}
+        <Card title="نتایج جستجوی معنایی">
+          {semanticResults.length === 0 && <EmptyState text="نتیجه‌ای یافت نشد." />}
           {semanticResults.map((r, i) => (
-            <div key={i} style={{ marginBottom: 14 }}>
-              <div className="h-stack" style={{ gap: 8 }}>
-                <strong>{r.document_name}</strong>
-                <Badge tone="accent">{Math.round(Number(r.similarity) * 100)}% match</Badge>
-              </div>
-              <div className="muted small mt-2">{String(r.excerpt).slice(0, 220)}…</div>
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div><strong>{r.document_name}</strong> <span className="muted">({r.similarity})</span></div>
+              <div className="muted">{r.excerpt.slice(0, 220)}...</div>
             </div>
           ))}
         </Card>
       )}
 
-      <div className="mb-4" style={{ marginTop: 18 }}>
-        <Tabs tabs={TABS} active={tab} onChange={setTab} />
-      </div>
+      <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       {documents === null && <Spinner />}
-      {documents && documents.length === 0 && (
-        <Card><EmptyState icon="file" title="Nothing here" text="No document exists at this access level." /></Card>
-      )}
+      {documents && documents.length === 0 && <EmptyState text="سندی در این سطح دسترسی یافت نشد." />}
 
-      {documents && documents.length > 0 && (
-        <Card style={{ padding: "8px 14px" }}>
-          {documents.map((d) => (
-            <div className="list-row" key={d.id}>
-              <div className="icon-tile"><Icon name="file" size={18} /></div>
-              <div className="grow">
-                <div className="h-stack" style={{ gap: 8, flexWrap: "wrap" }}>
-                  <strong>{d.name}</strong>
-                  <Badge tone={ACCESS_TONE[d.access_level]}>{ACCESS_LABEL[d.access_level] || d.access_level}</Badge>
-                  {d.department && <span className="muted small">· {d.department}</span>}
-                  {d.group && <span className="muted small">· {d.group}</span>}
-                </div>
-                {d.description && <div className="muted small">{d.description}</div>}
-                <div className="faint xsmall mt-2">
-                  {d.owner ? `Owner: ${d.owner}` : ""}{d.file_name ? ` · ${d.file_name}` : ""}
-                </div>
+      {documents && documents.map((d) => (
+        <Card key={d.id}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div>
+                <strong>{d.name}</strong>{" "}
+                <Badge tone={ACCESS_TONE[d.access_level]}>{ACCESS_LABEL[d.access_level]}</Badge>
+                {d.department && <span className="muted"> — {d.department}</span>}
+                {d.group && <span className="muted"> — {d.group}</span>}
               </div>
-              {(d.is_mine || isAdmin) && (
-                <Button variant="danger" size="sm" icon="trash" onClick={() => handleDelete(d.id)}>Delete</Button>
-              )}
+              {d.description && <div className="muted">{d.description}</div>}
+              <div className="muted" style={{ fontSize: 12 }}>
+                {d.owner ? `مالک: ${d.owner}` : ""} {d.file_name ? `— ${d.file_name}` : ""}
+              </div>
             </div>
-          ))}
+            {(d.is_mine || (user && (user.capabilities || []).includes("document.admin.manage"))) && (
+              <Button variant="danger" size="sm" onClick={() => handleDelete(d.id)}>حذف</Button>
+            )}
+          </div>
         </Card>
-      )}
+      ))}
 
       <Modal
         open={uploadOpen}
-        title="Upload a document"
+        title="آپلود سند جدید"
         onClose={() => setUploadOpen(false)}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setUploadOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleUpload} loading={uploading} disabled={!uploadForm.name}>Save</Button>
+            <Button variant="ghost" onClick={() => setUploadOpen(false)}>انصراف</Button>
+            <Button onClick={handleUpload} loading={uploading} disabled={!uploadForm.name}>ثبت</Button>
           </>
         }
       >
         <form onSubmit={handleUpload}>
-          <Input id="doc-name" label="Name" required value={uploadForm.name}
-            onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })} />
-          <TextArea id="doc-desc" label="Description (optional)" rows={2} value={uploadForm.description}
-            onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })} />
-          <Select id="doc-access" label="Access level" value={uploadForm.access_level}
+          <Input
+            label="نام سند" required value={uploadForm.name}
+            onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
+          />
+          <TextArea
+            label="توضیح (اختیاری)" rows={2} value={uploadForm.description}
+            onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+          />
+          <Select
+            label="سطح دسترسی" value={uploadForm.access_level}
             onChange={(e) => setUploadForm({ ...uploadForm, access_level: e.target.value })}
             options={[
-              { value: "personal", label: "Personal (only me)" },
-              { value: "department", label: "Department" },
-              { value: "group", label: "Restricted group" },
-              { value: "company", label: "Company-wide" },
-            ]} />
+              { value: "personal", label: "شخصی (فقط خودم)" },
+              { value: "department", label: "دپارتمان" },
+              { value: "group", label: "گروه محدود" },
+              { value: "company", label: "کل سازمان" },
+            ]}
+          />
           {uploadForm.access_level === "department" && (
-            <Select id="doc-dept" label="Department" value={uploadForm.department_id}
+            <Select
+              label="دپارتمان" value={uploadForm.department_id}
               onChange={(e) => setUploadForm({ ...uploadForm, department_id: e.target.value })}
-              placeholder="Choose…"
-              options={(options?.departments || []).map((d) => ({ value: d.id, label: d.name }))} />
+              placeholder="انتخاب کنید..."
+              options={(options?.departments || []).map((d) => ({ value: d.id, label: d.name }))}
+            />
           )}
           {uploadForm.access_level === "group" && (
-            <Select id="doc-group" label="Group" value={uploadForm.group_id}
+            <Select
+              label="گروه" value={uploadForm.group_id}
               onChange={(e) => setUploadForm({ ...uploadForm, group_id: e.target.value })}
-              placeholder="Choose…"
-              options={(options?.groups || []).map((g) => ({ value: g.id, label: g.name }))} />
+              placeholder="انتخاب کنید..."
+              options={(options?.groups || []).map((g) => ({ value: g.id, label: g.name }))}
+            />
           )}
           {uploadForm.access_level === "group" && options && options.groups.length === 0 && (
-            <p className="muted small">You are not a member of any restricted group — pick another access level.</p>
+            <p className="muted">شما عضو هیچ گروه محدودی نیستید - فقط می‌توانید سطح دسترسی دیگری انتخاب کنید.</p>
           )}
-          <Input id="doc-file" label="File (optional)" type="file"
-            onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })} />
+          <Input
+            label="فایل (اختیاری)" type="file"
+            onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
+          />
         </form>
       </Modal>
-    </>
+    </div>
   );
 }

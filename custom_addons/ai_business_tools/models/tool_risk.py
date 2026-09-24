@@ -30,10 +30,6 @@ class AiGatewayToolRisk(models.Model):
     _rec_name = "tool_name"
 
     tool_name = fields.Char(required=True, index=True)
-    # Explicit owner of the tool surface. This prevents an installed
-    # module's tool from being offered to the agent (or executed directly)
-    # after that module is absent from the current database.
-    module_name = fields.Char(index=True, help="Technical addon that owns this AI tool")
     risk_level = fields.Integer(required=True, default=0)
     approver_group_id = fields.Many2one(
         "res.groups",
@@ -58,25 +54,17 @@ class AiGatewayToolRisk(models.Model):
 
     @api.model
     def enforce(self, tool_name, context_label=""):
-        """Backward-compatible shim. RISK_5 remains a hard UserError here
-        for callers/tests that historically used this API directly; all other
-        decisions continue through the central execution gate.
+        """Backward-compatible shim. All enforcement is now centralized
+        in ai.gateway.execution.gate; no business tool should implement
+        its own risk decision.
         """
-        if int(self.get_risk_level(tool_name) or 0) >= 5:
-            raise UserError("RISK_5 tools are human-only")
         return self.env["ai.gateway.execution.gate"].authorize(
             tool_name, context_label=context_label
         )
 
     @api.model
     def registered_tool_ids(self):
-        installed_names = set(self.env["ir.module.module"].sudo().search([
-            ("state", "=", "installed"),
-        ]).mapped("name"))
-        risks = self.sudo().search([]).filtered(
-            lambda risk: bool(risk.module_name and risk.module_name in installed_names)
-        )
-        names = set(risks.mapped("tool_name"))
+        names = set(self.sudo().search([]).mapped("tool_name"))
         Tool = self.env["llm.tool"]
         return Tool.search([]).filtered(lambda t: (getattr(t, "name", "") or "") in names and not (getattr(t, "name", "") or "").startswith("llm_tool_odoo_")).ids
 
@@ -91,18 +79,8 @@ class AiGatewayToolRisk(models.Model):
         """
         user = user or self.env.user
         risks = self.sudo().search([])
-        installed_names = set(self.env["ir.module.module"].sudo().search([
-            ("state", "=", "installed"),
-        ]).mapped("name"))
         allowed_names = set()
         for risk in risks:
-            # A risk row is not proof that its owning addon is installed.
-            # Keep optional module tools out of the agent until the official
-            # module and its server-side adapter are present in this database.
-            if not risk.module_name or risk.module_name not in installed_names:
-                # Unowned tool metadata is not an agent connection. Require
-                # an explicit module owner before the tool can be advertised.
-                continue
             if risk.risk_level >= 5:
                 continue
             if risk.capability_name and "ai.control.authorization" in self.env:

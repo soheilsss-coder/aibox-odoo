@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import re
 import time
@@ -9,12 +8,8 @@ from odoo.http import request
 from odoo.exceptions import AccessError, UserError
 from odoo.sql_db import db_connect
 from .rate_limit import check as _shared_rate_limit, blocked as _shared_rate_blocked
-from .output_firewall import scrub_public_text, scrub_public_payload
-from odoo.addons.ai_gateway.models.chat_queue import get_chat_pool, get_global_chat_gate
-from odoo.addons.ai_gateway.models.inference_config import classify_request
+from .chat_queue import get_chat_pool
 from werkzeug.wrappers import Response
-
-_logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -31,73 +26,25 @@ if not _ALLOWED_ORIGIN and os.environ.get("AI_GATEWAY_ENV", "development") == "p
 _ALLOWED_ORIGIN = _ALLOWED_ORIGIN or ("http://localhost:5173" if os.environ.get("AI_GATEWAY_ENV", "development") != "production" else None)
 if os.environ.get("AI_GATEWAY_ENV", "development") == "production" and (not _ALLOWED_ORIGIN or _ALLOWED_ORIGIN == "*"):
     raise RuntimeError("AI_GATEWAY_ALLOWED_ORIGIN must be a concrete HTTPS origin in production")
-_ALLOWED_ORIGINS = {
-    origin.strip().rstrip("/")
-    for origin in (os.environ.get("AI_GATEWAY_ALLOWED_ORIGINS") or _ALLOWED_ORIGIN or "").split(",")
-    if origin.strip()
-}
-_ALLOW_TRYCLOUDFLARE = os.environ.get("AI_GATEWAY_ALLOW_TRYCLOUDFLARE", "0") == "1"
-_TRYCLOUDFLARE_RE = re.compile(r"^https://[A-Za-z0-9-]+\.trycloudflare\.com$")
-
-
-def _origin_allowed(origin):
-    origin = (origin or "").rstrip("/")
-    if not origin:
-        return True
-    if origin in _ALLOWED_ORIGINS:
-        return True
-    return bool(_ALLOW_TRYCLOUDFLARE and _TRYCLOUDFLARE_RE.match(origin))
-
-
-def _cors_origin():
-    origin = request.httprequest.headers.get("Origin", "") if request else ""
-    origin = origin.rstrip("/")
-    return origin if origin and _origin_allowed(origin) else _ALLOWED_ORIGIN
-
-
-def _cors_headers():
-    return [
-        ("Access-Control-Allow-Origin", _cors_origin()),
-        ("Access-Control-Allow-Credentials", "true"),
-        ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
-        ("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization, X-CSRF-Token"),
-    ]
-
 
 _CORS_HEADERS = [
     ("Access-Control-Allow-Origin", _ALLOWED_ORIGIN),
     ("Access-Control-Allow-Credentials", "true"),
     ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
-    ("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization, X-CSRF-Token"),
+    ("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization"),
 ]
-
-
-def _scoped_user_env(user):
-    """Build every customer request environment inside the user's tenant.
-
-    Do not inherit an attacker-controlled ``allowed_company_ids`` context from
-    the HTTP request. Multi-company users may switch explicitly in a separate
-    audited flow; the API default is the credential owner's current company.
-    """
-    return request.env(
-        user=user.id,
-        context={
-            "lang": user.lang,
-            "allowed_company_ids": [user.company_id.id],
-        },
-    )
 
 
 def _json_response(data, status=200):
     return request.make_response(
         json.dumps(data, ensure_ascii=False, default=str),
-        headers=[("Content-Type", "application/json; charset=utf-8")] + _cors_headers(),
+        headers=[("Content-Type", "application/json; charset=utf-8")] + _CORS_HEADERS,
         status=status,
     )
 
 
 def _cors_preflight_response():
-    return request.make_response("", headers=_cors_headers())
+    return request.make_response("", headers=_CORS_HEADERS)
 
 
 # --- Shared rate limiting ---------------------------------------------
@@ -148,7 +95,7 @@ def _authenticate():
     """
     method = request.httprequest.method.upper()
     origin = request.httprequest.headers.get("Origin", "")
-    if method not in ("GET", "HEAD", "OPTIONS") and origin and not _origin_allowed(origin):
+    if method not in ("GET", "HEAD", "OPTIONS") and origin and origin != _ALLOWED_ORIGIN:
         return None, None, False
 
     ip = _client_ip()
@@ -157,15 +104,7 @@ def _authenticate():
 
     session_token = request.httprequest.cookies.get("ai_session", "").strip()
     if session_token and "ai.gateway.session" in request.env:
-        # API routes deliberately disable the framework CSRF mechanism because
-        # they also support header-authenticated clients.  A cookie-authenticated
-        # browser request therefore uses a session-bound double-submit token.
-        # Do not accept a mutation with only the HttpOnly session cookie.
-        csrf_token = request.httprequest.headers.get("X-CSRF-Token", "")
-        require_csrf = method not in ("GET", "HEAD", "OPTIONS")
-        session = request.env["ai.gateway.session"].sudo().authenticate_token(
-            session_token, csrf_token=csrf_token, require_csrf=require_csrf,
-        )
+        session = request.env["ai.gateway.session"].sudo().authenticate_token(session_token)
         if session:
             return session.user_id, session_token, False
 
@@ -257,93 +196,6 @@ def _is_privileged(env, user):
     return False
 
 
-def _active_profile_section(env, section_name):
-    if "ai.customer.configuration.profile" not in env:
-        return {}
-    try:
-        profile = env["ai.customer.configuration.profile"].active_for_company(env.company)
-        sections = profile.runtime_config().get("sections", {}) if profile else {}
-        value = sections.get(section_name, {})
-        return value if isinstance(value, dict) else {}
-    except Exception:  # noqa: BLE001
-        _logger.exception("Could not read active customer profile section")
-        return {}
-
-
-def _select_assistant(env, message, has_attachment=False):
-    """Select a certified assistant for the workload without exposing routing data.
-
-    The third-party thread API binds generation to an ``llm.assistant`` record,
-    so routing is implemented by choosing the assistant/model record before a
-    thread is created. If no certified profile is available, production
-    fails closed; only development/legacy mode may use the configured
-    compatibility assistant. No unreviewed model is auto-created or
-    silently promoted.
-    """
-    budget = classify_request(message, has_attachment=has_attachment)
-    Assistant = env["llm.assistant"]
-    agent_policy = _active_profile_section(env, "agent")
-    assistant_name = str(agent_policy.get("assistant_name") or agent_policy.get("agent_name") or "Company Assistant").strip()
-    base_domain = [("name", "=", assistant_name), ("active", "=", True)]
-    preferred_model = str(agent_policy.get("model") or "").strip()
-    if preferred_model:
-        preferred = Assistant.search(base_domain + [("model_id.name", "=", preferred_model)], limit=1)
-        if preferred:
-            return preferred, budget
-    if "ai.model.router" in env:
-        try:
-            profile = env["ai.model.router"].route(
-                purpose=budget.purpose,
-                requires_vision=budget.requires_vision,
-                latency_budget_ms=budget.latency_budget_ms,
-                requires_tools=budget.requires_tools,
-            )
-            candidate = Assistant.search(
-                base_domain + [("model_id.name", "=", profile.model_id)], limit=1
-            )
-            if candidate:
-                return candidate, budget
-            if os.environ.get("AI_GATEWAY_ENV", "development") == "production":
-                return Assistant.browse(), budget
-        except Exception:
-            # Production must not silently downgrade to an unbenchmarked
-            # assistant. Development/legacy databases retain an explicit
-            # compatibility path so upgrades remain usable before promotion.
-            if os.environ.get("AI_GATEWAY_ENV", "development") == "production":
-                return Assistant.browse(), budget
-    assistant = Assistant.search(base_domain, limit=1)
-    if not assistant:
-        # Upgrade compatibility for databases created before the assistant
-        # activation data fix. Do not create or select an arbitrary assistant.
-        assistant = Assistant.search([("name", "=", "Company Assistant")], limit=1)
-    return assistant, budget
-
-
-def _agent_tools(env, assistant):
-    """Return tools attached to the installed-module Company Assistant.
-
-    The assistant record is deliberately the source of the third-party
-    framework's tool catalog, while the binding model is the source of truth
-    for which installed modules currently own that catalog. A binding does
-    not grant permissions; the caller-specific risk/capability intersection
-    happens immediately after this helper returns.
-    """
-    if "ai.integration.agent.module" not in env:
-        return assistant.tool_ids
-    try:
-        Binding = env["ai.integration.agent.module"].sudo()
-        # The cron is the normal path. This idempotent refresh closes the
-        # small install-to-cron window without asking an administrator to
-        # press a second sync button.
-        Binding.refresh_if_stale()
-        return Binding.tool_ids_for_agent(assistant)
-    except Exception:  # noqa: BLE001
-        # Fail closed: stale assistant tools must not survive a broken module
-        # connection and become an accidental capability path.
-        _logger.exception("Could not resolve installed-module tools for the agent")
-        return None
-
-
 def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     """Business logic for one assistant turn, executed wholly as the
     environment's user (env.uid).
@@ -361,18 +213,11 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     """
     t0 = time.time()
     user_id = env.uid
-    assistant, budget = _select_assistant(
-        env, message, has_attachment=bool(attachment_ids)
+    assistant = env["llm.assistant"].search(
+        [("name", "=", "Company Assistant")], limit=1
     )
     if not assistant:
-        return {"error": "assistant is not configured"}
-
-    # A personal identity gives each user a durable workspace/profile without
-    # creating a second unrestricted agent. Authorization, tools and model
-    # selection remain bound to the shared Company Assistant and this user.
-    personal_identity = False
-    if "ai.gateway.agent.identity" in env:
-        personal_identity = env["ai.gateway.agent.identity"].sudo().ensure_personal(env.user)
+        return {"error": "Company Assistant not found - check AI module install"}
 
     # v19 (roadmap #50) - CLOSED GAP: this used to accept ANY
     # thread_id the client sent and just check .exists(), with no
@@ -401,50 +246,21 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     # existing thread owned by them. The previous implementation had
     # the create block outside this branch, silently replacing every
     # continuation with a new thread and breaking conversation memory.
-    # Resolve the installed-module catalog once per turn. The returned tools
-    # are the agent connection, not user authorization; the latter is applied
-    # below for both new and existing threads.
-    agent_tools = _agent_tools(env, assistant)
-    if agent_tools is None:
-        _audit(env, user_id, "chat", "chat_agent_module_connection_failed", {
-            "assistant_id": assistant.id,
-        }, success=False, error_message="installed-module agent catalog unavailable")
-        return {"error": "assistant module connections are unavailable"}
-    thread_values = {}
-    if personal_identity and "personal_agent_identity_id" in env["llm.thread"]._fields:
-        thread_values["personal_agent_identity_id"] = personal_identity.id
     if not thread:
-        provider = assistant.provider_id or assistant.model_id.provider_id
-        if not provider or not assistant.model_id:
-            _audit(env, user_id, "chat", "chat_provider_not_configured", {
-                "assistant_id": assistant.id,
-            }, success=False, error_message="assistant has no provider/model")
-            return {"error": "assistant is not configured with a provider/model"}
-        allowed_tools = agent_tools
+        allowed_tools = assistant.tool_ids
         if "ai.gateway.tool.risk" in env:
-            allowed_ids = set(env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user))
-            allowed_tools = agent_tools.filtered(lambda tool: tool.id in allowed_ids)
-        thread_values.update({
+            allowed_ids = env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user)
+            allowed_tools = assistant.tool_ids.filtered(lambda t: t.id in allowed_ids)
+        thread = env["llm.thread"].create({
             "assistant_id": assistant.id,
-            "provider_id": provider.id,
-            "model_id": assistant.model_id.id,
             "tool_ids": [(6, 0, allowed_tools.ids)],
         })
-        thread = env["llm.thread"].create(thread_values)
-    elif thread_values and thread.personal_agent_identity_id != personal_identity:
-        # Existing threads are already ownership-checked above. Refresh only
-        # the profile link; never replace the shared assistant or its tools.
-        thread.write(thread_values)
 
-    # Defense-in-depth: every thread gets the intersection of the installed
-    # module-agent connection and this user's risk/capability allowlist.
+    # Defense-in-depth: every thread gets a user-specific allowlist.
     # Generic framework CRUD tools are never exposed through chat.
     if "ai.gateway.tool.risk" in env:
-        allowed_ids = set(env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user))
-        allowed_ids.intersection_update(agent_tools.ids)
-        allowed_tools = thread.tool_ids.filtered(lambda t: t.id in allowed_ids)
-        allowed_tools |= env["llm.tool"].browse(sorted(allowed_ids))
-        thread.write({"tool_ids": [(6, 0, allowed_tools.ids)]})
+        allowed_ids = env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user)
+        thread.write({"tool_ids": [(6, 0, [i for i in thread.tool_ids.ids if i in allowed_ids])]})
 
     # Attachments are persisted on a mail.message belonging to this exact
     # user-owned thread. The file-reader/vision tools discover attachments
@@ -467,67 +283,38 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
         attachments.write({"res_model": "llm.thread", "res_id": thread.id})
         thread.message_post(body=message or "[attachment]", attachment_ids=attachments.ids)
 
-    # Propagate the owning thread into tool execution so explicit memory
-    # writes can bind their source quote to the current user message.
-    thread = thread.with_context(memory_source_thread_id=thread.id)
     try:
         list(thread.generate(user_message_body=message or "لطفاً فایل ضمیمه را بررسی کن."))
     except Exception as exc:  # noqa: BLE001
-        _audit(env, user_id, "chat", "chat", {"message": message, "purpose": budget.purpose},
+        _audit(env, user_id, "chat", "chat", {"message": message},
                success=False, error_message=str(exc),
                duration_ms=int((time.time() - t0) * 1000),
                token_count=_estimate_tokens(message))
         return {"error": "generation failed, check server logs for details"}
 
-    # Candidate memory extraction is asynchronous and source-linked. It is
-    # deliberately enqueued only after the user turn has been accepted and
-    # generated; the worker never changes the assistant response or blocks
-    # this request. Candidates remain unconfirmed until the user explicitly
-    # saves/approves a fact.
-    if message and "ai.agent.memory.fact.job" in env:
-        user_messages = env["mail.message"].sudo().search(
-            [
-                ("model", "=", "llm.thread"),
-                ("res_id", "=", thread.id),
-                ("author_id", "=", env.user.partner_id.id),
-            ],
-            order="id desc",
-            limit=5,
-        )
-        if user_messages:
-            env["ai.agent.memory.fact.job"].sudo().enqueue(
-                user_messages[0], user=env.user, thread_id=thread.id,
-            )
-
     last_message = env["mail.message"].search(
         [("model", "=", "llm.thread"), ("res_id", "=", thread.id)],
-        order="id desc",
+        order="create_date desc",
         limit=1,
     )
-    _audit(env, user_id, "chat", "chat", {"message": message, "purpose": budget.purpose}, success=True,
+    _audit(env, user_id, "chat", "chat", {"message": message}, success=True,
            duration_ms=int((time.time() - t0) * 1000),
            token_count=_estimate_tokens(message, last_message.body))
     reply_html = last_message.body or ""
-    reply_text = scrub_public_text(re.sub(r"<[^>]+>", "", reply_html).strip())
+    reply_text = re.sub(r"<[^>]+>", "", reply_html).strip()
 
     return {
         "thread_id": thread.id,
         "reply": reply_text,
-        "personal_agent": {
-            "label": "دستیار شخصی شما",
-            "shared_core": True,
-        },
     }
 
 
 def _run_chat(user, message, thread_id=None, attachment_ids=None):
-    """Compatibility wrapper for integrations that call the shared chat core.
-
-    Use the same detached cursor and global capacity lease as HTTP chat so
-    Telegram cannot bypass concurrency protection by entering the old direct
-    helper.
-    """
-    return _run_chat_detached(request.env.cr.dbname, user.id, message, thread_id, attachment_ids)
+    """Wrapper for the synchronous (request-env) path - kept so the
+    Telegram bridge keeps calling exactly the same signature as before.
+    Queued execution uses _run_chat_detached below instead."""
+    env = request.env(user=user.id)
+    return _run_chat_env(env, message, thread_id, attachment_ids)
 
 
 def _run_chat_detached(dbname, user_id, message, thread_id=None, attachment_ids=None):
@@ -536,43 +323,17 @@ def _run_chat_detached(dbname, user_id, message, thread_id=None, attachment_ids=
     request thread's transaction (which belongs to a different,
     possibly idle query). Used only when the chat pool queues the job;
     the idle fast path keeps running inline with the request env."""
-    lease = get_global_chat_gate().acquire()
-    if lease is False:
-        return {"error": "assistant capacity is currently full, try again shortly"}
-    cr = None
+    cr = db_connect(dbname).cursor()
     try:
-        cr = db_connect(dbname).cursor()
-        env = api.Environment(cr, user_id, {})
-        result = _run_chat_env(env, message, thread_id, attachment_ids)
-        cr.commit()
+        with api.Environment(cr, user_id, {}) as env:
+            result = _run_chat_env(env, message, thread_id, attachment_ids)
         return result
     except Exception:  # noqa: BLE001
         try:
-            if cr is not None:
-                cr.rollback()
+            cr.rollback()
         except Exception:  # noqa: BLE001
             pass
-        _logger.exception("Detached chat turn failed")
         return {"error": "generation failed, check server logs for details"}
-    finally:
-        try:
-            if cr is not None:
-                cr.close()
-        finally:
-            get_global_chat_gate().release(lease)
-
-
-def _run_chat_bounded(env, message, thread_id=None, attachment_ids=None):
-    """Run non-HTTP callers through the same cross-process capacity lease."""
-    lease = get_global_chat_gate().acquire()
-    if lease is False:
-        return {"error": "assistant capacity is currently full, try again shortly"}
-    try:
-        return _run_chat_env(env, message, thread_id, attachment_ids)
-    except Exception:  # noqa: BLE001 - callers receive the public-safe error
-        return {"error": "generation failed, check server logs for details"}
-    finally:
-        get_global_chat_gate().release(lease)
 
 
 # ---------------------------------------------------------------------------
@@ -596,10 +357,10 @@ class AiGatewayController(http.Controller):
         args = params.get("args") or {}
         if not tool_name:
             return {"error": "'tool_name' is required"}
-        env = _scoped_user_env(user)
+        env = request.env(user=user.id)
         try:
             result = env["ai.gateway.execution.gate"].execute(tool_name, args)
-            return {"status": "done", "result": scrub_public_payload(result)}
+            return {"status": "done", "tool": tool_name, "result": result}
         except Exception as exc:  # noqa: BLE001
             _audit(env, user.id, "tool", tool_name, {"args": args}, success=False, error_message=str(exc))
             return {"error": "operation failed, check server logs for details"}
@@ -618,7 +379,7 @@ class AiGatewayController(http.Controller):
         if not _check_rate_limit(api_key):
             return _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
 
-        env = _scoped_user_env(user)
+        env = request.env(user=user.id)
 
         top_menus = env["ir.ui.menu"].search(
             [("parent_id", "=", False)], order="sequence"
@@ -627,10 +388,12 @@ class AiGatewayController(http.Controller):
         def serialize_menu(menu):
             action = None
             if menu.action:
-                # Bootstrap is a customer-facing contract. Do not expose ORM
-                # model names or internal action types to the browser; the
-                # frontend receives only a navigable/visible marker.
-                action = {"available": True}
+                act = menu.action
+                action = {
+                    "type": act._name,
+                    "model": getattr(act, "res_model", False),
+                    "view_mode": getattr(act, "view_mode", False),
+                }
             children = env["ir.ui.menu"].search(
                 [("parent_id", "=", menu.id)], order="sequence"
             )
@@ -647,15 +410,9 @@ class AiGatewayController(http.Controller):
             return bool(m["action"]) or any(has_content(c) for c in m["children"])
         menus = [m for m in menus if has_content(m)]
 
-        # Expose only product labels from the central integration registry.
-        # The technical module inventory is an admin/control-plane concern and
-        # must not leak through the customer bootstrap response.
-        available_domains = []
-        if "ai.control.module" in env:
-            available_domains = env["ai.control.module"].sudo().search(
-                [("state", "=", "installed"), ("active", "=", True)],
-                order="name",
-            ).mapped("name")
+        installed_modules = env["ir.module.module"].sudo().search(
+            [("state", "=", "installed")]
+        ).mapped("name")
 
         return _json_response({
             "user": {"id": user.id, "name": user.name, "login": user.login},
@@ -663,7 +420,7 @@ class AiGatewayController(http.Controller):
             "lang": env.user.lang or "en_US",
             "timezone": env.user.tz or "UTC",
             "menus": menus,
-            "available_domains": available_domains,
+            "installed_modules": installed_modules,
         })
 
     @http.route("/api/health", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
@@ -701,19 +458,13 @@ class AiGatewayController(http.Controller):
         if not _check_rate_limit(api_key):
             return _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
 
-        env = _scoped_user_env(user)
+        env = request.env(user=user.id)
         if not _is_privileged(env, user):
             return _json_response({"error": "access denied: metrics are restricted to privileged roles"}, status=403)
         if "ai.gateway.audit.log" not in env:
             return _json_response({"error": "ai_business_tools is not installed"}, status=501)
 
-        snapshot = env["ai.gateway.audit.log"].sudo().observability_snapshot()
-        snapshot["chat_queue"] = get_chat_pool().snapshot()
-        snapshot["global_concurrency_lease"] = {
-            "enabled": get_global_chat_gate().enabled,
-            "capacity": get_global_chat_gate().capacity,
-        }
-        return _json_response(snapshot)
+        return _json_response(env["ai.gateway.audit.log"].sudo().observability_snapshot())
 
     @http.route("/api/reports/tokens", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def token_report(self, **kwargs):
@@ -732,7 +483,7 @@ class AiGatewayController(http.Controller):
         if not _check_rate_limit(api_key):
             return _json_response({"error": "rate limit exceeded, try again shortly"}, status=429)
 
-        env = _scoped_user_env(user)
+        env = request.env(user=user.id)
         if not _is_privileged(env, user):
             return _json_response({"error": "access denied: token usage is restricted to privileged roles"}, status=403)
         if "ai.gateway.audit.log" not in env:
@@ -795,9 +546,6 @@ class AiGatewayController(http.Controller):
         # fast with a busy error when the queue is full) instead of
         # every parallel request hitting the single GPU at once.
         dbname = request.env.cr.dbname
-        # Always use the detached cursor path, including the idle fast path.
-        # That makes the Redis lease cover every request across all Odoo
-        # worker processes instead of only requests that entered the queue.
         ok, result = get_chat_pool().submit(
             lambda: _run_chat_detached(dbname, user.id, message, thread_id, attachment_ids)
         )
@@ -830,54 +578,29 @@ class AiGatewayController(http.Controller):
         def _sse(event, payload):
             return "event: %s\ndata: %s\n\n" % (event, json.dumps(payload, ensure_ascii=False))
 
-        # Everything this stream needs must be read out of the request BEFORE
-        # the generator is handed back to the WSGI server. The generator body
-        # is consumed after the request context has been unbound, so touching
-        # `request` in there raises RuntimeError('object is not bound') - which
-        # used to surface as a bare "invalid request", because the body parse
-        # sat inside a catch-all except and swallowed the real error.
-        #
-        # Reading once, here, while the request is live, also fixes the second
-        # half of that bug: for a form-encoded POST the dispatcher has already
-        # consumed the body building `request.params`, so `httprequest.data`
-        # is empty by the time we get to it. Both sources are accepted now.
-        raw = request.httprequest.get_data(as_text=True)
-        data = {}
-        if raw:
-            try:
-                data = json.loads(raw)
-            except ValueError:
-                data = {}
-        if not data:
-            # Form-encoded POST: the body was already consumed building
-            # request.params, so the raw bytes are gone. Take them from there.
-            data = dict(request.params or {})
-        if not isinstance(data, dict):
-            return _json_response({"error": "invalid request"}, status=400)
-
-        message = data.get("message")
-        thread_id = data.get("thread_id")
-        attachment_ids = data.get("attachment_ids") or []
-        if not isinstance(attachment_ids, list):
-            attachment_ids = []
-        attachment_ids = [int(x) for x in attachment_ids if str(x).isdigit()]
-        if not message and not attachment_ids:
-            return _json_response(
-                {"error": "'message' or attachment_ids is required"}, status=400
-            )
-
-        # Same bounded worker pool as /api/chat - the heavy turn is
-        # queued when the engine is saturated, overflowing requests
-        # get the busy error instead of piling up, and the SSE stream
-        # still delivers the final reply progressively.
-        # Captured as plain values: the worker thread has no request context.
-        dbname = request.env.cr.dbname
-        user_id = user.id
-
         def generate():
             yield _sse("thinking", {})
+            try:
+                data = json.loads(request.httprequest.data or b"{}")
+            except Exception:  # noqa: BLE001
+                yield _sse("error", {"error": "invalid request"})
+                return
+            message = data.get("message")
+            thread_id = data.get("thread_id")
+            attachment_ids = data.get("attachment_ids") or []
+            if not isinstance(attachment_ids, list):
+                attachment_ids = []
+            attachment_ids = [int(x) for x in attachment_ids if str(x).isdigit()]
+            if not message and not attachment_ids:
+                yield _sse("error", {"error": "'message' or attachment_ids is required"})
+                return
+            # Same bounded worker pool as /api/chat - the heavy turn is
+            # queued when the engine is saturated, overflowing requests
+            # get the busy error instead of piling up, and the SSE stream
+            # still delivers the final reply progressively.
+            dbname = request.env.cr.dbname
             ok, result = get_chat_pool().submit(
-                lambda: _run_chat_detached(dbname, user_id, message, thread_id, attachment_ids)
+                lambda: _run_chat_detached(dbname, user.id, message, thread_id, attachment_ids)
             )
             if not ok:
                 yield _sse("busy", {"error": result})
@@ -888,14 +611,13 @@ class AiGatewayController(http.Controller):
             for word in re.split(r"(\s+)", result.get("reply") or ""):
                 if word:
                     yield _sse("delta", {"text": word})
-            yield _sse("done", {
-                "thread_id": result.get("thread_id"),
-                "personal_agent": result.get("personal_agent"),
-            })
+            yield _sse("done", {"thread_id": result.get("thread_id")})
 
         headers = [
             ("Content-Type", "text/event-stream; charset=utf-8"),
             ("Cache-Control", "no-cache"),
             ("X-Accel-Buffering", "no"),
-        ] + _cors_headers()
+            ("Access-Control-Allow-Origin", _ALLOWED_ORIGIN),
+            ("Access-Control-Allow-Credentials", "true"),
+        ]
         return Response(generate(), headers=headers)

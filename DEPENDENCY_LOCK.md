@@ -1,33 +1,29 @@
-# Immutable native dependency contract
+# Immutable dependency contract
 
-The package never silently chooses a floating production Odoo, Python, vLLM,
-PostgreSQL/pgvector, Redis, or model artifact. Production installation is
-native/bare-metal only; Docker and compose are not part of the deployment
-path.
+The package never silently chooses a floating production Odoo/vLLM/model artifact.
+Set immutable image/git digests in the deployment environment or compose override before production installation.
 
-Application Python pins are in `requirements.lock` and frontend pins are in
-`frontend/package-lock.json`.
+Application pins are in `requirements.lock`.
 
-## Required production values
+Required infrastructure artifacts:
+- Odoo 18.0 image or immutable source commit
+- PostgreSQL 16 + pgvector image digest
+- Redis 7.x image digest
+- vLLM image digest
+- Chat/reasoning/vision/embedding model revisions
+- Frontend Node build artifact digest
 
-Set and review these exact environment variables before running
-`00_final_production_install.sh`:
 
-- `ODOO_COMMIT_SHA` — immutable Odoo source commit
-- `ODOO_LLM_REPO` and `ODOO_LLM_COMMIT_SHA` — immutable AI addon source
-- `VLLM_VERSION` — validated, immutable vLLM Python package version
-- `AI_VLLM_CHAT_MODEL_PATH`, `AI_VLLM_EMBEDDING_MODEL_PATH` and
-  `AI_VLLM_VISION_MODEL_PATH` — model weights stored outside this workspace
-- `AI_RAG_INDEX_VERSION` — explicit embedding/chunk revision for safe rebuilds
-- `PYTHON_RUNTIME_VERSION` and `NODE_RUNTIME_VERSION`
-- `PGVECTOR_PACKAGE` — native PostgreSQL pgvector package name
+## Immutable artifact contract (fail-closed)
+Production must provide these exact environment variables before `00_final_production_install.sh` can certify the runtime:
+- `ODOO_COMMIT_SHA`
+- `ODOO_LLM_COMMIT_SHA`
+- `VLLM_IMAGE_DIGEST`
+- `PYTHON_RUNTIME_VERSION`
+- `NODE_RUNTIME_VERSION`
 - `MODEL_REVISION_QWEN`
 - `MODEL_REVISION_GLIMMER`
 - `MODEL_REVISION_VISION`
 - `MODEL_REVISION_EMBEDDING`
-
-The native installer consumes `PGVECTOR_PACKAGE` in its apt transaction and
-installs vLLM with `vllm==${VLLM_VERSION}`. No floating git branch or
-`pip install -U` is permitted by the production gate. PostgreSQL, Redis and
-vLLM model-serving service versions must be recorded in
-`DEPLOYMENT_ARTIFACTS.lock` for the target host before runtime certification.
+- `PGVECTOR_IMAGE_DIGEST`
+No floating git branch or `pip install -U` is permitted by the production gate.

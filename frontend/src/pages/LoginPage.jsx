@@ -1,22 +1,18 @@
 import React, { useState } from "react";
-import { login, clearApiKey, getMe, ApiError } from "../api/client.js";
-import { Alert, Button, Input } from "../components";
+import { login, setApiKey, clearApiKey, getMe, ApiError } from "../api/client.js";
+import { Card, Input, Button, Alert } from "../components";
 
-// Login screen: the employee's front door. Trades email+password for a
-// session (cookie; the dev backend also returns an api_key the client then
-// sends as X-API-Key so auth survives third-party iframe previews).
-// Forms are pre-filled in `vite dev` and in the static GitHub Pages demo
-// build (any credentials work there); real production builds stay empty.
+// v24: this used to ask the user to paste in a raw API key ("get it
+// from your admin"). Every onboarded employee already has a normal
+// email + password (see onboarding/onboard_from_excel.py) - there is
+// no reason to make them separately handle a 48-character key by hand
+// day to day. This screen now takes login/password like any ordinary
+// app; /api/login (backend) checks the real Odoo credentials once and
+// hands back that same user's existing API key, which is then stored
+// exactly as before and used for every request after this one.
 export default function LoginPage({ onLoggedIn }) {
-  const DEMO = Boolean(import.meta.env && (import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === "1"));
-  const STATIC_DEMO = import.meta.env.VITE_DEMO_MODE === "1";
-  // Dev-server runs talk to the REAL appliance (sandbox/codespaces): its
-  // bootstrap account is admin/admin. The static GitHub Pages demo keeps the
-  // fictional sara@example.com persona. Pre-filling the WRONG defaults here
-  // made people hit "invalid email or password" on a working appliance.
-  const APPLIANCE_CREDS = STATIC_DEMO ? ["sara@example.com", "demo"] : ["admin", "admin"];
-  const [loginId, setLoginId] = useState(DEMO ? APPLIANCE_CREDS[0] : "");
-  const [password, setPassword] = useState(DEMO ? APPLIANCE_CREDS[1] : "");
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -26,67 +22,47 @@ export default function LoginPage({ onLoggedIn }) {
     setLoading(true);
     try {
       await login(loginId.trim(), password);
+      setApiKey("");
       const user = await getMe();
       onLoggedIn(user);
     } catch (err) {
       clearApiKey();
-      setError(err instanceof ApiError ? err.message : "Could not connect.");
+      setError(err instanceof ApiError ? err.message : "اتصال برقرار نشد");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="auth-wrap">
-      <span className="auth-blob b1" />
-      <span className="auth-blob b2" />
-      <span className="auth-blob b3" />
-
-      <div className="auth-card">
-        <div className="orb-glow" style={{ display: "inline-block" }}>
-          <span className="orb" />
-        </div>
-        <h1>Welcome back</h1>
-        <p className="sub">Sign in with the work email and password you were given at onboarding.</p>
-
+    <div className="main" style={{ maxWidth: 380, margin: "80px auto" }}>
+      <Card>
+        <h1 style={{ fontSize: 20, marginTop: 0 }}>ورود</h1>
+        <p className="muted">
+          با ایمیل و رمز عبوری که هنگام راه‌اندازی برایتان ساخته شده وارد
+          شوید.
+        </p>
         <form onSubmit={handleSubmit}>
           <Input
-            id="login-email"
             type="text"
-            label="Email"
-            placeholder="you@company.com"
+            placeholder="ایمیل"
             value={loginId}
             onChange={(e) => setLoginId(e.target.value)}
             autoFocus
             autoComplete="username"
           />
           <Input
-            id="login-password"
             type="password"
-            label="Password"
-            placeholder="••••••••"
+            placeholder="رمز عبور"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
           />
           <Alert>{error}</Alert>
-          <Button variant="primary" size="lg" type="submit" className="btn-block" disabled={!loginId || !password} loading={loading}>
-            Sign in
+          <Button type="submit" disabled={!loginId || !password} loading={loading}>
+            ورود
           </Button>
         </form>
-
-        <div className="auth-foot">
-          Nova Enterprise · AI Operating System
-          {STATIC_DEMO && (
-            <div className="small muted mt-2">Static demo build — running fully in your browser, any credentials work.</div>
-          )}
-          {!STATIC_DEMO && DEMO && (
-            <div className="small muted mt-2">
-              Appliance demo — bootstrap admin <b>admin / admin</b>, seeded staff <b>demo.*@yourbrand.example / demo</b>
-            </div>
-          )}
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }

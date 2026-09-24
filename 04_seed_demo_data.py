@@ -199,10 +199,16 @@ else:
     # -----------------------------------------------------------------
     admin_user = env["res.users"].search([("login", "=", "admin")], limit=1)
     if admin_user:
-        sys_role = env.ref("ai_business_tools.role_system_admin", raise_if_not_found=False)
-        if sys_role and sys_role not in admin_user.groups_id:
-            admin_user.groups_id = [(4, sys_role.id)]
-            print("Granted ai_business_tools.role_system_admin to admin.")
+        # Fresh installs can leave the bootstrap admin group-less depending on
+        # install order, which locks them out of the console AND of basic
+        # internal-user ACLs (chat included). Grant explicitly and idempotently.
+        for xmlid in ("base.group_user", "base.group_system",
+                      "ai_business_tools.role_system_admin",
+                      "ai_business_tools.role_executive"):
+            group = env.ref(xmlid, raise_if_not_found=False)
+            if group and group not in admin_user.groups_id:
+                admin_user.groups_id = [(4, group.id)]
+                print("Granted %s to admin." % xmlid)
 
     env.cr.commit()
     print("\n=== Demo data seeded and committed. ===")

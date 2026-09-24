@@ -1,9 +1,9 @@
 {
     "name": "AI Universal Integration",
-    "version": "18.0.2.4.0",
+    "version": "18.0.2.0.0",
     "summary": "Universal Odoo module discovery, capability adapters, events, model routing and integration health",
     "category": "Technical",
-    "depends": ["base", "mail", "llm_tool", "llm_assistant", "ai_control_plane", "ai_gateway", "ai_business_tools"],
+    "depends": ["base", "mail", "llm_tool", "llm_assistant", "ai_control_plane", "ai_gateway"],
     "data": [
         "security/ir.model.access.csv",
         "data/adapter_data.xml",
@@ -20,5 +20,4 @@
     "installable": True,
     "application": False,
     "license": "LGPL-3",
-    "post_init_hook": "post_init_hook",
 }

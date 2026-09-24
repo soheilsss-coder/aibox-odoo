@@ -239,7 +239,7 @@ class LLMToolTask(models.Model):
         today = fields.Date.context_today(self)
         tasks = self.env["project.task"].search([
             ("date_deadline", "<", today),
-            "|", ("stage_id", "=", False), ("stage_id.is_closed", "=", False),
+            ("stage_id.is_closed", "=", False),
         ])
         return {"count": len(tasks), "overdue": [
             {"id": t.id, "title": t.name,
@@ -269,45 +269,17 @@ class LLMToolTask(models.Model):
         """
         domain = [("user_ids", "in", [self.env.user.id])]
         if not include_done:
-            domain.extend(["|", ("stage_id", "=", False), ("stage_id.is_closed", "=", False)])
+            domain.append(("stage_id.is_closed", "=", False))
         today = fields.Date.context_today(self)
         tasks = self.env["project.task"].search(domain, order="date_deadline")
         return {"count": len(tasks), "tasks": [
             {"id": t.id, "title": t.name,
              "project": t.project_id.name or "",
              "deadline": str(t.date_deadline) if t.date_deadline else None,
-             "overdue": bool(t.date_deadline and fields.Date.to_date(t.date_deadline) < today and not t.stage_id.is_closed),
+             "overdue": bool(t.date_deadline and t.date_deadline < today and not t.stage_id.is_closed),
              "stage": t.stage_id.name or "", "done": bool(t.stage_id.is_closed)}
             for t in tasks
         ]}
-
-    @llm_tool(read_only_hint=True)
-    def get_task_status(self, task_id: int = 0) -> dict:
-        """Read one task through the current user's native ACL/record rules.
-
-        Workflow deadline checks use this tool instead of trusting the stale
-        ``task.created`` event payload. It is also useful in chat when a user
-        asks whether a specific task is complete; it never changes task state.
-        """
-        try:
-            task_id = int(task_id)
-        except (TypeError, ValueError):
-            return {"error": "task_id must be an integer"}
-        if task_id <= 0:
-            return {"error": "task_id is required"}
-        task = self.env["project.task"].browse(task_id).exists()
-        if not task:
-            return {"error": "task not found or access denied"}
-        task.ensure_one()
-        today = fields.Date.context_today(self)
-        return {
-            "task_id": task.id,
-            "title": task.name,
-            "state": task.stage_id.name or "",
-            "done": bool(task.stage_id.is_closed),
-            "deadline": str(task.date_deadline) if task.date_deadline else None,
-            "overdue": bool(task.date_deadline and fields.Date.to_date(task.date_deadline) < today and not task.stage_id.is_closed),
-        }
 
     def cron_notify_overdue_tasks(self):
         """Scheduled job (see data/cron_data.xml): runs as a dedicated
@@ -319,7 +291,7 @@ class LLMToolTask(models.Model):
         today = fields.Date.context_today(self)
         overdue = self.env["project.task"].sudo().search([
             ("date_deadline", "<", today),
-            "|", ("stage_id", "=", False), ("stage_id.is_closed", "=", False),
+            ("stage_id.is_closed", "=", False),
         ])
         for task in overdue:
             for user in task.user_ids:

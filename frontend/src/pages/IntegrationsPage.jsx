@@ -1,12 +1,27 @@
 import React, { useEffect, useRef, useState } from "react";
-import { getTelegramStatus, generateTelegramCode, unlinkTelegram, ApiError } from "../api/client.js";
-import { Alert, Badge, Button, Card, EmptyState, Icon, IconButton, Modal, Spinner } from "../components";
+import {
+  getTelegramStatus, generateTelegramCode, unlinkTelegram, ApiError,
+} from "../api/client.js";
+import { Card, Button, Badge, Alert, EmptyState, Spinner, Modal } from "../components";
 
-// Telegram linking — a self-serve door onto the backend's existing wizard
-// flow: one-time 8-char / 10-minute code, /link CODE to the bot, instant
-// status flip via background polling.
+// Integrations page - closes the exact gap roadmap #60 (Telegram
+// Bridge) left open on purpose: linking a Telegram chat used to be
+// possible ONLY through an Odoo backend wizard ("AI Telegram" >
+// "Generate Link Code"). This page is a second door onto the SAME
+// flow (/api/integrations/telegram*, semantic_api.py), so an employee
+// who lives entirely in this portal never has to open the Odoo
+// backend just to connect their Telegram. Nothing about the linking
+// rules themselves changed - same 8-character/10-minute code, same
+// proof-of-identity requirement, same webhook secret check server-side.
+//
+// More integrations (WhatsApp, Slack, ...) would each get their own
+// Card on this same page later - this file is written as "one
+// Telegram card" rather than a single hardcoded layout, but a real
+// second integration isn't built here (roadmap #60 only covers
+// Telegram; don't imply otherwise in the UI).
+
 const POLL_MS = 3000;
-const fmtDate = (v) => (v ? new Date(v.replace(" ", "T") + "Z").toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "—");
+const fmtDate = (v) => (v ? new Date(v.replace(" ", "T") + "Z").toLocaleString("fa-IR") : "—");
 
 export default function IntegrationsPage() {
   const [status, setStatus] = useState(null);
@@ -15,41 +30,48 @@ export default function IntegrationsPage() {
   const [generating, setGenerating] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
   const pollRef = useRef(null);
   const tickRef = useRef(null);
 
   function refresh() {
     return getTelegramStatus()
-      .then((data) => { setStatus(data); return data; })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load."));
+      .then((data) => {
+        setStatus(data);
+        return data;
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : "خطا در بارگذاری"));
   }
 
   useEffect(() => {
     refresh();
-    return () => { clearInterval(pollRef.current); clearInterval(tickRef.current); };
+    return () => {
+      clearInterval(pollRef.current);
+      clearInterval(tickRef.current);
+    };
   }, []);
 
-  // While a code is on screen and the user is still unlinked, poll so the
-  // page flips to "Connected" by itself the moment they send /link CODE.
+  // While a code is being shown and the user hasn't linked yet, poll
+  // status in the background so the moment they send /link CODE on
+  // Telegram, this page flips to "متصل" on its own - no manual
+  // refresh needed, and no page reload required either.
   useEffect(() => {
     if (!linkInfo) return undefined;
     pollRef.current = setInterval(async () => {
       const data = await refresh();
-      if (data && data.linked) { setLinkInfo(null); clearInterval(pollRef.current); }
+      if (data && data.linked) {
+        setLinkInfo(null);
+        clearInterval(pollRef.current);
+      }
     }, POLL_MS);
-    return () => clearInterval(pollRef.current);
-  }, [linkInfo]);
-
-  // 1s ticker for the countdown display.
-  useEffect(() => {
-    if (!linkInfo) return undefined;
     tickRef.current = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tickRef.current);
+    return () => {
+      clearInterval(pollRef.current);
+      clearInterval(tickRef.current);
+    };
   }, [linkInfo]);
 
-  async function handleGenerate() {
+  async function handleGenerateCode() {
     setGenerating(true);
     setError("");
     try {
@@ -60,7 +82,7 @@ export default function IntegrationsPage() {
         expires_at: Date.now() + data.expires_in_minutes * 60 * 1000,
       });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not generate a code.");
+      setError(err instanceof ApiError ? err.message : "دریافت کد ناموفق بود");
     } finally {
       setGenerating(false);
     }
@@ -70,127 +92,115 @@ export default function IntegrationsPage() {
     setUnlinking(true);
     setError("");
     try {
-      await unlinkTelegram();
+      const data = await unlinkTelegram();
+      setStatus(data);
       setConfirmOpen(false);
-      await refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not unlink.");
+      setError(err instanceof ApiError ? err.message : "قطع اتصال ناموفق بود");
     } finally {
       setUnlinking(false);
     }
   }
 
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(`/link ${linkInfo.code}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch { /* clipboard may be blocked */ }
+  if (!status) {
+    return (
+      <div>
+        <h2>یکپارچه‌سازی‌ها</h2>
+        <Alert>{error}</Alert>
+        <Spinner />
+      </div>
+    );
   }
 
-  if (!status && !error) return <Spinner />;
-  if (status && !status.available) {
+  if (!status.available) {
     return (
-      <>
-        <header className="page-head"><div><div className="eyebrow">Connections</div><h1>Integrations</h1></div></header>
-        <Card><EmptyState icon="plug" title="Telegram not installed" text="The Telegram bridge is not enabled on this system — ask an admin to enable the ai_telegram_bridge module." /></Card>
-      </>
+      <div>
+        <h2>یکپارچه‌سازی‌ها</h2>
+        <Card title="تلگرام">
+          <EmptyState text="یکپارچه‌سازی تلگرام روی این سیستم نصب نشده - از ادمین بخواه ماژول ai_telegram_bridge را فعال کند." />
+        </Card>
+      </div>
     );
   }
 
   const remainingMs = linkInfo ? linkInfo.expires_at - now : 0;
-  const expired = linkInfo && remainingMs <= 0;
-  const mm = Math.max(0, Math.floor(remainingMs / 60000));
-  const ss = Math.max(0, Math.floor((remainingMs % 60000) / 1000));
+  const remainingLabel = remainingMs > 0
+    ? `${Math.floor(remainingMs / 60000)}:${String(Math.floor((remainingMs % 60000) / 1000)).padStart(2, "0")}`
+    : null;
+  const codeExpired = linkInfo && remainingMs <= 0;
 
   return (
-    <>
-      <header className="page-head">
-        <div>
-          <div className="eyebrow">Connections</div>
-          <h1>Integrations</h1>
-          <p>Connect your assistant to the channels you already use.</p>
-        </div>
-      </header>
+    <div>
+      <h2>یکپارچه‌سازی‌ها</h2>
+      <Alert>{error}</Alert>
 
-      <Alert onDismiss={() => setError("")}>{error}</Alert>
+      <Card
+        title="تلگرام"
+        actions={<Badge tone={status.linked ? "success" : "neutral"}>{status.linked ? "متصل" : "متصل نیست"}</Badge>}
+      >
+        <p className="muted">
+          پیام‌هات از تلگرام به دستیار سازمانی برسه و جواب بگیری - دقیقاً با همون سطح دسترسی
+          حساب کاربری خودت، بدون نیاز به باز کردن بک‌اند اودو.
+        </p>
 
-      {status && (
-        <Card
-          title={
-            <span className="h-stack" style={{ gap: 10 }}>
-              <span className="icon-tile grad"><Icon name="message" size={18} /></span> Telegram
-            </span>
-          }
-          actions={
-            <Badge tone={status.linked ? "ok" : "neutral"} dot>{status.linked ? "Connected" : "Not connected"}</Badge>
-          }
-        >
-          {status.linked && (
-            <div className="v-stack" style={{ gap: 14 }}>
-              <div className="h-stack spread wrap">
-                <div>
-                  <div className="small muted">Linked on</div>
-                  <div className="strong">{fmtDate(status.linked_date)}</div>
-                </div>
-                <div>
-                  <div className="small muted">Last message</div>
-                  <div className="strong">{fmtDate(status.last_message_date)}</div>
-                </div>
-                <Button variant="danger" size="sm" icon="unlink" onClick={() => setConfirmOpen(true)}>Disconnect</Button>
+        {status.linked && (
+          <>
+            <div style={{ display: "flex", gap: 24, margin: "12px 0" }}>
+              <div>
+                <div className="muted">تاریخ اتصال</div>
+                <strong>{fmtDate(status.linked_date)}</strong>
               </div>
-              <p className="muted small">Messages you send the bot are answered by your assistant with your own permissions.</p>
+              <div>
+                <div className="muted">آخرین پیام</div>
+                <strong>{fmtDate(status.last_message_date)}</strong>
+              </div>
             </div>
-          )}
+            <Button variant="danger" onClick={() => setConfirmOpen(true)}>قطع اتصال</Button>
+          </>
+        )}
 
-          {!status.linked && !linkInfo && (
-            <div className="h-stack spread wrap">
-              <p className="muted">Chat with your assistant from Telegram — same identity, same permissions.</p>
-              <Button variant="primary" icon="link" onClick={handleGenerate} loading={generating}>Connect Telegram</Button>
-            </div>
-          )}
+        {!status.linked && !linkInfo && (
+          <Button onClick={handleGenerateCode} loading={generating}>دریافت کد اتصال</Button>
+        )}
 
-          {!status.linked && linkInfo && (
-            <div className="v-stack" style={{ gap: 14 }}>
-              {expired ? (
-                <>
-                  <Alert tone="warn">This code expired. Generate a new one.</Alert>
-                  <div><Button variant="primary" icon="refresh" onClick={handleGenerate} loading={generating}>New code</Button></div>
-                </>
+        {!status.linked && linkInfo && (
+          <div>
+            <p>
+              {linkInfo.bot_username ? (
+                <>در تلگرام به ربات <strong dir="ltr">@{linkInfo.bot_username}</strong> برو و این پیام را بفرست:</>
               ) : (
-                <>
-                  <p className="muted small">
-                    In Telegram, open <strong dir="ltr">@{linkInfo.bot_username || "your-company-bot"}</strong> and send:
-                  </p>
-                  <div className="code-line spread">
-                    <span className="kbd">/link {linkInfo.code}</span>
-                    <span className="h-stack">
-                      <Badge tone="warn"><Icon name="clock" size={12} /> {mm}:{String(ss).padStart(2, "0")}</Badge>
-                      <IconButton icon="copy" label="Copy command" onClick={handleCopy} />
-                    </span>
-                  </div>
-                  {copied && <Alert tone="ok">Copied to clipboard.</Alert>}
-                  <p className="faint xsmall">This page updates automatically once the bot confirms the link.</p>
-                </>
+                "به ربات تلگرام شرکت پیام زیر را بفرست:"
               )}
-            </div>
-          )}
-        </Card>
-      )}
+            </p>
+            <p><span className="ds-code">/link {linkInfo.code}</span></p>
+            {!codeExpired ? (
+              <p className="muted">این کد تا {remainingLabel} دیگر معتبر است - این صفحه به‌محض اتصال خودش به‌روز می‌شود.</p>
+            ) : (
+              <Alert tone="danger">کد منقضی شد - یک کد جدید بگیر.</Alert>
+            )}
+            <Button
+              variant="ghost" onClick={handleGenerateCode} loading={generating}
+              disabled={!codeExpired}
+            >
+              کد جدید
+            </Button>
+          </div>
+        )}
+      </Card>
 
       <Modal
         open={confirmOpen}
-        title="Disconnect Telegram?"
+        title="قطع اتصال تلگرام"
         onClose={() => setConfirmOpen(false)}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Keep connected</Button>
-            <Button variant="danger" onClick={handleUnlink} loading={unlinking}>Disconnect</Button>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>انصراف</Button>
+            <Button variant="danger" onClick={handleUnlink} loading={unlinking}>قطع اتصال</Button>
           </>
         }
       >
-        <p className="muted">You will stop receiving assistant replies in Telegram. You can link again any time with a new code.</p>
+        <p>اتصال تلگرام قطع می‌شود و دیگر پیام‌هایی که از آن چت می‌فرستی پردازش نمی‌شوند. هر وقت خواستی می‌توانی دوباره وصل شوی.</p>
       </Modal>
-    </>
+    </div>
   );
 }

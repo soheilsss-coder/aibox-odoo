@@ -2,191 +2,88 @@ import React, { useEffect, useState } from "react";
 import {
   adminListRoles, adminListUsers, adminListAccessGrants, adminCreateAccessGrant,
   adminRevokeAccessGrant, adminListDocuments, adminListAgents, adminGetBranding,
-  adminUpdateBranding, adminGetMetrics, adminGetControlPlane, adminGetLlm,
-  adminSetLlm, ApiError,
+  adminUpdateBranding, adminGetMetrics, ApiError,
 } from "../api/client.js";
-import { Alert, Badge, Button, Card, EmptyState, Icon, Input, Modal, Select, Spinner, Table, Tabs, TextArea } from "../components";
+import {
+  Card, Table, Badge, Button, Tabs, Alert, Spinner, EmptyState, Modal, Select, Input,
+} from "../components";
 
-// Admin Console — read (and, for grants/branding, write) views over the
-// /api/admin/* surface. Visibility is gated upstream by the
-// admin.console.read capability; every API call re-checks server-side.
+// Admin Console (roadmap #46) — "a separate admin section (not the
+// Odoo backend itself) that only shows product settings (Role,
+// documents, agents, branding)". Every tab below is a thin read (and,
+// for Access Grants/Branding, write) view over an /api/admin/* route
+// that already existed as data (res.groups, ai.gateway.access.grant,
+// ai.gateway.tool.risk, res.company) - see semantic_api.py for what
+// each endpoint actually does and why it's safe to expose here.
+//
+// This whole page assumes the caller already passed the /api/me
+// is_admin check in App.jsx before rendering it - but every API call
+// it makes is independently re-checked server-side regardless
+// (_require_privileged()), so a stale/forged client-side flag can't
+// actually see anything a real privilege check would refuse.
 
 const TABS = [
-  { key: "roles", label: "Roles" },
-  { key: "grants", label: "Access grants" },
-  { key: "documents", label: "Documents" },
-  { key: "agents", label: "Agents" },
-  { key: "branding", label: "Branding" },
-  { key: "observability", label: "Monitoring" },
+  { key: "roles", label: "نقش‌ها" },
+  { key: "grants", label: "دسترسی موقت / تفویض" },
+  { key: "documents", label: "اسناد" },
+  { key: "agents", label: "ایجنت‌ها" },
+  { key: "branding", label: "برندینگ" },
+  { key: "observability", label: "مانیتورینگ" },
   { key: "control", label: "Control Plane" },
-  { key: "aimodels", label: "AI Models" },
 ];
 
-function useLoad(fn, deps) {
+function useLoad(loader, deps = []) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const load = () => {
-    let alive = true;
-    Promise.resolve()
-      .then(fn)
-      .then((d) => { if (alive) setData(d); })
-      .catch((err) => { if (alive) setError(err instanceof ApiError ? err.message : "Failed to load."); });
-    return () => { alive = false; };
-  };
-  // Effect must return nothing (or a cleanup), never the loader's Promise.
-  useEffect(load, deps);
-  return [data, error, load];
+  function refresh() {
+    setError("");
+    loader()
+      .then(setData)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "خطا در بارگذاری"));
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(refresh, deps);
+  return [data, error, refresh];
 }
 
 export default function AdminPage() {
   const [tab, setTab] = useState("roles");
   return (
-    <>
-      <header className="page-head">
-        <div>
-          <div className="eyebrow">Administration</div>
-          <h1>Admin Console</h1>
-          <p>Roles, temporary access, documents, agents, branding and runtime health.</p>
-        </div>
-      </header>
-      <div className="mb-6"><Tabs tabs={TABS} active={tab} onChange={setTab} /></div>
+    <div>
+      <h2>کنسول مدیریت</h2>
+      <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "roles" && <RolesTab />}
       {tab === "grants" && <GrantsTab />}
       {tab === "documents" && <DocumentsTab />}
       {tab === "agents" && <AgentsTab />}
       {tab === "branding" && <BrandingTab />}
       {tab === "observability" && <ObservabilityTab />}
-      {tab === "aimodels" && <AiModelsTab />}
       {tab === "control" && <ControlPlaneTab />}
-    </>
-  );
-}
-
-/* --- AI Models ---------------------------------------------------------- */
-// Connect any OpenAI-compatible LLM endpoint (cloud free tier or local
-// llama.cpp) to the assistant - no redeploy, takes effect on save.
-function AiModelsTab() {
-  const [state, setState] = useState(null);
-  const [chat, setChat] = useState({ api_base: "", model: "", api_key: "" });
-  const [embedding, setEmbedding] = useState({ api_base: "", model: "", api_key: "" });
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState(null);
-  const [probe, setProbe] = useState(null);
-
-  const load = async () => {
-    try {
-      const data = await adminGetLlm();
-      setState(data);
-      setChat({
-        api_base: (data.chat && data.chat.api_base) || "",
-        model: (data.chat && data.chat.model) || "",
-        api_key: "",
-      });
-      setEmbedding({
-        api_base: (data.embedding && data.embedding.api_base) || "",
-        model: (data.embedding && data.embedding.model) || "",
-        api_key: "",
-      });
-    } catch (e) {
-      setNote({ tone: "err", text: e.message || String(e) });
-    }
-  };
-  useEffect(() => { load(); }, []);
-
-  async function save() {
-    setBusy(true); setNote(null); setProbe(null);
-    try {
-      const payload = { chat: { ...chat } };
-      if (embedding.api_base) payload.embedding = { ...embedding };
-      const data = await adminSetLlm(payload);
-      setProbe(data.probe);
-      setNote({
-        tone: data.probe && data.probe.ok ? "ok" : "warn",
-        text: data.probe && data.probe.ok
-          ? "Saved and verified - the appliance reached the endpoint. Nova answers through it immediately."
-          : "Saved, but the endpoint check failed: " + ((data.probe && data.probe.error) || "unknown"),
-      });
-      await load();
-    } catch (e) {
-      setNote({ tone: "err", text: e.message || String(e) });
-    } finally { setBusy(false); }
-  }
-
-  if (!state) return <Spinner />;
-  return (
-    <div className="stack">
-      {note && <Alert tone={note.tone === "ok" ? "success" : note.tone === "warn" ? "warning" : "danger"}>{note.text}</Alert>}
-      <Card title="Chat model (Nova's brain)">
-        <div className="grid grid-2 gap-3">
-          <label className="stack-sm">API base (OpenAI-compatible)
-            <Input value={chat.api_base} onChange={(e) => setChat({ ...chat, api_base: e.target.value })} placeholder="https://openrouter.ai/api/v1" />
-          </label>
-          <label className="stack-sm">Model name
-            <Input value={chat.model} onChange={(e) => setChat({ ...chat, model: e.target.value })} placeholder="meta-llama/llama-3.3-70b-instruct:free" />
-          </label>
-          <label className="stack-sm">API key (blank = keep current: {state.chat && state.chat.key_fingerprint})
-            <Input type="password" value={chat.api_key} onChange={(e) => setChat({ ...chat, api_key: e.target.value })} placeholder="sk-..." />
-          </label>
-        </div>
-        {state.hints && <p className="small muted mt-2">{state.hints.note} Examples: {(state.hints.api_base_examples || []).join(" · ")}</p>}
-      </Card>
-      <Card title="Embedding model (semantic search / RAG)">
-        <div className="grid grid-2 gap-3">
-          <label className="stack-sm">API base
-            <Input value={embedding.api_base} onChange={(e) => setEmbedding({ ...embedding, api_base: e.target.value })} placeholder="https://api.openai.com/v1" />
-          </label>
-          <label className="stack-sm">Model
-            <Input value={embedding.model} onChange={(e) => setEmbedding({ ...embedding, model: e.target.value })} placeholder="text-embedding-3-small" />
-          </label>
-          <label className="stack-sm">API key (blank = keep current: {state.embedding && state.embedding.key_fingerprint})
-            <Input type="password" value={embedding.api_key} onChange={(e) => setEmbedding({ ...embedding, api_key: e.target.value })} placeholder="sk-..." />
-          </label>
-        </div>
-        <p className="small muted mt-2">Leave empty to keep the current embedding setup.</p>
-      </Card>
-      <div>
-        <Button onClick={save} disabled={busy || !chat.api_base}>{busy ? "Saving..." : "Save & test connection"}</Button>
-        {probe && (
-          <div className="small muted mt-2">
-            Probe {probe.url}: {probe.ok ? "OK — models: " + (probe.models || []).join(", ") : "failed — " + probe.error}
-          </div>
-        )}
-      </div>
-      <Card title="Currently active">
-        <Table
-          emptyText="Nothing configured."
-          columns={[
-            { key: "use", header: "Use", width: 110 },
-            { key: "name", header: "Provider" },
-            { key: "api_base", header: "API base" },
-            { key: "model", header: "Model" },
-            { key: "key", header: "Key" },
-          ]}
-          rows={[
-            { use: "Chat", name: (state.chat && state.chat.name) || "—", api_base: (state.chat && state.chat.api_base) || "—", model: (state.chat && state.chat.model) || "—", key: (state.chat && state.chat.key_fingerprint) || "—" },
-            { use: "Embedding", name: (state.embedding && state.embedding.name) || "—", api_base: (state.embedding && state.embedding.api_base) || "—", model: (state.embedding && state.embedding.model) || "—", key: (state.embedding && state.embedding.key_fingerprint) || "—" },
-          ]}
-        />
-      </Card>
     </div>
   );
 }
 
-/* --- Roles ------------------------------------------------------------ */
+// --- Roles (#4/#5/#6) ----------------------------------------------------
 function RolesTab() {
   const [data, error] = useLoad(adminListRoles, []);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Spinner />;
+  if (data.roles.length === 0) return <EmptyState text="نقشی تعریف نشده." />;
   return (
-    <Card title="Roles and members">
+    <Card title="نقش‌ها و اعضا">
       <Table
-        emptyText="No roles defined."
         columns={[
-          { key: "name", header: "Role" },
-          { key: "comment", header: "Description" },
-          { key: "implied_roles", header: "Base groups", render: (r) => r.implied_roles.join(", ") || "—" },
-          { key: "member_count", header: "Members", width: 90 },
-          { key: "members", header: "People", render: (r) => r.members.map((m) => m.name).join(", ") || "—" },
+          { key: "name", header: "نقش" },
+          { key: "comment", header: "توضیح" },
+          {
+            key: "implied_roles", header: "گروه‌های زیربنایی",
+            render: (r) => r.implied_roles.join("، ") || "—",
+          },
+          { key: "member_count", header: "تعداد اعضا" },
+          {
+            key: "members", header: "اعضا",
+            render: (r) => r.members.map((m) => m.name).join("، ") || "—",
+          },
         ]}
         rows={data.roles}
       />
@@ -194,10 +91,7 @@ function RolesTab() {
   );
 }
 
-/* --- Access grants ----------------------------------------------------- */
-const GRANT_STATE_TONE = { active: "ok", expired: "neutral", revoked: "err" };
-const GRANT_STATE_LABEL = { active: "Active", expired: "Expired", revoked: "Revoked" };
-
+// --- Access Grants (#41/#42) ---------------------------------------------
 function GrantsTab() {
   const [data, error, refresh] = useLoad(adminListAccessGrants, []);
   const [users, setUsers] = useState(null);
@@ -221,15 +115,15 @@ function GrantsTab() {
     try {
       await adminCreateAccessGrant({
         to_user_id: Number(form.to_user_id),
-        group_id: form.group_id || "",
-        expires_on: form.expires_on || null,
+        group_id: Number(form.group_id),
+        expires_on: form.expires_on,
         reason: form.reason,
       });
       setOpen(false);
       setForm({ to_user_id: "", group_id: "", expires_on: "", reason: "" });
       refresh();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not create the grant.");
+      setFormError(err instanceof ApiError ? err.message : "ثبت ناموفق بود");
     } finally {
       setSaving(false);
     }
@@ -240,84 +134,96 @@ function GrantsTab() {
       await adminRevokeAccessGrant(grantId);
       refresh();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not revoke.");
+      setFormError(err instanceof ApiError ? err.message : "لغو ناموفق بود");
     }
   }
 
-  if (error) return <Alert>{error}</Alert>;
-  if (!data) return <Spinner />;
+  const STATE_TONE = { scheduled: "info", active: "success", expired: "neutral", revoked: "danger" };
+  const STATE_LABEL = { scheduled: "زمان‌بندی‌شده", active: "فعال", expired: "منقضی‌شده", revoked: "لغوشده" };
+
   return (
     <Card
-      title="Temporary / delegated access"
-      actions={<Button variant="primary" size="sm" icon="plus" onClick={openModal}>New grant</Button>}
+      title="دسترسی‌های موقت و تفویض‌شده"
+      actions={<Button size="sm" onClick={openModal}>+ دسترسی جدید</Button>}
     >
-      <Alert>{formError}</Alert>
-      <Table
-        emptyText="No active delegations."
-        columns={[
-          { key: "to_user", header: "User" },
-          { key: "role", header: "Role" },
-          { key: "delegated_from", header: "Delegated from", render: (g) => g.delegated_from || "—" },
-          { key: "expires_on", header: "Expires" },
-          { key: "state", header: "Status", render: (g) => <Badge tone={GRANT_STATE_TONE[g.state]} dot>{GRANT_STATE_LABEL[g.state] || g.state}</Badge> },
-          {
-            key: "actions", header: "", width: 110,
-            render: (g) => g.state === "active"
-              ? <Button variant="danger" size="sm" onClick={() => handleRevoke(g.id)}>Revoke</Button>
-              : null,
-          },
-        ]}
-        rows={data.grants}
-      />
+      <Alert>{error || formError}</Alert>
+      {!data && <Spinner />}
+      {data && data.grants.length === 0 && <EmptyState text="دسترسی موقتی ثبت نشده." />}
+      {data && data.grants.length > 0 && (
+        <Table
+          columns={[
+            { key: "to_user", header: "کاربر" },
+            { key: "role", header: "نقش" },
+            { key: "delegated_from", header: "تفویض‌شده از", render: (g) => g.delegated_from || "—" },
+            { key: "expires_on", header: "انقضا" },
+            { key: "state", header: "وضعیت", render: (g) => <Badge tone={STATE_TONE[g.state]}>{STATE_LABEL[g.state] || g.state}</Badge> },
+            {
+              key: "actions", header: "",
+              render: (g) => (g.state === "scheduled" || g.state === "active") && (
+                <Button size="sm" variant="danger" onClick={() => handleRevoke(g.id)}>لغو</Button>
+              ),
+            },
+          ]}
+          rows={data.grants}
+        />
+      )}
 
       <Modal
         open={open}
-        title="New access grant"
+        title="دسترسی موقت جدید"
         onClose={() => setOpen(false)}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleCreate} loading={saving} disabled={!form.to_user_id}>Create</Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>انصراف</Button>
+            <Button onClick={handleCreate} loading={saving}
+                    disabled={!form.to_user_id || !form.group_id || !form.expires_on}>
+              ثبت
+            </Button>
           </>
         }
       >
         <form onSubmit={handleCreate}>
-          <Select id="grant-user" label="User" value={form.to_user_id}
+          <Select
+            label="کاربر" value={form.to_user_id} placeholder="انتخاب کنید..."
             onChange={(e) => setForm({ ...form, to_user_id: e.target.value })}
-            placeholder="Choose…"
-            options={(users || []).map((u) => ({ value: u.id, label: `${u.name} (${u.login})` }))} />
-          <Select id="grant-role" label="Role" value={form.group_id}
+            options={(users || []).map((u) => ({ value: u.id, label: `${u.name} (${u.login})` }))}
+          />
+          <Select
+            label="نقش" value={form.group_id} placeholder="انتخاب کنید..."
             onChange={(e) => setForm({ ...form, group_id: e.target.value })}
-            placeholder="Choose…"
-            options={(roles || []).map((r, i) => ({ value: r.id ?? i, label: r.name }))} />
-          <Input id="grant-expiry" type="date" label="Expires on (optional)" value={form.expires_on}
-            onChange={(e) => setForm({ ...form, expires_on: e.target.value })} />
-          <TextArea id="grant-reason" rows={2} label="Reason (optional)" value={form.reason}
-            onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+            options={(roles || []).map((r) => ({ value: r.id, label: r.name }))}
+          />
+          <Input
+            label="تاریخ انقضا" type="date" required value={form.expires_on}
+            onChange={(e) => setForm({ ...form, expires_on: e.target.value })}
+          />
+          <Input
+            label="دلیل (اختیاری)" value={form.reason}
+            onChange={(e) => setForm({ ...form, reason: e.target.value })}
+          />
         </form>
       </Modal>
     </Card>
   );
 }
 
-/* --- Documents --------------------------------------------------------- */
-const ACCESS_LABEL = { company: "Company", department: "Department", group: "Group", personal: "Personal" };
-
+// --- Documents overview (#26/#27, org-wide) -------------------------------
 function DocumentsTab() {
   const [data, error] = useLoad(adminListDocuments, []);
+  const ACCESS_LABEL = { company: "کل سازمان", department: "دپارتمان", group: "گروه", personal: "شخصی" };
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Spinner />;
+  if (data.documents.length === 0) return <EmptyState text="سندی ثبت نشده." />;
   return (
-    <Card title="All documents (admin view)">
+    <Card title={`همه‌ی اسناد سازمان (${data.documents.length})`}>
       <Table
-        emptyText="No documents in the system."
         columns={[
-          { key: "name", header: "Name" },
-          { key: "access_level", header: "Scope", render: (d) => <Badge>{ACCESS_LABEL[d.access_level] || d.access_level}</Badge> },
-          { key: "department", header: "Department", render: (d) => d.department || "—" },
-          { key: "group", header: "Group", render: (d) => d.group || "—" },
-          { key: "owner", header: "Owner", render: (d) => d.owner || "—" },
-          { key: "create_date", header: "Created", render: (d) => (d.create_date || "").slice(0, 10) },
+          { key: "name", header: "نام" },
+          { key: "access_level", header: "سطح دسترسی", render: (d) => <Badge>{ACCESS_LABEL[d.access_level]}</Badge> },
+          { key: "department", header: "دپارتمان", render: (d) => d.department || "—" },
+          { key: "group", header: "گروه", render: (d) => d.group || "—" },
+          { key: "owner", header: "مالک", render: (d) => d.owner || "—" },
+          { key: "create_date", header: "تاریخ ثبت", render: (d) => (d.create_date || "").slice(0, 10) },
         ]}
         rows={data.documents}
       />
@@ -325,46 +231,46 @@ function DocumentsTab() {
   );
 }
 
-/* --- Agents ------------------------------------------------------------ */
-const RISK_TONE = (n) => (n >= 70 ? "err" : n >= 40 ? "warn" : "ok");
-
+// --- Agents / Tool Registry (#15/#17/#20) ---------------------------------
 function AgentsTab() {
   const [data, error] = useLoad(adminListAgents, []);
+  const RISK_TONE = (level) => (level >= 4 ? "danger" : level >= 2 ? "warning" : "neutral");
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Spinner />;
   return (
     <>
-      <Card title="Agents">
-        <Table
-          emptyText="No agents registered."
-          columns={[
-            { key: "name", header: "Name" },
-            { key: "model", header: "Model", render: (a) => a.model || "—" },
-            { key: "provider", header: "Provider", render: (a) => a.provider || "—" },
-            { key: "tool_count", header: "Tools", width: 80 },
-            { key: "active", header: "Active", render: (a) => <Badge tone={a.active ? "ok" : "neutral"} dot>{a.active ? "Yes" : "No"}</Badge> },
-          ]}
-          rows={data.agents}
-        />
-      </Card>
-      {data.tools && data.tools.length > 0 && (
-        <Card title="Tools and risk gates">
+      <Card title="دستیارها">
+        {data.assistants.length === 0 && <EmptyState text="دستیاری تعریف نشده." />}
+        {data.assistants.length > 0 && (
           <Table
             columns={[
-              { key: "name", header: "Tool" },
-              { key: "risk_level", header: "Risk", render: (t) => <Badge tone={RISK_TONE(t.risk_level)} dot>RISK {t.risk_level}</Badge> },
-              { key: "requires_approval_from", header: "Needs approval", render: (t) => t.requires_approval_from || "—" },
-              { key: "description", header: "Description" },
+              { key: "name", header: "نام" },
+              { key: "model", header: "مدل", render: (a) => a.model || "—" },
+              { key: "provider", header: "ارائه‌دهنده", render: (a) => a.provider || "—" },
+              { key: "tool_count", header: "تعداد ابزار" },
+              { key: "active", header: "فعال", render: (a) => <Badge tone={a.active ? "success" : "neutral"}>{a.active ? "بله" : "خیر"}</Badge> },
             ]}
-            rows={data.tools}
+            rows={data.assistants}
           />
-        </Card>
-      )}
+        )}
+        {data.vision_api_base && <p className="muted">آدرس مدل ویژن: {data.vision_api_base}</p>}
+      </Card>
+      <Card title="رجیستری ابزارها و سطح ریسک">
+        <Table
+          columns={[
+            { key: "name", header: "ابزار" },
+            { key: "risk_level", header: "ریسک", render: (t) => <Badge tone={RISK_TONE(t.risk_level)}>RISK {t.risk_level}</Badge> },
+            { key: "requires_approval_from", header: "نیازمند تایید", render: (t) => t.requires_approval_from || "—" },
+            { key: "description", header: "توضیح" },
+          ]}
+          rows={data.tools}
+        />
+      </Card>
     </>
   );
 }
 
-/* --- Branding ---------------------------------------------------------- */
+// --- Branding (#55) --------------------------------------------------------
 function BrandingTab() {
   const [data, error, refresh] = useLoad(adminGetBranding, []);
   const [form, setForm] = useState(null);
@@ -386,7 +292,7 @@ function BrandingTab() {
       setSaved(true);
       refresh();
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : "Could not save.");
+      setSaveError(err instanceof ApiError ? err.message : "ذخیره ناموفق بود");
     } finally {
       setSaving(false);
     }
@@ -396,89 +302,77 @@ function BrandingTab() {
   if (!data || !form) return <Spinner />;
 
   return (
-    <Card title="Brand settings (white-label)">
-      <p className="muted small mb-4">
-        Current company: <strong className="strong">{data.company_name}</strong> · Logo: {data.has_logo ? "set" : "not set"}
+    <Card title="تنظیمات برند (White-label، مورد #55)">
+      <p className="muted">
+        شرکت فعلی: {data.company_name} — لوگو: {data.has_logo ? "تنظیم شده" : "تنظیم نشده"}
       </p>
       <form onSubmit={handleSave}>
-        <Input id="brand-name" label="Brand name" value={form.brand_name}
-          onChange={(e) => setForm({ ...form, brand_name: e.target.value })} />
-        <Input id="brand-domain" label="Brand domain" value={form.brand_domain}
-          onChange={(e) => setForm({ ...form, brand_domain: e.target.value })} />
-        {saved && <Alert tone="ok">Settings saved.</Alert>}
+        <Input
+          label="نام برند" value={form.brand_name}
+          onChange={(e) => setForm({ ...form, brand_name: e.target.value })}
+        />
+        <Input
+          label="دامنه‌ی برند" value={form.brand_domain}
+          onChange={(e) => setForm({ ...form, brand_domain: e.target.value })}
+        />
+        {saved && <Alert tone="success">تنظیمات ذخیره شد.</Alert>}
         <Alert>{saveError}</Alert>
-        <Button variant="primary" type="submit" loading={saving} icon="check">Save</Button>
+        <Button type="submit" loading={saving}>ذخیره</Button>
       </form>
+      <p className="muted" style={{ marginTop: 12 }}>
+        نام برند از Configuration و QWeb template inheritance اعمال می‌شود؛ JS فقط fallback برای
+        محتوای پویاست و منبع اصلی white-label نیست.
+      </p>
     </Card>
   );
 }
 
-/* --- Observability ----------------------------------------------------- */
+// --- Observability (#48) --------------------------------------------------
 function ObservabilityTab() {
   const [data, error, refresh] = useLoad(adminGetMetrics, []);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Spinner />;
   return (
-    <Card title="Runtime metrics (/api/metrics)" actions={<Button size="sm" variant="soft" icon="refresh" onClick={refresh}>Refresh</Button>}>
-      <div className="stat-grid">
-        <Metric label="Requests (1h)" value={data.requests_last_hour} />
-        <Metric label="Requests (24h)" value={data.requests_last_24h} />
-        <Metric label="Errors (24h)" value={data.errors_last_24h} />
-        <Metric label="Error rate" value={`${(data.error_rate_24h * 100).toFixed(1)}%`} />
-        <Metric label="Avg latency (ms)" value={data.avg_duration_ms_24h ?? "—"} />
+    <Card title="مانیتورینگ (خلاصه‌ی همان /api/metrics)" actions={<Button size="sm" variant="ghost" onClick={refresh}>تازه‌سازی</Button>}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+        <Metric label="درخواست‌های ساعت اخیر" value={data.requests_last_hour} />
+        <Metric label="درخواست‌های ۲۴ ساعت اخیر" value={data.requests_last_24h} />
+        <Metric label="خطاهای ۲۴ ساعت اخیر" value={data.errors_last_24h} />
+        <Metric label="نرخ خطا" value={`${(data.error_rate_24h * 100).toFixed(1)}%`} />
+        <Metric label="میانگین تاخیر (ms)" value={data.avg_duration_ms_24h ?? "—"} />
       </div>
-      <h4 className="mt-6 mb-4">Most-called operations (24h)</h4>
-      <Table
-        emptyText="Nothing recorded yet."
-        columns={[{ key: "action", header: "Operation" }, { key: "calls", header: "Calls", width: 90 }]}
-        rows={data.top_actions_24h}
-      />
+      <h4>پرتکرارترین عملیات (۲۴ ساعت اخیر)</h4>
+      {data.top_actions_24h.length === 0 && <EmptyState text="داده‌ای ثبت نشده." />}
+      {data.top_actions_24h.length > 0 && (
+        <Table
+          columns={[{ key: "action", header: "عملیات" }, { key: "calls", header: "تعداد" }]}
+          rows={data.top_actions_24h}
+        />
+      )}
     </Card>
   );
 }
 
 function Metric({ label, value }) {
   return (
-    <div className="stat">
-      <b>{value}</b>
-      <span>{label}</span>
+    <div className="card" style={{ margin: 0, textAlign: "center" }}>
+      <div style={{ fontSize: "var(--font-size-xl)", fontWeight: "var(--font-weight-bold)" }}>{value}</div>
+      <div className="muted">{label}</div>
     </div>
   );
 }
 
-/* --- Control Plane ------------------------------------------------------ */
+
 function ControlPlaneTab() {
-  const [data, error] = useLoad(adminGetControlPlane, []);
+  const [data, error] = useLoad(() => fetch("/api/admin/control-plane", { credentials: "include" }).then(async r => { const j=await r.json(); if(!r.ok) throw new Error(j.error || "خطا"); return j; }), []);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Spinner />;
-  return (
-    <Card title="Customer Control Plane">
-      <div className="stat-grid">
-        <Metric label="Users" value={data.users} />
-        <Metric label="Departments" value={data.departments} />
-        <Metric label="Positions" value={data.positions} />
-        <Metric label="Designers" value={data.designers} />
-        <Metric label="Access reviews" value={data.access_reviews} />
-        <Metric label="Active SCIM tokens" value={data.scim_active_tokens} />
-      </div>
-      {data.sections?.length > 0 && (
-        <>
-          <h4 className="mt-6 mb-4">Enabled sections</h4>
-          <p className="muted small">{data.sections.join(" · ")}</p>
-        </>
-      )}
-      <h4 className="mt-6 mb-4">SSO</h4>
-      <Table
-        emptyText="No SSO providers configured."
-        columns={[{ key: "name", header: "Provider" }, { key: "protocol", header: "Protocol" }, { key: "active", header: "Active", render: (s) => <Badge tone={s.active ? "ok" : "neutral"} dot>{s.active ? "Yes" : "No"}</Badge> }]}
-        rows={data.sso || []}
-      />
-      <h4 className="mt-6 mb-4">Configuration profiles</h4>
-      <Table
-        emptyText="No configuration profiles."
-        columns={[{ key: "name", header: "Profile" }, { key: "state", header: "State" }, { key: "version", header: "Version" }]}
-        rows={data.configuration_profiles || []}
-      />
-    </Card>
-  );
+  return <Card title="Customer Control Plane">
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+      <Metric label="کاربران" value={data.users}/><Metric label="دپارتمان‌ها" value={data.departments}/><Metric label="موقعیت‌ها" value={data.positions}/><Metric label="Designerها" value={data.designers}/><Metric label="Access Review" value={data.access_reviews}/><Metric label="SCIM token فعال" value={data.scim_active_tokens}/>
+    </div>
+    <h4>بخش‌های فعال Control Plane</h4><p>{data.sections.join(" • ")}</p>
+    <h4>SSO</h4><Table columns={[{key:"name",header:"Provider"},{key:"protocol",header:"Protocol"},{key:"active",header:"Active"}]} rows={data.sso || []}/>
+    <h4>Configuration Profiles</h4><Table columns={[{key:"name",header:"Profile"},{key:"state",header:"State"},{key:"version",header:"Version"}]} rows={data.configuration_profiles || []}/>
+  </Card>;
 }

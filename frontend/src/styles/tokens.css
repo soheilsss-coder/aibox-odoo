@@ -1,123 +1,43 @@
-/* =============================================================================
-   tokens.css — design tokens for the Nova Enterprise frontend ("Nova Light").
-   Every color/radius/shadow/font the app uses comes from THIS file, so a
-   white-label customer re-themes the whole product by editing one place.
-   Light is the default; [data-theme="dark"] mirrors the same variables.
-   ============================================================================= */
+/* tokens.css — roadmap #45 (Design System). Originally just a starting
+   palette (colors/spacing/type as CSS variables, no shared components
+   or docs yet - see the phase-7 note in components/README.md for what
+   changed). Now the base layer under a real component library
+   (src/components/) that reads these variables via the ds-* classes
+   in app.css - so re-theming the whole app (a white-label customer,
+   item #55) still means editing values here, nothing else. */
 :root {
-  /* ---- typography ---- */
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
-  --fs-xs: 12px;
-  --fs-sm: 13px;
-  --fs-base: 14.5px;
-  --fs-md: 15.5px;
-  --fs-lg: 17px;
-  --fs-xl: 21px;
-  --fs-2xl: 27px;
-  --fs-3xl: 34px;
-  --fw-medium: 500;
-  --fw-semibold: 600;
-  --fw-bold: 700;
+  --color-bg: #0f1115;
+  --color-surface: #171a21;
+  --color-surface-alt: #1e222b;
+  --color-border: #2a2f3a;
+  --color-text: #e8eaed;
+  --color-text-muted: #9aa1ac;
+  --color-primary: #4f8cff;
+  --color-primary-hover: #6ea0ff;
+  --color-danger: #e5484d;
+  --color-success: #3dd68c;
 
-  /* ---- spacing ---- */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 20px;
-  --sp-6: 24px;
-  --sp-8: 32px;
-  --sp-10: 40px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 40px;
 
-  /* ---- radius ---- */
-  --r-sm: 10px;
-  --r-md: 14px;
-  --r-lg: 18px;
-  --r-xl: 24px;
-  --r-full: 999px;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-sans: "Vazirmatn", "Segoe UI", system-ui, sans-serif;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-lg: 20px;
+  --font-size-xl: 26px;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
 
-  /* ---- THE accent (single, used with restraint — Perplexity philosophy) ---- */
-  --accent: #5a5ad6;
-  --accent-hover: #4848c2;
-  --accent-active: #3d3dae;
-  --accent-soft: rgba(90, 90, 214, 0.1);
-  --accent-softer: rgba(90, 90, 214, 0.06);
-  --accent-contrast: #ffffff;
-  --ring-accent: 0 0 0 4px rgba(90, 90, 214, 0.16);
-
-  /* ---- the AI signature gradient (orb, brand mark, send button) ---- */
-  --grad-brand: linear-gradient(135deg, #6a5cff 0%, #9b5cff 55%, #e05d8f 100%);
-  --grad-orb: conic-gradient(from 0deg, #6a5cff, #b95cff, #ff6b8b, #ffb35c, #6a5cff);
-
-  /* ---- status ---- */
-  --ok: #0e9f6e;
-  --ok-soft: rgba(14, 159, 110, 0.12);
-  --warn: #d97706;
-  --warn-soft: rgba(217, 119, 6, 0.12);
-  --err: #dc2626;
-  --err-soft: rgba(220, 38, 38, 0.1);
-  --info: #2563eb;
-  --info-soft: rgba(37, 99, 235, 0.1);
-
-  /* ---- light surfaces: warm paper canvas, pure-white cards ---- */
-  --bg: #f7f6f2;
-  --bg-elev: #faf9f5;
-  --surface: #ffffff;
-  --surface-2: #f1efe9;
-  --surface-3: #e8e5dd;
-  --border: #e8e5dd;
-  --border-strong: #d9d5ca;
-  --text: #1b1a17;
-  --text-muted: #6f6a60;
-  --text-faint: #a39d92;
-  --ink: #1f1d1a;
-
-  --shadow-xs: 0 1px 2px rgba(31, 29, 26, 0.05);
-  --shadow-sm: 0 2px 6px rgba(31, 29, 26, 0.06), 0 1px 2px rgba(31, 29, 26, 0.05);
-  --shadow-md: 0 10px 28px rgba(31, 29, 26, 0.1), 0 2px 6px rgba(31, 29, 26, 0.05);
-  --shadow-lg: 0 24px 64px rgba(31, 29, 26, 0.18), 0 4px 12px rgba(31, 29, 26, 0.07);
-  --shadow-glow: 0 8px 32px rgba(106, 92, 255, 0.28);
-
-  /* ---- aurora tints behind the app (parallax, ultra-subtle) ---- */
-  --aurora-1: radial-gradient(38rem 30rem at 12% -10%, rgba(106, 92, 255, 0.1), transparent 60%);
-  --aurora-2: radial-gradient(34rem 26rem at 98% 6%, rgba(255, 107, 139, 0.09), transparent 60%);
-  --aurora-3: radial-gradient(30rem 24rem at 50% 115%, rgba(255, 179, 92, 0.08), transparent 60%);
-
-  --sidebar-w: 268px;
-  --topbar-h: 56px;
-  --chat-max: 820px;
-
-  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1);
-}
-
-[data-theme="dark"] {
-  --bg: #0e1013;
-  --bg-elev: #12141a;
-  --surface: #171a22;
-  --surface-2: #1f232e;
-  --surface-3: #272c39;
-  --border: #262b38;
-  --border-strong: #343b4d;
-  --text: #eceae4;
-  --text-muted: #98939a;
-  --text-faint: #6d6a72;
-  --ink: #f2f0ea;
-
-  --accent: #8a88ff;
-  --accent-hover: #a5a3ff;
-  --accent-active: #b9b8ff;
-  --accent-soft: rgba(138, 136, 255, 0.14);
-  --accent-softer: rgba(138, 136, 255, 0.08);
-  --ring-accent: 0 0 0 4px rgba(138, 136, 255, 0.2);
-
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
-
-  --aurora-1: radial-gradient(38rem 30rem at 12% -10%, rgba(106, 92, 255, 0.16), transparent 60%);
-  --aurora-2: radial-gradient(34rem 26rem at 98% 6%, rgba(255, 107, 139, 0.1), transparent 60%);
-  --aurora-3: radial-gradient(30rem 24rem at 50% 115%, rgba(255, 179, 92, 0.07), transparent 60%);
+  /* Added in phase 7 for the component library (#45) - the tokens
+     above already covered color/spacing/type; these fill in the two
+     things Button/Card/Modal needed that weren't there yet. */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-modal: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --color-warning: #caa23d;
+  --color-info: #4f8cff;
 }

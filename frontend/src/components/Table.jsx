@@ -1,31 +1,26 @@
 import React from "react";
-import EmptyState from "./EmptyState.jsx";
 
-// Config-driven table: columns: [{ key, header, render?(row), width? }]
-// rows: array of objects. Shows a shared empty state when rows is empty.
-export default function Table({ columns = [], rows = [], emptyText = "Nothing to show yet." }) {
-  if (!rows.length) {
-    return (
-      <div className="table-wrap">
-        <EmptyState icon="inbox" text={emptyText} />
-      </div>
-    );
+// columns: [{ key, header, render? }]
+// rows: array of plain objects; row.id used as React key when present.
+export default function Table({ columns, rows, emptyText = "موردی یافت نشد." }) {
+  if (!rows || rows.length === 0) {
+    return <p className="muted">{emptyText}</p>;
   }
   return (
-    <div className="table-wrap">
-      <table className="table">
+    <div className="ds-table-wrap">
+      <table className="ds-table">
         <thead>
           <tr>
-            {columns.map((c) => (
-              <th key={c.key} style={c.width ? { width: c.width } : undefined}>{c.header}</th>
+            {columns.map((col) => (
+              <th key={col.key}>{col.header}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.id ?? i}>
-              {columns.map((c) => (
-                <td key={c.key}>{c.render ? c.render(r) : r[c.key]}</td>
+          {rows.map((row, i) => (
+            <tr key={row.id ?? i}>
+              {columns.map((col) => (
+                <td key={col.key}>{col.render ? col.render(row) : row[col.key]}</td>
               ))}
             </tr>
           ))}
