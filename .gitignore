@@ -22,4 +22,4 @@ __.pycache__/
 
 # Ignore deployment scripts that may not need to be versioned
 0*.sh
-0*_production_install.sh
+0*_production_install.shnode_modules/
