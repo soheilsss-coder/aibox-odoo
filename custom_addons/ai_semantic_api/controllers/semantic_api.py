@@ -242,6 +242,8 @@ class AiSemanticApiController(http.Controller):
         employee = env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
         capabilities = env["ai.control.authorization"].effective_capabilities(user=user) if "ai.control.authorization" in env else self.env["ai.control.capability"].browse()
         capability_names = sorted(capabilities.mapped("name"))
+        if _is_privileged(env, user):
+            capability_names.append("admin.console.read")
         return _json_response({
             "id": user.id,
             "name": user.name,
@@ -1022,10 +1024,20 @@ class AiControlPlaneSemanticController(_http.Controller):
         if err:
             return err
         caps = env["ai.control.authorization"].effective_capabilities(user=env.user)
+        cap_names = {c.name for c in caps}
+        # admin.console.read is a UI gate (Admin Console nav item + route
+        # guards), not a registry capability - grant it to the same
+        # privileged set the backend re-checks on every /api/admin/* call.
+        if _is_privileged(env, env.user):
+            cap_names.add("admin.console.read")
+        caps_by_name = {c.name: c for c in caps}
         return _json_response({"capabilities": [{
-            "name": c.name, "module": c.module_name, "operation": c.operation,
-            "risk_level": c.risk_level, "model": c.model_name,
-        } for c in caps]})
+            "name": n,
+            "module": caps_by_name[n].module_name if n in caps_by_name else "",
+            "operation": caps_by_name[n].operation if n in caps_by_name else "",
+            "risk_level": caps_by_name[n].risk_level if n in caps_by_name else 0,
+            "model": caps_by_name[n].model_name if n in caps_by_name else "",
+        } for n in sorted(cap_names)]})
 
     @http.route("/api/integrations", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def integrations(self, **kwargs):
