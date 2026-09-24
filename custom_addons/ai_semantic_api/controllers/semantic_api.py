@@ -177,6 +177,10 @@ class AiSemanticApiController(http.Controller):
             "authenticated": True,
             "user": {"id": user.id, "name": user.name, "login": user.login},
             "expires_at": expires,
+            # Header clients (and browsers that block third-party cookies)
+            # authenticate every call with X-API-Key: <token>. The token IS
+            # the ai.gateway.session issued above - revocable, 8h TTL.
+            "api_key": token,
         })
         # Secure flag follows the ACTUAL request scheme: the review preview
         # and GitHub Pages reach us over https (secure cookie, cross-site

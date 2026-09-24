@@ -16,7 +16,7 @@ return data}catch(e){return data}}
 async function __realRequest(path,opts){opts=opts||{};
 if(path==="/api/login"&&__realOn!==!1){
  try{var resp=await fetch(__BASE+"/api/login",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify(opts.body||{}),signal:AbortSignal.timeout(20000)});
-  if(resp.ok){__realOn=!0;var out=await resp.json().catch(function(){return{}});var u=out.user||{};return new Response(JSON.stringify({user:{id:u.id,name:u.name,login:u.login,company:"Nova Enterprise",capabilities:[]},api_key:"",csrf_token:"",expires_at:out.expires_at}),{status:200,headers:{"Content-Type":"application/json; charset=utf-8"}})}
+  if(resp.ok){__realOn=!0;var out=await resp.json().catch(function(){return{}});var u=out.user||{};return new Response(JSON.stringify({user:{id:u.id,name:u.name,login:u.login,company:"Nova Enterprise",capabilities:[]},api_key:out.api_key||"",csrf_token:"",expires_at:out.expires_at}),{status:200,headers:{"Content-Type":"application/json; charset=utf-8"}})}
  }catch(e){__realOn=!1}
  return __demoRequest(path,{method:opts.method||"GET",body:opts.body,apiKey:opts.apiKey});
 }

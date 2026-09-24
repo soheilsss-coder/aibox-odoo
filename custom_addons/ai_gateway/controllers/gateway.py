@@ -123,6 +123,13 @@ def _authenticate():
 
     key_rec = request.env["ai.gateway.api.key"].sudo().authenticate_secret(api_key)
     if not key_rec:
+        # Not a perpetual API key: accept a login-session token as well.
+        # /api/login issues one per session; browsers that block third-party
+        # cookies (Pages -> appliance) authenticate via the X-API-Key header.
+        if "ai.gateway.session" in request.env:
+            session = request.env["ai.gateway.session"].sudo().authenticate_token(api_key)
+            if session:
+                return session.user_id, api_key, False
         _record_auth_failure(ip)
         return None, None, False
     return key_rec.user_id, api_key, False
