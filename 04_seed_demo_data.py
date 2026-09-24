@@ -219,6 +219,45 @@ else:
     #    Console (admin.console.read) is visible and reachable on a real
     #    appliance, not only in the static demo.
     # -----------------------------------------------------------------
+    # 7b. The demo identity the product UI ships with (prefilled on the
+    #     login screen): Sara Mohammadi <sara@example.com> / demo.
+    sara = env["res.users"].with_context(no_reset_password=True).search(
+        [("login", "=", "sara@example.com")], limit=1)
+    if not sara:
+        sara = env["res.users"].with_context(no_reset_password=True).create({
+            "name": "Sara Mohammadi", "login": "sara@example.com",
+            "email": "sara@example.com", "password": "demo",
+        })
+    sara.password = "demo"
+    for _xml in ("ai_business_tools.role_executive",
+                 "ai_business_tools.role_sales_manager"):
+        try:
+            _g = env.ref(_xml)
+            if _g.id not in sara.groups_id.ids:
+                sara.groups_id = [(4, _g.id)]
+        except Exception:
+            pass
+    if not env["hr.employee"].search([("user_id", "=", sara.id)], limit=1):
+        _dept = env["hr.department"].search([("name", "ilike", "Sales")], limit=1)
+        env["hr.employee"].create({"name": "Sara Mohammadi", "user_id": sara.id,
+                                   "department_id": _dept.id if _dept else False})
+    if "ai.gateway.api.key" in env:
+        env["ai.gateway.api.key"].sudo().create_key_by_id(sara.id)
+    # A few real tasks for Sara so her dashboard isn't empty on a fresh box.
+    _proj = env["project.project"].search([("name", "=", "AI Tasks")], limit=1)
+    if _proj:
+        for _t in ("Prepare quote for Aria Industries",
+                   "Review the 2026 leave policy draft",
+                   "Board demo preparation"):
+            if not env["project.task"].search_count(
+                    [("project_id", "=", _proj.id), ("name", "=", _t)]):
+                env["project.task"].create({
+                    "name": _t, "project_id": _proj.id,
+                    "user_ids": [(6, 0, [sara.id])],
+                    "description": "Seeded demo task.",
+                })
+    print("Demo identity ready: sara@example.com / demo")
+
     admin_user = env["res.users"].search([("login", "=", "admin")], limit=1)
     if admin_user:
         # Fresh installs can leave the bootstrap admin group-less depending on

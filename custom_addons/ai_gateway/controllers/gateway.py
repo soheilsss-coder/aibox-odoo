@@ -596,32 +596,47 @@ class AiGatewayController(http.Controller):
         def _sse(event, payload):
             return "event: %s\ndata: %s\n\n" % (event, json.dumps(payload, ensure_ascii=False))
 
-        def generate():
-            yield _sse("thinking", {})
-            try:
-                data = json.loads(request.httprequest.data or b"{}")
-            except Exception:  # noqa: BLE001
-                yield _sse("error", {"error": "invalid request"})
-                return
-            message = data.get("message")
-            thread_id = data.get("thread_id")
-            attachment_ids = data.get("attachment_ids") or []
+        # Read the request body BEFORE the response generator starts: by the
+        # time the SSE generator runs, the request input stream is already
+        # drained and httprequest.data comes back empty ("invalid request").
+        payload = {}
+        try:
+            payload = json.loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            payload = None
+
+        # Capture EVERYTHING the generator needs while the request context is
+        # still bound: once the SSE response starts iterating, the werkzeug
+        # request proxy is unbound and touching `request` raises RuntimeError.
+        if payload is None:
+            turn = None
+        else:
+            message = payload.get("message")
+            thread_id = payload.get("thread_id")
+            attachment_ids = payload.get("attachment_ids") or []
             if not isinstance(attachment_ids, list):
                 attachment_ids = []
             attachment_ids = [int(x) for x in attachment_ids if str(x).isdigit()]
-            if not message and not attachment_ids:
-                yield _sse("error", {"error": "'message' or attachment_ids is required"})
-                return
             # Same bounded worker pool as /api/chat - the heavy turn is
             # queued when the engine is saturated, overflowing requests
             # get the busy error instead of piling up, and the SSE stream
             # still delivers the final reply progressively.
-            dbname = request.env.cr.dbname
+            turn = (message, thread_id, attachment_ids, request.env.cr.dbname, user.id)
+
+        def generate():
+            yield _sse("thinking", {})
+            if turn is None:
+                yield _sse("error", {"error": "invalid request"})
+                return
+            message, thread_id, attachment_ids, dbname, user_id = turn
+            if not message and not attachment_ids:
+                yield _sse("error", {"error": "'message' or attachment_ids is required"})
+                return
             ok, result = get_chat_pool().submit(
-                lambda: _run_chat_detached(dbname, user.id, message, thread_id, attachment_ids)
+                lambda: _run_chat_detached(dbname, user_id, message, thread_id, attachment_ids)
             )
             if not ok:
-                yield _sse("busy", {"error": result})
+                yield _sse("error", {"error": result})
                 return
             if "error" in result:
                 yield _sse("error", result)
