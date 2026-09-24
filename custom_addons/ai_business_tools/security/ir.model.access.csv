@@ -18,4 +18,4 @@ access_company_document_admin,company.document.admin,model_company_document,base
 access_ai_gateway_approval_history_admin,ai.gateway.approval.history.admin,model_ai_gateway_approval_history,base.group_system,1,1,1,0
 access_ai_schedule_rule_user,ai.schedule.rule.user,model_ai_schedule_rule,base.group_user,1,1,1,0
 access_ai_schedule_rule_admin,ai.schedule.rule.admin,model_ai_schedule_rule,base.group_system,1,1,1,1
-access_ir_cron_ai_schedule,ir.cron.ai.schedule,model_ir_cron,base.group_user,0,0,0,0
+access_ir_cron_ai_schedule,ir.cron.ai.schedule,base.model_ir_cron,base.group_user,0,0,0,0

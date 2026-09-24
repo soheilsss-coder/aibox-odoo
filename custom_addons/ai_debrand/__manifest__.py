@@ -5,6 +5,11 @@
                 "Install LAST, after every other module.",
     "category": "Technical",
     "depends": ["web", "mail"],
+    "post_init_hook": "post_init_hook",
+    "assets": {
+        "web.assets_frontend": ["/ai_debrand/static/src/js/debrand.js"],
+        "web.assets_backend": ["/ai_debrand/static/src/js/debrand.js"],
+    },
     "data": [
         "data/debrand_data.xml",
         "views/debrand_templates.xml",

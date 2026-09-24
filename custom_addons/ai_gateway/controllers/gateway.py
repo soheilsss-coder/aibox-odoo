@@ -2,6 +2,9 @@ import json
 import os
 import re
 import time
+import logging
+
+_logger = logging.getLogger(__name__)
 
 from odoo import api, http
 from odoo.http import request
@@ -251,10 +254,15 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
         if "ai.gateway.tool.risk" in env:
             allowed_ids = env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user)
             allowed_tools = assistant.tool_ids.filtered(lambda t: t.id in allowed_ids)
-        thread = env["llm.thread"].create({
+        # This odoo-llm fork requires provider_id/model_id on llm.thread
+        # (NOT NULL): default them from the assistant's binding.
+        thread_vals = {
             "assistant_id": assistant.id,
             "tool_ids": [(6, 0, allowed_tools.ids)],
-        })
+        }
+        thread_vals.setdefault("provider_id", assistant.provider_id.id)
+        thread_vals.setdefault("model_id", assistant.model_id.id)
+        thread = env["llm.thread"].create(thread_vals)
 
     # Defense-in-depth: every thread gets a user-specific allowlist.
     # Generic framework CRUD tools are never exposed through chat.
@@ -294,7 +302,8 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
 
     last_message = env["mail.message"].search(
         [("model", "=", "llm.thread"), ("res_id", "=", thread.id)],
-        order="create_date desc",
+        order="id desc",  # create_date has second resolution - same-second
+        # messages sort arbitrarily and the thread-creation note could win.
         limit=1,
     )
     _audit(env, user_id, "chat", "chat", {"message": message}, success=True,
@@ -325,15 +334,24 @@ def _run_chat_detached(dbname, user_id, message, thread_id=None, attachment_ids=
     the idle fast path keeps running inline with the request env."""
     cr = db_connect(dbname).cursor()
     try:
-        with api.Environment(cr, user_id, {}) as env:
-            result = _run_chat_env(env, message, thread_id, attachment_ids)
+        # Odoo 18: api.Environment is NOT a context manager - build it
+        # directly and manage the cursor explicitly.
+        env = api.Environment(cr, user_id, {})
+        result = _run_chat_env(env, message, thread_id, attachment_ids)
+        cr.commit()
         return result
     except Exception:  # noqa: BLE001
+        _logger.exception("detached chat turn failed (db=%s, user=%s)", dbname, user_id)
         try:
             cr.rollback()
         except Exception:  # noqa: BLE001
             pass
         return {"error": "generation failed, check server logs for details"}
+    finally:
+        try:
+            cr.close()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -578,32 +596,47 @@ class AiGatewayController(http.Controller):
         def _sse(event, payload):
             return "event: %s\ndata: %s\n\n" % (event, json.dumps(payload, ensure_ascii=False))
 
-        def generate():
-            yield _sse("thinking", {})
-            try:
-                data = json.loads(request.httprequest.data or b"{}")
-            except Exception:  # noqa: BLE001
-                yield _sse("error", {"error": "invalid request"})
-                return
-            message = data.get("message")
-            thread_id = data.get("thread_id")
-            attachment_ids = data.get("attachment_ids") or []
+        # Read the request body BEFORE the response generator starts: by the
+        # time the SSE generator runs, the request input stream is already
+        # drained and httprequest.data comes back empty ("invalid request").
+        payload = {}
+        try:
+            payload = json.loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            payload = None
+
+        # Capture EVERYTHING the generator needs while the request context is
+        # still bound: once the SSE response starts iterating, the werkzeug
+        # request proxy is unbound and touching `request` raises RuntimeError.
+        if payload is None:
+            turn = None
+        else:
+            message = payload.get("message")
+            thread_id = payload.get("thread_id")
+            attachment_ids = payload.get("attachment_ids") or []
             if not isinstance(attachment_ids, list):
                 attachment_ids = []
             attachment_ids = [int(x) for x in attachment_ids if str(x).isdigit()]
-            if not message and not attachment_ids:
-                yield _sse("error", {"error": "'message' or attachment_ids is required"})
-                return
             # Same bounded worker pool as /api/chat - the heavy turn is
             # queued when the engine is saturated, overflowing requests
             # get the busy error instead of piling up, and the SSE stream
             # still delivers the final reply progressively.
-            dbname = request.env.cr.dbname
+            turn = (message, thread_id, attachment_ids, request.env.cr.dbname, user.id)
+
+        def generate():
+            yield _sse("thinking", {})
+            if turn is None:
+                yield _sse("error", {"error": "invalid request"})
+                return
+            message, thread_id, attachment_ids, dbname, user_id = turn
+            if not message and not attachment_ids:
+                yield _sse("error", {"error": "'message' or attachment_ids is required"})
+                return
             ok, result = get_chat_pool().submit(
-                lambda: _run_chat_detached(dbname, user.id, message, thread_id, attachment_ids)
+                lambda: _run_chat_detached(dbname, user_id, message, thread_id, attachment_ids)
             )
             if not ok:
-                yield _sse("busy", {"error": result})
+                yield _sse("error", {"error": result})
                 return
             if "error" in result:
                 yield _sse("error", result)

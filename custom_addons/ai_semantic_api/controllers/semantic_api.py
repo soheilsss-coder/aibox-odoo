@@ -146,8 +146,13 @@ class AiSemanticApiController(http.Controller):
         if not login_id or not password:
             return _json_response({"error": "login and password are both required"}, status=400)
 
+        # Odoo 18 session contract: authenticate(dbname, credential_dict),
+        # returns None on success - read request.session.uid afterwards.
         try:
-            uid = request.session.authenticate(request.db, login_id, password)
+            request.session.authenticate(request.db, {
+                "login": login_id, "password": password, "type": "password",
+            })
+            uid = request.session.uid
         except AccessDenied:
             uid = False
 
@@ -173,7 +178,16 @@ class AiSemanticApiController(http.Controller):
             "user": {"id": user.id, "name": user.name, "login": user.login},
             "expires_at": expires,
         })
-        response.set_cookie("ai_session", token, max_age=8 * 3600, httponly=True, secure=os.environ.get("AI_GATEWAY_COOKIE_SECURE", "1" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "0") == "1", samesite=os.environ.get("AI_GATEWAY_COOKIE_SAMESITE", "None" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "Lax"), path="/")
+        # Secure flag follows the ACTUAL request scheme: the review preview
+        # and GitHub Pages reach us over https (secure cookie, cross-site
+        # wiring), while local http probes must still receive it.
+        response.set_cookie(
+            "ai_session", token, max_age=8 * 3600, httponly=True,
+            secure=bool(request.httprequest.is_secure),
+            samesite=os.environ.get("AI_GATEWAY_COOKIE_SAMESITE",
+                                    "None" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "Lax"),
+            path="/",
+        )
         return response
 
     @http.route("/api/logout", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])

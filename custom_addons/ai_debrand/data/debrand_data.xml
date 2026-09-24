@@ -8,8 +8,7 @@
         <field name="key">ai.brand.domain</field>
         <field name="value">https://example.invalid</field>
     </record>
-    <function model="res.company" name="write">
-        <value model="res.company" eval="obj().search([])"/>
-        <value eval="{'report_footer': 'Company AI'}"/>
-    </function>
+    <!-- report_footer is set in post_init_hook.py: <function> value evals
+         have no `obj` helper in Odoo 18 and a bare recordset crashes the
+         fresh-install init ("can't adapt type 'res.company'"). -->
 </odoo>

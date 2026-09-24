@@ -26,6 +26,7 @@ class AiScheduleRule(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "name"
 
+    active = fields.Boolean(default=True, help="Paused rules keep their cron but skip execution.")
     name = fields.Char(string="Name", required=True)
     prompt_text = fields.Text(
         string="Prompt", required=True,
