@@ -47,7 +47,12 @@ function serveStatic(req, res) {
       }
       res.writeHead(404); return res.end("not found");
     }
-    res.writeHead(200, { "Content-Type": MIME[path.extname(filePath)] || "application/octet-stream" });
+    res.writeHead(200, {
+      "Content-Type": MIME[path.extname(filePath)] || "application/octet-stream",
+      // The preview must always reflect the newest bundle; filenames are
+      // content-hashed so no-store never breaks asset caching.
+      "Cache-Control": "no-store",
+    });
     fs.createReadStream(filePath).pipe(res);
   });
 }
