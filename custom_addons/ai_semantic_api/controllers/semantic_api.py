@@ -178,7 +178,16 @@ class AiSemanticApiController(http.Controller):
             "user": {"id": user.id, "name": user.name, "login": user.login},
             "expires_at": expires,
         })
-        response.set_cookie("ai_session", token, max_age=8 * 3600, httponly=True, secure=os.environ.get("AI_GATEWAY_COOKIE_SECURE", "1" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "0") == "1", samesite=os.environ.get("AI_GATEWAY_COOKIE_SAMESITE", "None" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "Lax"), path="/")
+        # Secure flag follows the ACTUAL request scheme: the review preview
+        # and GitHub Pages reach us over https (secure cookie, cross-site
+        # wiring), while local http probes must still receive it.
+        response.set_cookie(
+            "ai_session", token, max_age=8 * 3600, httponly=True,
+            secure=bool(request.httprequest.is_secure),
+            samesite=os.environ.get("AI_GATEWAY_COOKIE_SAMESITE",
+                                    "None" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "Lax"),
+            path="/",
+        )
         return response
 
     @http.route("/api/logout", type="http", auth="none", csrf=False, methods=["POST", "OPTIONS"])

@@ -217,8 +217,14 @@ def _tokens(text):
 
 
 def _sentences(text):
-    parts = re.split(r"(?<=[.!?:])\s+|\n+", text or "")
+    # ":" stays INSIDE a sentence: labels like "Incident SLA: ..." carry the
+    # very tokens a question matches on; splitting after ":" deleted them.
+    parts = re.split(r"(?<=[.!?])\s+|\n+", text or "")
     return [p.strip() for p in parts if len(p.strip()) >= 25]
+
+
+def _stem(t):
+    return t[:5] if len(t) > 5 else t
 
 
 def _document_answer(message):
@@ -244,8 +250,8 @@ def _document_answer(message):
         return ("I opened %s but no readable text could be extracted from it "
                 "(scanned/image PDFs need OCR). Upload a text-based PDF or a .txt/.docx and I can read it."
                 % fname)
-    qtoks = set(_tokens(question))
-    overlap = [(s, len(qtoks & set(_tokens(s)))) for s in sents]
+    qtoks = {_stem(t) for t in _tokens(question)}
+    overlap = [(s, len(qtoks & {_stem(t) for t in _tokens(s)})) for s in sents]
     quoted = [s for s, n in sorted(overlap, key=lambda x: x[1], reverse=True)[:3] if n > 0]
     if quoted:
         return ("Here is exactly what %s says - the parts that answer \"%s\":\n\n%s\n\n"
