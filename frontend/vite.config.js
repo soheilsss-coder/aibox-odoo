@@ -8,6 +8,9 @@ import react from "@vitejs/plugin-react";
 // pointing at a different domain for the Odoo box).
 export default defineConfig({
   plugins: [react()],
+  // The built bundle is deployed BOTH as the review preview (served under
+  // /aibox-odoo/) and as GitHub Pages (https://<owner>.github.io/aibox-odoo/).
+  base: "/aibox-odoo/",
   server: {
     port: 5173,
     // The appliance is reached through proxy hosts that change per sandbox /
