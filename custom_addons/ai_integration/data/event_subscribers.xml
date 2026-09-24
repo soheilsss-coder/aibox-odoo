@@ -3,7 +3,7 @@
         <field name="event_type">workflow.activity.requested</field>
         <field name="target">workflow</field>
         <field name="handler_key">workflow_activity_requested</field>
-        <field name="subscriber_model">ai.integration.activity.subscriber</field>
+        <field name="subscriber_model">ai.integration.workflow.subscriber</field>
         <field name="subscriber_method">_handle_event</field>
         <field name="priority">30</field>
     </record>

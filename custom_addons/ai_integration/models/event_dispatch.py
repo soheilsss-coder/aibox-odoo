@@ -40,7 +40,11 @@ class AiEventSubscription(models.Model):
         method = vals.get("subscriber_method")
         if bool(model_name) != bool(method):
             raise ValueError("subscriber_model and subscriber_method must be provided together")
-        if method and not (method == "_handle_event" or method.startswith("_handle_event_")):
+        if method and not (method == "_handle_event" or method.startswith("_handle_event_")
+                           or (method.startswith("_handle_") and model_name
+                               and model_name == "ai.integration.event.dispatcher")):
+            # Dispatcher-direct subscriptions target the per-target handlers
+            # (_handle_calendar / _handle_audit / ...) on the dispatcher itself.
             raise ValueError("event subscriber method must use the _handle_event* contract")
         if model_name and model_name not in self.env:
             raise ValueError("subscriber model is not installed: %s" % model_name)

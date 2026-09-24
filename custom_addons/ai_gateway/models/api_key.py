@@ -57,6 +57,19 @@ class AiGatewayApiKey(models.Model):
         return secret
 
     @api.model
+    def create_key_by_id(self, user_id, scope="m2m"):
+        """XML-data-friendly wrapper around create_key (takes a user id).
+
+        The seed data cannot pass a browsable record through <function>, and
+        calling bare create() would insert a key without a hash, violating
+        the not-null constraint on fresh installs.
+        """
+        if isinstance(user_id, (list, tuple)):
+            user_id = user_id[0]
+        self.create_key(self.env["res.users"].browse(int(user_id)), scope=scope)
+        return True
+
+    @api.model
     def authenticate_secret(self, secret):
         if not secret:
             return self.browse()
