@@ -146,8 +146,13 @@ class AiSemanticApiController(http.Controller):
         if not login_id or not password:
             return _json_response({"error": "login and password are both required"}, status=400)
 
+        # Odoo 18 session contract: authenticate(dbname, credential_dict),
+        # returns None on success - read request.session.uid afterwards.
         try:
-            uid = request.session.authenticate(request.db, login_id, password)
+            request.session.authenticate(request.db, {
+                "login": login_id, "password": password, "type": "password",
+            })
+            uid = request.session.uid
         except AccessDenied:
             uid = False
 

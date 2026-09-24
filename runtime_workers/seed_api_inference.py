@@ -198,11 +198,34 @@ if cfg.embedding and cfg.embedding.model:
 # -- assistant binding --------------------------------------------------
 assistant = env["llm.assistant"].search([("name", "=", "Company Assistant")], limit=1)
 if not assistant:
+    # llm.assistant.prompt_id is required in this odoo-llm fork: make sure a
+    # default template exists before creating the assistant.
+    prompt = env["llm.prompt"].search([("name", "=", "Company Assistant System Prompt")], limit=1)
+    if not prompt:
+        prompt = env["llm.prompt"].create({
+            "name": "Company Assistant System Prompt",
+            "description": "Default company assistant persona (seeded).",
+            "template": ("You are Nova, the company AI assistant. Answer accurately and concisely. "
+                         "When a document is attached, quote from it verbatim when answering from it "
+                         "and never invent facts."),
+            "format": "text",
+        })
+        print("  created prompt 'Company Assistant System Prompt'")
     assistant = env["llm.assistant"].create({
         "name": "Company Assistant",
         "res_model": "res.users",
+        "prompt_id": prompt.id,
     })
     print("  created assistant 'Company Assistant'")
+if not assistant.prompt_id:
+    _prompt = env["llm.prompt"].search([("name", "=", "Company Assistant System Prompt")], limit=1)
+    if not _prompt:
+        _prompt = env["llm.prompt"].create({
+            "name": "Company Assistant System Prompt",
+            "template": "You are Nova, the company AI assistant. Answer accurately and concisely.",
+            "format": "text",
+        })
+    assistant.prompt_id = _prompt.id
 if assistant.provider_id != provider:
     assistant.provider_id = provider.id
 if assistant.model_id != chat_model:
@@ -240,13 +263,21 @@ if emb_model is not None:
         "benchmark_score": 0.85,
     }
 
-for pname, vals in profiles.items():
+_profile_fields = set(env["ai.model.profile"]._fields)
+for pname, raw_vals in profiles.items():
+    vals = {k: v for k, v in raw_vals.items() if k in _profile_fields}
+    dropped = sorted(set(raw_vals) - _profile_fields)
+    if dropped:
+        print("  note: profile %r skips unknown fields %s" % (pname, dropped))
     prof = env["ai.model.profile"].search([("name", "=", pname)], limit=1)
     if not prof:
         prof = env["ai.model.profile"].create(dict({"name": pname}, **vals))
         print("  created model profile %r" % pname)
     updates = dict(vals)
-    updates.update({"active": True, "production": True, "health_state": "healthy"})
+    updates.update({"active": True, "production": True})
+    if "health_state" in _profile_fields:
+        updates["health_state"] = "healthy"
+    updates = {k: v for k, v in updates.items() if k in _profile_fields}
     if prof.read(list(updates.keys()))[0] != updates:
         prof.write(updates)
         print("  updated model profile %r" % pname)

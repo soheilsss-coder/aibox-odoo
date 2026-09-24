@@ -119,9 +119,16 @@ else:
                     leave.sudo().action_confirm()
                 leave_count += 1
         # Approve a few of them for realism (some stay pending on purpose)
+        from odoo.exceptions import ValidationError as _VE
+
         pending = env["hr.leave"].search([("state", "in", ("confirm", "validate1"))], limit=4)
         for l in pending:
-            l.sudo().action_approve()
+            try:
+                l.sudo().action_approve()
+            except _VE as e:
+                # hr_holidays refuses leaves overlapping non-working days for
+                # some calendars; leave those pending - fine for the demo.
+                print(f"  (leave #{l.id} stays pending: {str(e)[:80]}...)")
     print(f"Created {leave_count} leave requests (some approved, some left pending for the demo).")
 
     # -----------------------------------------------------------------
@@ -179,11 +186,26 @@ else:
     #    so the Admin Console isn't empty either.
     # -----------------------------------------------------------------
     ceo_env = env(user=ceo_emp.user_id.id)
-    decree_res = ceo_env["llm.tool"].generate_hr_decree(
+
+    def _expect_approval(fn, **kw):
+        """These tools raise UserError('approval_required: ...') BY DESIGN when
+        the execution gate needs a human decision - the approval row is real.
+        Catch it so the seed keeps going."""
+        from odoo.exceptions import UserError as _UE
+
+        try:
+            return fn(**kw)
+        except _UE as e:
+            print(f"  (approval pending by design: {e})")
+            return {"status": "approval_required"}
+
+    decree_res = _expect_approval(
+        ceo_env["llm.tool"].generate_hr_decree,
         employee_name=created_users["demo.eng1@yourbrand.example"][1].name,
         decree_type="raise", decree_text="افزایش حقوق سالانه بر اساس عملکرد.",
     )
-    grant_res = ceo_env["llm.tool"].grant_temporary_access(
+    grant_res = _expect_approval(
+        ceo_env["llm.tool"].grant_temporary_access,
         user_name=created_users["demo.hr.staff@yourbrand.example"][1].name,
         role_name="HR Manager",
         expires_on=str(today + timedelta(days=14)),

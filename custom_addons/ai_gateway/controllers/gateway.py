@@ -2,6 +2,9 @@ import json
 import os
 import re
 import time
+import logging
+
+_logger = logging.getLogger(__name__)
 
 from odoo import api, http
 from odoo.http import request
@@ -251,10 +254,15 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
         if "ai.gateway.tool.risk" in env:
             allowed_ids = env["ai.gateway.tool.risk"].allowed_tool_ids_for_user(env.user)
             allowed_tools = assistant.tool_ids.filtered(lambda t: t.id in allowed_ids)
-        thread = env["llm.thread"].create({
+        # This odoo-llm fork requires provider_id/model_id on llm.thread
+        # (NOT NULL): default them from the assistant's binding.
+        thread_vals = {
             "assistant_id": assistant.id,
             "tool_ids": [(6, 0, allowed_tools.ids)],
-        })
+        }
+        thread_vals.setdefault("provider_id", assistant.provider_id.id)
+        thread_vals.setdefault("model_id", assistant.model_id.id)
+        thread = env["llm.thread"].create(thread_vals)
 
     # Defense-in-depth: every thread gets a user-specific allowlist.
     # Generic framework CRUD tools are never exposed through chat.
@@ -294,7 +302,8 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
 
     last_message = env["mail.message"].search(
         [("model", "=", "llm.thread"), ("res_id", "=", thread.id)],
-        order="create_date desc",
+        order="id desc",  # create_date has second resolution - same-second
+        # messages sort arbitrarily and the thread-creation note could win.
         limit=1,
     )
     _audit(env, user_id, "chat", "chat", {"message": message}, success=True,
@@ -325,15 +334,24 @@ def _run_chat_detached(dbname, user_id, message, thread_id=None, attachment_ids=
     the idle fast path keeps running inline with the request env."""
     cr = db_connect(dbname).cursor()
     try:
-        with api.Environment(cr, user_id, {}) as env:
-            result = _run_chat_env(env, message, thread_id, attachment_ids)
+        # Odoo 18: api.Environment is NOT a context manager - build it
+        # directly and manage the cursor explicitly.
+        env = api.Environment(cr, user_id, {})
+        result = _run_chat_env(env, message, thread_id, attachment_ids)
+        cr.commit()
         return result
     except Exception:  # noqa: BLE001
+        _logger.exception("detached chat turn failed (db=%s, user=%s)", dbname, user_id)
         try:
             cr.rollback()
         except Exception:  # noqa: BLE001
             pass
         return {"error": "generation failed, check server logs for details"}
+    finally:
+        try:
+            cr.close()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 # ---------------------------------------------------------------------------
