@@ -41,9 +41,10 @@ function serveStatic(req, res) {
     if (err || !st.isFile()) {
       // SPA fallback: any unknown extension-less path renders the app shell.
       if (!path.extname(urlPath)) {
+        res.statusCode = 200;
         return fs.createReadStream(path.join(ROOT, "index.html"))
           .on("error", () => { res.writeHead(404); res.end("not found"); })
-          .pipe(res.statusCode = 200, res);
+          .pipe(res);
       }
       res.writeHead(404); return res.end("not found");
     }
