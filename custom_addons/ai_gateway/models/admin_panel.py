@@ -266,6 +266,62 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                  "action": l.action, "success": l.success,
                  "error": (l.error_message or "")[:120]} for l in logs]
 
+    # ------------------------------------------------------------- branding
+    BRANDING_TEXT = ("brand_name", "legal_name", "tagline", "product_title",
+                     "support_email", "support_url", "footer_text", "login_message")
+    BRANDING_COLORS = ("primary_color", "secondary_color", "accent_color",
+                       "danger_color", "warning_color")
+
+    def branding_get(self):
+        Branding = self.env["ai.customer.branding"].sudo()
+        rec = Branding.get_for_company() or Branding.search([], limit=1)
+        if not rec:
+            return {"exists": False, "brand_name": ""}
+        out = {"exists": True, "brand_name": rec.brand_name or "",
+               "logo_uploaded": bool(rec.logo),
+               "logo_mimetype": rec.logo_mimetype or ""}
+        for f in self.BRANDING_TEXT + self.BRANDING_COLORS:
+            out[f] = rec[f] or ""
+        out["font_family"] = rec.font_family or "system"
+        out["border_radius"] = rec.border_radius or "comfortable"
+        return out
+
+    def branding_save(self, vals):
+        Branding = self.env["ai.customer.branding"].sudo()
+        data = {}
+        for f in self.BRANDING_TEXT:
+            if f in vals:
+                val = (vals.get(f) or "").strip()
+                if val:
+                    data[f] = val
+        for f in self.BRANDING_COLORS:
+            if vals.get(f):
+                data[f] = vals[f]
+        for f in ("font_family", "border_radius"):
+            if vals.get(f):
+                data[f] = vals[f]
+        if vals.get("logo_b64"):
+            import base64 as _b64
+
+            try:
+                payload = vals["logo_b64"].split(",")[-1]
+                data["logo"] = _b64.b64decode(payload)
+            except Exception:  # noqa: BLE001
+                return {"error": "logo file could not be decoded"}
+            data["logo_filename"] = vals.get("logo_filename") or "logo.png"
+            data["logo_mimetype"] = vals.get("logo_mimetype") or "image/png"
+        try:
+            rec = Branding.get_for_company() or Branding.search([], limit=1)
+            if rec:
+                rec.write(data)
+            else:
+                data.setdefault("brand_name", self.env.company.name or "Company AI")
+                data["company_id"] = self.env.company.id
+                rec = Branding.create(data)
+        except Exception as exc:  # noqa: BLE001
+            return {"error": str(exc)[:200]}
+        return {"ok": True, "brand_name": rec.brand_name}
+
     # --------------------------------------------------------- token usage
     @staticmethod
     def _plain_name(value):

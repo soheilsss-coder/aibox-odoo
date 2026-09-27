@@ -15,7 +15,7 @@
 </style>
 <link rel="stylesheet" href="assets/index-B7tjfh8Z.css" />
 <style>
-/* ---- admin console layout (uses the app's tokens/classes) ---- */
+/* ---- vendor console layout (uses the app's tokens/classes) ---- */
 body{font-family:var(--font-sans)}
 .auth-card h1{display:flex;align-items:center;gap:10px}
 .auth-card h1 svg{color:var(--accent);flex:none}
@@ -43,14 +43,6 @@ body{font-family:var(--font-sans)}
 .pw-cell{display:flex;gap:8px;align-items:center}
 .pw-cell .input{width:160px;padding:6px 10px;font-size:var(--fs-sm)}
 .nav-label{font-size:10.5px;font-weight:var(--fw-bold);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);padding:14px 10px 4px}
-/* workspace embed */
-#work{position:fixed;inset:0;display:none}
-#work iframe{width:100%;height:100%;border:none;display:block}
-.fab-stack{position:fixed;bottom:22px;inset-inline-end:22px;display:flex;flex-direction:column;gap:10px;z-index:90}
-.fab{display:flex;align-items:center;gap:9px;background:var(--grad-brand);color:#fff;border:none;border-radius:var(--r-full);padding:12px 20px;font:inherit;font-size:var(--fs-sm);font-weight:var(--fw-semibold);cursor:pointer;box-shadow:var(--shadow-glow);transition:transform .15s var(--ease-out),filter .15s}
-.fab:hover{transform:translateY(-2px);filter:brightness(1.06)}
-.fab svg{flex:none}
-/* usage bars */
 .bar{height:8px;border-radius:var(--r-full);background:var(--surface-3);overflow:auto}
 .bar i{display:block;height:100%;border-radius:var(--r-full);background:var(--grad-brand)}
 .chart{display:flex;align-items:flex-end;gap:6px;height:120px;padding:10px 4px 0}
@@ -58,18 +50,24 @@ body{font-family:var(--font-sans)}
 .chart .col b{font-size:10px;color:var(--text-faint);font-weight:var(--fw-medium)}
 .chart .col .stick{width:100%;max-width:38px;border-radius:8px 8px 3px 3px;background:var(--grad-brand);opacity:.9;min-height:3px}
 .dnum{font-size:11px;color:var(--text-faint);direction:ltr}
+/* branding */
+.color-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.color-field{display:grid;grid-template-columns:1fr 44px minmax(80px,1fr);align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--text-muted)}
+.color-field input[type=color]{width:44px;height:34px;margin:0;padding:2px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer}
+.brand-preview{border-radius:var(--r-md);padding:18px;display:flex;align-items:center;gap:12px;margin-bottom:14px;border:1px solid var(--border)}
+.brand-preview .bp-logo{width:40px;height:40px;border-radius:10px;object-fit:contain;background:#fff}
 @media (max-width:960px){.console-table th:nth-child(3),.console-table td:nth-child(3){display:none}}
 </style>
 </head>
 <body>
 
-<!-- ==================== LOGIN (separate world) ==================== -->
+<!-- ==================== LOGIN (vendor only) ==================== -->
 <div id="auth" class="auth-wrap" hidden>
   <div class="auth-blob b1"></div><div class="auth-blob b2"></div><div class="auth-blob b3"></div>
   <div class="auth-card">
     <span class="orb" style="width:46px;height:46px"></span>
     <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Admin Console</h1>
-    <p class="sub">Administrator sign-in. After login you get the full Nova workspace <b>plus</b> the platform management console.</p>
+    <p class="sub">Vendor access only — prepare the platform, connect the AI engine, manage modules, then hand the appliance over.</p>
     <div class="field"><label>Username</label><input class="input" id="lu" autocomplete="username" value="admin" /></div>
     <div class="field"><label>Password</label><input class="input" id="lp" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
     <button class="btn btn-gradient btn-block" id="lb">Sign in</button>
@@ -78,23 +76,12 @@ body{font-family:var(--font-sans)}
   </div>
 </div>
 
-<!-- ==================== FULL WORKSPACE (real app) ==================== -->
-<div id="work">
-  <iframe id="appFrame" title="Nova Workspace" src="about:blank"></iframe>
-  <div class="fab-stack">
-    <button class="fab" id="fabAdmin">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Admin Console
-    </button>
-  </div>
-</div>
-
-<!-- ==================== ADMIN CONSOLE ==================== -->
+<!-- ==================== VENDOR CONSOLE ==================== -->
 <div id="shell" class="shell" hidden>
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="orb" style="width:30px;height:30px"></span>
-      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">platform console</div></div>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console</div></div>
     </div>
     <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
     <div style="flex:1"></div>
@@ -116,8 +103,8 @@ body{font-family:var(--font-sans)}
     <div class="page">
       <div class="page-head">
         <div>
-          <div class="eyebrow">ADMIN CONSOLE</div>
-          <h1 id="phTitle">Overview</h1>
+          <div class="eyebrow">VENDOR CONSOLE</div>
+          <h1 id="phTitle">System Health</h1>
           <p id="phDesc"></p>
         </div>
         <div id="phActions" class="h-stack"></div>
@@ -136,10 +123,9 @@ const API = (() => {
     return sessionStorage.getItem("aibox.apiBase") || "";
   } catch(e) { return ""; }
 })();
-const APP_URL = "/aibox-odoo/" + (API ? "?api=" + encodeURIComponent(API) : "");
 const $id = (i) => document.getElementById(i);
 const esc = (s) => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let SEC = "workspace";
+let SEC = "health";
 
 async function api(path, opts={}) {
   const o = {credentials:"include", headers:{}, ...opts};
@@ -162,7 +148,7 @@ try { const t = localStorage.getItem("aibox.admin.theme"); if (t) document.docum
 
 /* ================= auth ================= */
 function showAuth(msg) {
-  $id("shell").hidden = true; $id("work").style.display = "none";
+  $id("shell").hidden = true;
   $id("auth").hidden = false;
   $id("lerr").textContent = msg || "";
   $id("lp").value = "";
@@ -172,10 +158,9 @@ async function doLogin() {
   const b = $id("lb"); b.disabled = true; b.textContent = "Signing in…";
   $id("lerr").textContent = "";
   try {
-    const r = await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
+    await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
       username: $id("lu").value.trim(), password: $id("lp").value })});
-    if (r.gateway_api_key) { try { localStorage.setItem("aibox.apiKey", r.gateway_api_key); } catch(e){} }
-    showWorkspace();
+    showConsole();
   } catch(e) { $id("lerr").textContent = e.message; }
   b.disabled = false; b.textContent = "Sign in";
 }
@@ -184,59 +169,35 @@ $id("lp").onkeydown = (e)=>{ if(e.key==="Enter") doLogin(); };
 $id("lu").onkeydown = (e)=>{ if(e.key==="Enter") $id("lp").focus(); };
 $id("btnLogout").onclick = async () => {
   try { await api("/api/admin/panel/logout", {method:"POST"}); } catch(e){}
-  try { await fetch(API + "/api/logout", {method:"POST", credentials:"include"}); } catch(e){}
-  try { localStorage.removeItem("aibox.apiKey"); } catch(e){}
-  SEC = "workspace"; showAuth();
+  SEC = "health"; showAuth();
 };
 $id("btnBurger").onclick = () => $id("sidebar").classList.toggle("open");
-$id("fabAdmin").onclick = () => showConsole();
-
-/* ================= views: workspace / console ================= */
-function showWorkspace() {
-  $id("auth").hidden = true; $id("shell").hidden = true;
-  const w = $id("work"); w.style.display = "block";
-  const f = $id("appFrame");
-  if (f.src === "about:blank" || !f.src) f.src = APP_URL;
-}
-function showConsole() {
-  $id("work").style.display = "none";
-  $id("auth").hidden = true;
-  $id("shell").hidden = false;
-  renderNav(); renderSection(); refreshSideStatus();
-}
 
 /* ================= console shell ================= */
 const ICONS = {
-  workspace: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
-  overview: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+  health: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
   engine: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>',
   usage: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
+  branding: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>',
   modules: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
   users: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   logs: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
 };
 const SECTIONS = [
-  ["workspace","Nova Workspace","", "ws"],
-  ["overview","Overview","Platform status at a glance — services, engine and recent activity."],
+  ["health","System Health","Live status of this appliance: database, cache, AI engine and installed apps."],
   ["engine","AI Engine","Connect the AI brain of the whole platform: provider, endpoint, models and API key. Test before you apply."],
   ["usage","Token Usage","Real recorded AI consumption — total, per department and per employee, with the daily trend."],
+  ["branding","Branding","White-label the platform for the customer: name, tagline, colors and logo before handover."],
   ["modules","Modules","Install, update or remove Odoo apps on this appliance. Critical platform modules are protected."],
   ["users","Users","Internal accounts and passwords."],
   ["logs","Audit Log","Every admin action recorded by the panel."],
 ];
 function renderNav() {
   const nav = $id("nav"); nav.innerHTML = "";
-  const wsFirst = SECTIONS[0];
-  const a0 = document.createElement("a");
-  a0.href = "#"; a0.className = "nav-item" + (SEC==="workspace" ? " active" : "");
-  a0.style.color = SEC==="workspace" ? "var(--accent)" : "";
-  a0.innerHTML = ICONS.workspace + "<span>" + esc(wsFirst[1]) + "</span>";
-  a0.onclick = (ev) => { ev.preventDefault(); showWorkspace(); };
-  nav.appendChild(a0);
   const lbl = document.createElement("div");
   lbl.className = "nav-label"; lbl.textContent = "Platform management";
   nav.appendChild(lbl);
-  SECTIONS.slice(1).forEach(([k,label]) => {
+  SECTIONS.forEach(([k,label]) => {
     const a = document.createElement("a");
     a.href = "#"; a.className = "nav-item" + (k===SEC ? " active" : "");
     a.innerHTML = ICONS[k] + "<span>" + esc(label) + "</span>";
@@ -244,6 +205,11 @@ function renderNav() {
       $id("sidebar").classList.remove("open"); };
     nav.appendChild(a);
   });
+}
+function showConsole() {
+  $id("auth").hidden = true;
+  $id("shell").hidden = false;
+  renderNav(); renderSection(); refreshSideStatus();
 }
 async function refreshSideStatus() {
   const el = $id("sideStatus");
@@ -264,42 +230,42 @@ function renderSection() {
   setHead(meta[1], meta[2]);
   const view = $id("view");
   view.innerHTML = '<div class="card"><span class="muted small">Loading…</span></div>';
-  const fn = {overview:secOverview, engine:secEngine, usage:secUsage, modules:secModules, users:secUsers, logs:secLogs}[SEC];
+  const fn = {health:secHealth, engine:secEngine, usage:secUsage, branding:secBranding, modules:secModules, users:secUsers, logs:secLogs}[SEC];
   fn(view).catch(e => { if (e.message !== "unauthorized")
     view.innerHTML = '<div class="card"><span style="color:var(--err)">'+esc(e.message)+'</span> <button class="btn btn-sm" style="margin-left:10px" onclick="renderSection()">Retry</button></div>'; });
 }
 
-/* ================= section: overview ================= */
-async function secOverview(view) {
-  const [h, eng, lg] = await Promise.all([
-    api("/api/admin/panel/health"), api("/api/admin/panel/engine"),
+/* ================= section: system health (landing) ================= */
+async function secHealth(view) {
+  const [h, lg] = await Promise.all([
+    api("/api/admin/panel/health"),
     api("/api/admin/panel/logs").catch(()=>({logs:[]}))]);
   const c = h.counts || {};
   const engineUp = h.ai_engine === "up";
   const tile = (val,label,col)=>'<div class="card stat-tile"><b style="'+(col?'color:'+col:'')+'">'+esc(val)+'</b><span>'+esc(label)+'</span></div>';
   const countsHtml = Object.entries(c).map(([k,v])=>
-    '<div class="card stat-tile"><b>'+(v==null?"-":esc(v))+'</b><span>'+esc(k.replace(/_/g," "))+'</span></div>').join("");
+    '<div class="card stat-tile"><b>'+(v==null?"-":esc(v))+'</b><span>'+esc(k)+'</span></div>').join("");
   const recent = (lg.logs||[]).slice(0,6);
   view.innerHTML =
   '<div class="fade-in">' +
     '<div class="card hero-engine" style="margin-bottom:16px"><div class="h-stack spread wrap">' +
       '<div><span class="bgd '+(engineUp?'bgd-ok':'bgd-warn')+'" style="margin-bottom:10px"><span class="bgd-dot"></span>AI engine '+esc(h.ai_engine)+'</span>' +
-      '<h2 style="font-size:var(--fs-xl);margin:6px 0 4px">'+esc(eng.provider||"No engine configured")+'</h2>' +
-      '<p class="muted small" style="direction:ltr;text-align:left">'+esc(eng.api_base||"—")+' · chat model: <b>'+esc(eng.chat_model||"—")+'</b>'+(eng.has_key?' · key <span class="bgd bgd-accent">'+esc(eng.api_key_tail)+'</span>':' · no API key')+'</p></div>' +
-      '<button class="btn btn-gradient" id="ovEngineBtn">Configure engine</button>' +
+      '<h2 style="font-size:var(--fs-xl);margin:6px 0 4px">Appliance is '+(h.database==="up"?"ready":"not ready")+' for handover</h2>' +
+      '<p class="muted small">Services below must be green before you ship this device to the customer.</p></div>' +
+      '<button class="btn" id="h_refresh">Refresh</button>' +
     '</div></div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:16px">' +
       tile(h.database,"Database", h.database==="up"?"var(--ok)":"var(--err)") +
-      tile(h.redis,"Redis", h.redis==="up"?"var(--ok)":null) +
+      tile(h.redis,"Redis cache", h.redis==="up"?"var(--ok)":null) +
       tile(h.modules_installed,"Modules installed") +
       '<div class="card stat-tile"><b style="font-size:var(--fs-md)">'+esc(h.ai_engine)+'</b><span>AI engine</span></div>' +
     '</div>' +
     (countsHtml?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:16px">'+countsHtml+'</div>':'') +
-    '<div class="card"><div class="card-head"><h3>Recent admin activity</h3><a href="#" id="ovLogs" class="small" style="color:var(--accent)">view all →</a></div>' +
+    '<div class="card"><div class="card-head"><h3>Recent admin activity</h3><a href="#" id="hLogs" class="small" style="color:var(--accent)">view all →</a></div>' +
     (recent.length ? recent.map(l=>'<div class="logline"><span class="faint mono">'+esc(l.date)+'</span><b>'+esc(l.action)+'</b><span class="muted">'+esc(l.user||"system")+'</span>'+(l.success?'<span class="bgd bgd-ok" style="margin-inline-start:auto"><span class="bgd-dot"></span>ok</span>':'<span class="bgd bgd-err" style="margin-inline-start:auto"><span class="bgd-dot"></span>'+esc(l.error||"failed")+'</span>')+'</div>').join("") : '<span class="muted small">No events yet.</span>') +
     '</div></div>';
-  $id("ovEngineBtn").onclick = () => { SEC="engine"; renderNav(); renderSection(); };
-  $id("ovLogs").onclick = (ev)=>{ ev.preventDefault(); SEC="logs"; renderNav(); renderSection(); };
+  $id("h_refresh").onclick = () => renderSection();
+  $id("hLogs").onclick = (ev)=>{ ev.preventDefault(); SEC="logs"; renderNav(); renderSection(); };
 }
 
 /* ================= section: AI engine ================= */
@@ -409,6 +375,62 @@ async function secUsage(view) {
   };
 }
 
+/* ================= section: branding (white-label before handover) ================= */
+async function secBranding(view) {
+  const b = await api("/api/admin/panel/branding");
+  const colors = [["primary_color","Primary"],["secondary_color","Secondary"],["accent_color","Accent"],["danger_color","Danger"],["warning_color","Warning"]];
+  const def = (k, d) => esc(b[k] || d);
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Customer brand</h3>'+(b.logo_uploaded?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>logo uploaded</span>':'<span class="bgd bgd-warn"><span class="bgd-dot"></span>no logo</span>')+'</div>' +
+    '<div class="brand-preview" style="background:'+ (b.primary_color||'#5a5ad6') +'1a"><span class="orb" style="width:40px;height:40px"></span>' +
+      '<div><b style="font-family:var(--font-display);font-size:var(--fs-lg)">'+esc(b.brand_name||"Customer AI")+'</b><div class="muted small">'+esc(b.tagline||"Your tagline appears here")+'</div></div></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">' +
+      '<div class="field"><label>Brand name *</label><input class="input" id="b_name" value="'+def("brand_name","")+'"/></div>' +
+      '<div class="field"><label>Tagline</label><input class="input" id="b_tag" value="'+def("tagline","")+'"/></div>' +
+      '<div class="field"><label>Product title</label><input class="input" id="b_prod" value="'+def("product_title","")+'"/></div>' +
+      '<div class="field"><label>Support email</label><input class="input" id="b_semail" value="'+def("support_email","")+'" dir="ltr"/></div>' +
+      '<div class="field"><label>Support URL</label><input class="input" id="b_surl" value="'+def("support_url","")+'" dir="ltr"/></div>' +
+      '<div class="field"><label>Footer text</label><input class="input" id="b_foot" value="'+def("footer_text","")+'"/></div>' +
+      '<div class="field"><label>Login screen message</label><input class="input" id="b_lmsg" value="'+def("login_message","")+'"/></div>' +
+    '</div>' +
+    '<div class="card-head" style="margin-top:16px"><h3>Colors</h3></div>' +
+    '<div class="color-grid">' +
+      colors.map(([k,label])=>'<div class="color-field"><span>'+label+'</span><input type="color" id="b_'+k+'" value="'+def(k,"#5a5ad6")+'"/><input class="input" style="padding:5px 8px;font-size:12px" id="b_'+k+'_txt" value="'+def(k,"#5a5ad6")+'" dir="ltr"/></div>').join("") +
+    '</div>' +
+    '<div class="h-stack wrap" style="margin-top:18px;align-items:flex-end">' +
+      '<div class="field" style="margin:0"><label>Logo (PNG/SVG)</label><input class="input" id="b_logo" type="file" accept="image/png,image/jpeg,image/svg+xml"/></div>' +
+      '<button class="btn btn-gradient" id="b_save">Save branding</button>' +
+      '<span id="b_msg" class="muted small"></span>' +
+    '</div>' +
+    '<p class="muted small" style="margin-top:14px">This white-label profile is what the customer sees on their platform. It does not touch the vendor console itself.</p>' +
+  '</div></div>';
+  colors.forEach(([k]) => {
+    $id("b_"+k).oninput = () => { $id("b_"+k+"_txt").value = $id("b_"+k).value; };
+    $id("b_"+k+"_txt").oninput = () => { if (/^#[0-9a-fA-F]{6}$/.test($id("b_"+k+"_txt").value)) $id("b_"+k).value = $id("b_"+k+"_txt").value; };
+  });
+  $id("b_save").onclick = async () => {
+    const msg = $id("b_msg"); msg.textContent = "Saving…";
+    try {
+      const payload = { brand_name: $id("b_name").value.trim(), tagline: $id("b_tag").value.trim(),
+        product_title: $id("b_prod").value.trim(), support_email: $id("b_semail").value.trim(),
+        support_url: $id("b_surl").value.trim(), footer_text: $id("b_foot").value.trim(),
+        login_message: $id("b_lmsg").value.trim() };
+      colors.forEach(([k]) => { payload[k] = $id("b_"+k+"_txt").value.trim(); });
+      const f = $id("b_logo").files[0];
+      if (f) {
+        if (f.size > 2*1024*1024) throw new Error("logo must be under 2 MB");
+        payload.logo_b64 = await new Promise((res,rej)=>{ const rd = new FileReader();
+          rd.onload = ()=>res(String(rd.result)); rd.onerror = ()=>rej(new Error("read failed")); rd.readAsDataURL(f); });
+        payload.logo_filename = f.name; payload.logo_mimetype = f.type || "image/png";
+      }
+      const r = await api("/api/admin/panel/branding", {method:"POST", body: JSON.stringify(payload)});
+      msg.innerHTML = r.ok ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Branding saved — “'+esc(r.brand_name)+'”</span>'
+                           : '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(r.error||"failed")+'</span>';
+    } catch(e){ msg.innerHTML = '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(e.message)+'</span>'; }
+  };
+}
+
 /* ================= section: modules ================= */
 async function secModules(view) {
   const {modules} = await api("/api/admin/panel/modules");
@@ -483,11 +505,7 @@ async function secLogs(view) {
 
 /* ================= boot ================= */
 (async function boot(){
-  try {
-    const s = await api("/api/admin/panel/session");
-    if (s.gateway_api_key) { try { localStorage.setItem("aibox.apiKey", s.gateway_api_key); } catch(e){} }
-    showWorkspace();
-  }
+  try { await api("/api/admin/panel/session"); showConsole(); }
   catch(e){ /* 401 already switched to the login card; network errors too */ showAuth(); }
 })();
 </script>

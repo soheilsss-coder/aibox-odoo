@@ -284,6 +284,23 @@ class AdminPanelController(http.Controller):
             return err
         return _json(_panel_env().health())
 
+    # -------------------------------------------------------------- branding
+    @http.route("/api/admin/panel/branding", type="http", auth="none", csrf=False,
+                methods=["GET", "POST", "OPTIONS"])
+    def branding(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _json({"ok": True})
+        user, err = _require_admin()
+        if err:
+            return err
+        if request.httprequest.method == "GET":
+            return _json(_panel_env().branding_get())
+        try:
+            body = __import__("json").loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            return _json({"error": "invalid body"}, status=400)
+        return _json(_panel_env().branding_save(body))
+
     # ---------------------------------------------------------- token usage
     @http.route("/api/admin/panel/usage", type="http", auth="none", csrf=False,
                 methods=["GET", "OPTIONS"])
