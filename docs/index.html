@@ -19,6 +19,75 @@
         document.documentElement.dataset.theme = localStorage.getItem("nova.theme") || "light";
       } catch (e) {}
     </script>
+    <script>
+      // VENDOR ROUTING LAYER (backend console wiring - the bundle is
+      // untouched): the appliance administrator (vendor) must land in the
+      // admin console, not the company workspace. If an admin logs in here,
+      // or already has a live admin session, send them to /admin.
+      (function () {
+        var REDIRECT_DONE = "__aiboxAdminChecked";
+        function toAdmin() {
+          if (sessionStorage.getItem(REDIRECT_DONE)) return;
+          sessionStorage.setItem(REDIRECT_DONE, "1");
+          location.replace("/admin");
+        }
+        function whoAmI(base) {
+          try {
+            fetch((base || "") + "/api/bootstrap", {
+              credentials: "include",
+              headers: (function () {
+                var h = {};
+                try {
+                  var k = localStorage.getItem("aibox.apiKey");
+                  if (k) h["X-API-Key"] = k;
+                } catch (e) {}
+                return h;
+              })(),
+            })
+              .then(function (r) {
+                return r.ok ? r.json() : null;
+              })
+              .then(function (d) {
+                if (d && d.user && d.user.login === "admin") toAdmin();
+              })
+              .catch(function () {});
+          } catch (e) {}
+        }
+        var _fetch = window.fetch;
+        if (_fetch) {
+          window.fetch = function (input, init) {
+            var p = _fetch.apply(this, arguments);
+            try {
+              var url = typeof input === "string" ? input : (input && input.url) || "";
+              var li = url.indexOf("/api/login");
+              if (li !== -1) {
+                p.then(function (r) {
+                  if (r && r.status === 200) {
+                    r.clone().json().then(function (d) {
+                      if (d && d.authenticated && d.user && d.user.login === "admin") {
+                        // land on the console of the SAME origin the login
+                        // was sent to (works on the appliance preview and
+                        // on GitHub Pages with an explicit api base).
+                        if (!sessionStorage.getItem(REDIRECT_DONE)) {
+                          sessionStorage.setItem(REDIRECT_DONE, "1");
+                          location.replace(url.slice(0, li) + "/admin");
+                        }
+                      }
+                    }).catch(function () {});
+                  }
+                }).catch(function () {});
+              }
+            } catch (e) {}
+            return p;
+          };
+        }
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", function () { whoAmI(""); });
+        } else {
+          whoAmI("");
+        }
+      })();
+    </script>
     <script type="module" crossorigin src="/aibox-odoo/assets/index-BKB2eATq.js"></script>
     <link rel="stylesheet" crossorigin href="/aibox-odoo/assets/index-B7tjfh8Z.css">
   </head>
