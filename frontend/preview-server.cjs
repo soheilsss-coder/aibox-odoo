@@ -35,6 +35,8 @@ function serveStatic(req, res) {
   }
   if (urlPath.startsWith("/aibox-odoo/")) urlPath = urlPath.slice("/aibox-odoo".length);
   if (urlPath === "/" || urlPath === "") urlPath = "/index.html";
+  // Friendly alias for the admin console (docs/admin.html).
+  if (urlPath === "/admin") urlPath = "/admin.html";
   let filePath = path.normalize(path.join(ROOT, urlPath));
   if (!filePath.startsWith(ROOT)) { res.writeHead(403); return res.end("forbidden"); }
   fs.stat(filePath, (err, st) => {

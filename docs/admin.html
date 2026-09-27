@@ -1,70 +1,108 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr" data-theme="light">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Admin Panel — Platform Console</title>
+<meta name="theme-color" content="#f7f6f2" />
+<meta name="description" content="Nova Enterprise — platform admin console (separate from the workspace)." />
+<meta name="robots" content="noindex" />
+<title>Nova Enterprise — Admin Console</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%236a5cff'/><stop offset='1' stop-color='%23ff6b8b'/></linearGradient></defs><circle cx='50' cy='50' r='42' fill='url(%23g)'/></svg>" />
 <style>
-:root{--bg:#0f1420;--panel:#171e2e;--panel2:#1c2436;--line:#2a3450;--txt:#e8ecf6;--dim:#93a0bd;--acc:#6a5cff;--ok:#3ecf8e;--bad:#ff6b8b;--warn:#f5b14c}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
-.wrap{max-width:1080px;margin:0 auto;padding:0 20px 60px}
-header{display:flex;align-items:center;gap:14px;padding:18px 0;border-bottom:1px solid var(--line);margin-bottom:22px}
-.logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#6a5cff,#ff6b8b);display:flex;align-items:center;justify-content:center;font-weight:700}
-h1{font-size:17px;letter-spacing:.4px}
-.badge{font-size:10px;letter-spacing:2px;color:var(--dim);border:1px solid var(--line);padding:3px 8px;border-radius:99px}
-.spacer{flex:1}
-.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
-.login-box{max-width:400px;margin:12vh auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:34px}
-.login-box h2{font-size:20px;margin-bottom:6px}
-.login-box p{color:var(--dim);font-size:13px;margin-bottom:22px}
-label{display:block;font-size:12px;color:var(--dim);margin:14px 0 6px}
-input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--txt);font-size:14px;outline:none}
-input:focus{border-color:var(--acc)}
-button{background:var(--acc);border:none;color:#fff;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
-button:hover{filter:brightness(1.1)}
-button:disabled{opacity:.55;cursor:wait}
-button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-weight:500}
-button.small{padding:7px 12px;font-size:12.5px}
-.err{color:var(--bad);font-size:13px;margin-top:12px;min-height:17px}
-.tabs{display:flex;gap:6px;margin:18px 0;flex-wrap:wrap}
-.tabs button{background:var(--panel2);border:1px solid var(--line);color:var(--dim);padding:9px 15px;border-radius:10px;font-weight:500}
-.tabs button.on{background:var(--acc);border-color:var(--acc);color:#fff}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
-.card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-@media(max-width:760px){.grid2,.grid4{grid-template-columns:1fr}}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:var(--dim);font-weight:500;padding:8px 6px;border-bottom:1px solid var(--line)}
-td{padding:8px 6px;border-bottom:1px solid var(--line)}
-.pill{font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
-.pill.ok{color:var(--ok);border-color:rgba(62,207,142,.4)}
-.pill.bad{color:var(--bad);border-color:rgba(255,107,139,.4)}
-.pill.warn{color:var(--warn);border-color:rgba(245,177,76,.4)}
-.stat{background:var(--panel2);border-radius:12px;padding:14px}
-.stat b{font-size:22px;display:block}
-.stat span{color:var(--dim);font-size:12px}
-.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
-.mut{color:var(--dim);font-size:12.5px}
-.log{font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.75;max-height:420px;overflow:auto}
-.ok-txt{color:var(--ok)} .bad-txt{color:var(--bad)}
-.fade{animation:f .25s ease}@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+/* Fallback tokens (mirror the app bundle) — the real stylesheet below
+   overrides them when it loads. Keeps the page on-brand even offline. */
+:root{--font-sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:"Space Grotesk","Inter",system-ui,sans-serif;--fs-xs:12px;--fs-sm:13px;--fs-base:14.5px;--fs-md:15.5px;--fs-lg:17px;--fs-xl:21px;--fs-2xl:27px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-full:999px;--accent:#5a5ad6;--accent-soft:#5a5ad61a;--accent-contrast:#fff;--ring-accent:0 0 0 4px #5a5ad629;--grad-brand:linear-gradient(135deg,#6a5cff 0%,#9b5cff 55%,#e05d8f 100%);--shadow-glow:0 8px 32px #6a5cff47;--ok:#0e9f6e;--ok-soft:#0e9f6e1f;--warn:#d97706;--warn-soft:#d977061f;--err:#dc2626;--err-soft:#dc26261a;--info:#2563eb;--info-soft:#2563eb1a;--bg:#f7f6f2;--bg-elev:#faf9f5;--surface:#fff;--surface-2:#f1efe9;--surface-3:#e8e5dd;--border:#e8e5dd;--border-strong:#d9d5ca;--text:#1b1a17;--text-muted:#6f6a60;--text-faint:#a39d92;--sidebar-w:268px;--topbar-h:56px;--ease-out:cubic-bezier(.22,.61,.36,1)}
+</style>
+<link rel="stylesheet" href="assets/index-B7tjfh8Z.css" />
+<style>
+/* ---- admin console layout (uses the app's tokens/classes) ---- */
+body{font-family:var(--font-sans)}
+.auth-card h1{display:flex;align-items:center;gap:10px}
+.auth-card h1 svg{color:var(--accent);flex:none}
+.err{color:var(--err);font-size:var(--fs-sm);min-height:18px;margin-top:12px}
+.console-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.console-table th{text-align:left;font-weight:var(--fw-semibold);color:var(--text-faint);font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;padding:10px 12px;border-bottom:1px solid var(--border)}
+.console-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.console-table tr:last-child td{border-bottom:none}
+.console-table tr:hover td{background:var(--accent-softer)}
+.out{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;font-family:ui-monospace,SF Mono,Menlo,Consolas,monospace;font-size:12px;line-height:1.7;max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;direction:ltr;text-align:left;margin-top:12px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.logline{display:flex;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px dashed var(--border);font-size:var(--fs-sm)}
+.logline:last-child{border-bottom:none}
+.stat-tile{display:flex;flex-direction:column;gap:8px}
+.stat-tile b{font-size:var(--fs-xl);font-family:var(--font-display)}
+.stat-tile span{font-size:var(--fs-xs);color:var(--text-muted);font-weight:var(--fw-medium);text-transform:uppercase;letter-spacing:.05em}
+.side-foot{display:flex;flex-direction:column;gap:6px}
+.side-status{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--text-muted);padding:8px 10px}
+.filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:var(--sp-4)}
+.filter-row .input{max-width:320px}
+.hero-engine{position:relative;overflow:hidden}
+.hero-engine:before{content:"";background:var(--grad-brand);opacity:.07;pointer-events:none;position:absolute;inset:0}
+.fade-in{animation:fadeUp .3s var(--ease-out) both}
+@keyframes fadeUp{0%{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.pw-cell{display:flex;gap:8px;align-items:center}
+.pw-cell .input{width:160px;padding:6px 10px;font-size:var(--fs-sm)}
+.mono{font-size:12px}
+@media (max-width:960px){.console-table th:nth-child(3),.console-table td:nth-child(3){display:none}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="logo">A</div>
-    <div><h1>Admin Panel</h1></div>
-    <span class="badge">PLATFORM CONSOLE</span>
-    <div class="spacer"></div>
-    <span id="hdrSvcs" class="mut"></span>
-    <button id="btnLogout" class="ghost small" style="display:none">Log out</button>
-  </header>
-  <div id="app" class="fade"></div>
+
+<!-- ==================== LOGIN (separate world) ==================== -->
+<div id="auth" class="auth-wrap" hidden>
+  <div class="auth-blob b1"></div><div class="auth-blob b2"></div><div class="auth-blob b3"></div>
+  <div class="auth-card">
+    <span class="orb" style="width:46px;height:46px"></span>
+    <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Admin Console</h1>
+    <p class="sub">Platform management — a separate world from the workspace. Sign in with an administrator username &amp; password.</p>
+    <div class="field"><label>Username</label><input class="input" id="lu" autocomplete="username" value="admin" /></div>
+    <div class="field"><label>Password</label><input class="input" id="lp" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
+    <button class="btn btn-gradient btn-block" id="lb">Sign in to console</button>
+    <div class="err" id="lerr"></div>
+    <div class="auth-foot">Nova Enterprise · restricted area</div>
+  </div>
 </div>
+
+<!-- ==================== CONSOLE ==================== -->
+<div id="shell" class="shell" hidden>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="orb" style="width:30px;height:30px"></span>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">platform console</div></div>
+    </div>
+    <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:10px"></nav>
+    <div style="flex:1"></div>
+    <div class="side-foot">
+      <div class="side-status" id="sideStatus"><span class="dot" style="background:var(--text-faint)"></span>checking services…</div>
+      <button class="btn btn-ghost btn-block" id="btnTheme" title="Toggle theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>Theme
+      </button>
+      <button class="btn btn-ghost btn-block" id="btnLogout" style="color:var(--err)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log out
+      </button>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <button class="btn btn-icon btn-ghost" id="btnBurger" title="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <div class="brand" style="padding:0"><span class="orb" style="width:24px;height:24px"></span><div class="brand-name" style="font-size:14px">Nova Admin</div></div>
+    </div>
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">ADMIN CONSOLE</div>
+          <h1 id="phTitle">Overview</h1>
+          <p id="phDesc"></p>
+        </div>
+        <div id="phActions" class="h-stack"></div>
+      </div>
+      <div id="view"></div>
+    </div>
+  </div>
+</div>
+
 <script>
+/* ================= API base (?api= or remembered) ================= */
 const API = (() => {
   try {
     const q = new URLSearchParams(location.search).get("api");
@@ -72,190 +110,282 @@ const API = (() => {
     return sessionStorage.getItem("aibox.apiBase") || "";
   } catch(e) { return ""; }
 })();
-const $ = (h) => { const d = document.createElement("div"); d.innerHTML = h.trim(); return d.firstElementChild; };
-const esc = (s) => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let TAB = "engine";
+const $id = (i) => document.getElementById(i);
+const esc = (s) => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let SEC = "overview";
 
 async function api(path, opts={}) {
   const o = {credentials:"include", headers:{}, ...opts};
   if (o.body) o.headers["Content-Type"] = "application/json";
   const r = await fetch(API + path, o);
   const d = await r.json().catch(()=>({}));
-  if (r.status === 401) { renderLogin(); throw new Error(d.error || "unauthorized"); }
+  if (r.status === 401) { showAuth(); throw new Error(d.error || "unauthorized"); }
   if (!r.ok || d.error) throw new Error(d.error || ("request failed ("+r.status+")"));
   return d;
 }
 
-/* ---------------- Login ---------------- */
-function renderLogin(msg) {
-  document.getElementById("btnLogout").style.display = "none";
-  const app = document.getElementById("app");
-  app.innerHTML = "";
-  app.appendChild($(`<div class="login-box fade"><h2>Admin sign in</h2>
-    <p>Platform console — separate from the workspace. Username + password only.</p>
-    <label>Username</label><input id="lu" autocomplete="username" value="admin"/>
-    <label>Password</label><input id="lp" type="password" autocomplete="current-password"/>
-    <div style="margin-top:20px"><button id="lb" style="width:100%">Sign in</button></div>
-    <div class="err" id="lerr">${esc(msg||"")}</div></div>`));
-  const go = async () => {
-    const b = document.getElementById("lb"); b.disabled = true;
-    try {
-      await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
-        username: document.getElementById("lu").value.trim(),
-        password: document.getElementById("lp").value })});
-      renderPanel();
-    } catch(e) { document.getElementById("lerr").textContent = e.message; }
-    b.disabled = false;
-  };
-  document.getElementById("lb").onclick = go;
-  document.getElementById("lp").onkeydown = (e)=>{ if(e.key==="Enter") go(); };
-  document.getElementById("lu").onkeydown = (e)=>{ if(e.key==="Enter") document.getElementById("lp").focus(); };
-  document.getElementById("lu").focus();
-}
-
-/* ---------------- Panel shell ---------------- */
-const TABS = [["engine","AI Engine"],["modules","Modules"],["users","Users"],["health","System Health"],["logs","Logs"]];
-function renderPanel() {
-  document.getElementById("btnLogout").style.display = "";
-  const app = document.getElementById("app");
-  app.innerHTML = "";
-  const tabs = $(`<div class="tabs"></div>`);
-  TABS.forEach(([k,label]) => {
-    const b = document.createElement("button");
-    b.textContent = label; if (k===TAB) b.className = "on";
-    b.onclick = () => { TAB = k; renderPanel(); };
-    tabs.appendChild(b);
-  });
-  app.appendChild(tabs);
-  const body = $("<div></div>"); app.appendChild(body);
-  ({engine: tabEngine, modules: tabModules, users: tabUsers, health: tabHealth, logs: tabLogs}[TAB])(body);
-}
-document.getElementById("btnLogout").onclick = async () => {
-  try { await api("/api/admin/panel/logout", {method:"POST"}); } catch(e){}
-  renderLogin();
+/* ================= theme ================= */
+$id("btnTheme").onclick = () => {
+  const el = document.documentElement;
+  const next = el.dataset.theme === "dark" ? "light" : "dark";
+  el.dataset.theme = next;
+  try { localStorage.setItem("aibox.admin.theme", next); } catch(e){}
 };
+try { const t = localStorage.getItem("aibox.admin.theme"); if (t) document.documentElement.dataset.theme = t; } catch(e){}
 
-/* ---------------- Tab: AI Engine ---------------- */
-async function tabEngine(root) {
+/* ================= auth ================= */
+function showAuth(msg) {
+  $id("shell").hidden = true;
+  $id("auth").hidden = false;
+  $id("lerr").textContent = msg || "";
+  $id("lp").value = "";
+  $id("lu").focus();
+}
+async function doLogin() {
+  const b = $id("lb"); b.disabled = true; b.textContent = "Signing in…";
+  $id("lerr").textContent = "";
+  try {
+    await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
+      username: $id("lu").value.trim(), password: $id("lp").value })});
+    showConsole();
+  } catch(e) { $id("lerr").textContent = e.message; }
+  b.disabled = false; b.textContent = "Sign in to console";
+}
+$id("lb").onclick = doLogin;
+$id("lp").onkeydown = (e)=>{ if(e.key==="Enter") doLogin(); };
+$id("lu").onkeydown = (e)=>{ if(e.key==="Enter") $id("lp").focus(); };
+$id("btnLogout").onclick = async () => {
+  try { await api("/api/admin/panel/logout", {method:"POST"}); } catch(e){}
+  SEC = "overview"; showAuth();
+};
+$id("btnBurger").onclick = () => $id("sidebar").classList.toggle("open");
+
+/* ================= console shell ================= */
+const ICONS = {
+  overview: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+  engine: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>',
+  modules: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+  users: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  logs: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+};
+const SECTIONS = [
+  ["overview","Overview","Platform status at a glance — services, engine and recent activity."],
+  ["engine","AI Engine","Connect the AI brain of the whole platform: provider, endpoint, models and API key. Test before you apply."],
+  ["modules","Modules","Install, update or remove Odoo apps on this appliance. Critical platform modules are protected."],
+  ["users","Users","Internal accounts and passwords."],
+  ["logs","Audit Log","Every admin action recorded by the panel."],
+];
+function renderNav() {
+  const nav = $id("nav"); nav.innerHTML = "";
+  SECTIONS.forEach(([k,label]) => {
+    const a = document.createElement("a");
+    a.href = "#"; a.className = "nav-item" + (k===SEC ? " active" : "");
+    a.innerHTML = ICONS[k] + "<span>" + esc(label) + "</span>";
+    a.onclick = (ev) => { ev.preventDefault(); SEC = k; renderNav(); renderSection();
+      $id("sidebar").classList.remove("open"); };
+    nav.appendChild(a);
+  });
+}
+function showConsole() {
+  $id("auth").hidden = true;
+  $id("shell").hidden = false;
+  renderNav(); renderSection(); refreshSideStatus();
+}
+async function refreshSideStatus() {
+  const el = $id("sideStatus");
+  try {
+    const h = await api("/api/admin/panel/health");
+    const allUp = h.database==="up" && h.ai_engine==="up";
+    const col = allUp ? "var(--ok)" : (h.database==="up" ? "var(--warn)" : "var(--err)");
+    el.innerHTML = '<span class="dot" style="background:'+col+'"></span>db '+esc(h.database)+' · engine '+esc(h.ai_engine);
+  } catch(e) { /* 401 handled centrally */ }
+}
+function setHead(title, desc) {
+  $id("phTitle").textContent = title;
+  $id("phDesc").textContent = desc || "";
+  $id("phActions").innerHTML = "";
+}
+function renderSection() {
+  const meta = SECTIONS.find(s=>s[0]===SEC);
+  setHead(meta[1], meta[2]);
+  const view = $id("view");
+  view.innerHTML = '<div class="card"><span class="muted small">Loading…</span></div>';
+  const fn = {overview:secOverview, engine:secEngine, modules:secModules, users:secUsers, logs:secLogs}[SEC];
+  fn(view).catch(e => { if (e.message !== "unauthorized")
+    view.innerHTML = '<div class="card"><span style="color:var(--err)">'+esc(e.message)+'</span> <button class="btn btn-sm" style="margin-left:10px" onclick="renderSection()">Retry</button></div>'; });
+}
+
+/* ================= section: overview ================= */
+async function secOverview(view) {
+  const [h, eng, lg] = await Promise.all([
+    api("/api/admin/panel/health"), api("/api/admin/panel/engine"),
+    api("/api/admin/panel/logs").catch(()=>({logs:[]}))]);
+  const c = h.counts || {};
+  const engineUp = h.ai_engine === "up";
+  const tile = (val,label,col)=>'<div class="card stat-tile"><b style="'+(col?'color:'+col:'')+'">'+esc(val)+'</b><span>'+esc(label)+'</span></div>';
+  const countsHtml = Object.entries(c).map(([k,v])=>
+    '<div class="card stat-tile"><b>'+(v==null?"-":esc(v))+'</b><span>'+esc(k.replace(/_/g," "))+'</span></div>').join("");
+  const recent = (lg.logs||[]).slice(0,6);
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="card hero-engine" style="margin-bottom:16px"><div class="h-stack spread wrap">' +
+      '<div><span class="bgd '+(engineUp?'bgd-ok':'bgd-warn')+'" style="margin-bottom:10px"><span class="bgd-dot"></span>AI engine '+esc(h.ai_engine)+'</span>' +
+      '<h2 style="font-size:var(--fs-xl);margin:6px 0 4px">'+esc(eng.provider||"No engine configured")+'</h2>' +
+      '<p class="muted small" style="direction:ltr;text-align:left">'+esc(eng.api_base||"—")+' · chat model: <b>'+esc(eng.chat_model||"—")+'</b>'+(eng.has_key?' · key <span class="bgd bgd-accent">'+esc(eng.api_key_tail)+'</span>':' · no API key')+'</p></div>' +
+      '<button class="btn btn-gradient" id="ovEngineBtn">Configure engine</button>' +
+    '</div></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:16px">' +
+      tile(h.database,"Database", h.database==="up"?"var(--ok)":"var(--err)") +
+      tile(h.redis,"Redis", h.redis==="up"?"var(--ok)":null) +
+      tile(h.modules_installed,"Modules installed") +
+      '<div class="card stat-tile"><b style="font-size:var(--fs-md)">'+esc(h.ai_engine)+'</b><span>AI engine</span></div>' +
+    '</div>' +
+    (countsHtml?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:16px">'+countsHtml+'</div>':'') +
+    '<div class="card"><div class="card-head"><h3>Recent admin activity</h3><a href="#" id="ovLogs" class="small" style="color:var(--accent)">view all →</a></div>' +
+    (recent.length ? recent.map(l=>'<div class="logline"><span class="faint mono">'+esc(l.date)+'</span><b>'+esc(l.action)+'</b><span class="muted">'+esc(l.user||"system")+'</span>'+(l.success?'<span class="bgd bgd-ok" style="margin-inline-start:auto"><span class="bgd-dot"></span>ok</span>':'<span class="bgd bgd-err" style="margin-inline-start:auto"><span class="bgd-dot"></span>'+esc(l.error||"failed")+'</span>')+'</div>').join("") : '<span class="muted small">No events yet.</span>') +
+    '</div></div>';
+  $id("ovEngineBtn").onclick = () => { SEC="engine"; renderNav(); renderSection(); };
+  $id("ovLogs").onclick = (ev)=>{ ev.preventDefault(); SEC="logs"; renderNav(); renderSection(); };
+}
+
+/* ================= section: AI engine ================= */
+const PRESETS = [
+  ["", "— choose a provider preset —", "", ""],
+  ["deepseek", "DeepSeek API", "https://api.deepseek.com/v1", "deepseek-chat"],
+  ["openai", "OpenAI API", "https://api.openai.com/v1", "gpt-4o-mini"],
+  ["compat", "Other OpenAI-compatible API", "", ""],
+  ["local", "Local server on this appliance (Nova brain)", "http://127.0.0.1:8001/v1", "nova-local-brain"],
+];
+async function secEngine(view) {
   const cfg = await api("/api/admin/panel/engine");
-  const el = $(`<div>
-    <div class="card fade"><h3>AI Engine</h3>
-      <div class="grid2">
-        <div><label>Provider label</label><input id="e_provider" value="${esc(cfg.provider||"")}"/></div>
-        <div><label>Base URL (OpenAI-compatible, ends without /v1 suffix)</label><input id="e_base" value="${esc(cfg.api_base||"")}" placeholder="https://api.deepseek.com/v1"/></div>
-        <div><label>Chat model</label><input id="e_chat" value="${esc(cfg.chat_model||"")}" placeholder="deepseek-chat"/></div>
-        <div><label>Embedding model</label><input id="e_emb" value="${esc(cfg.embedding_model||"")}"/></div>
-        <div><label>API key ${cfg.has_key?`<span class="pill ok">saved ${esc(cfg.api_key_tail)}</span>`:`<span class="pill">not set</span>`}</label><input id="e_key" type="password" placeholder="${cfg.has_key?"(keep current)":"sk-..."}"/></div>
-      </div>
-      <div class="row" style="margin-top:16px">
-        <button id="e_test">Test connection</button>
-        <button id="e_save">Save & apply to chat</button>
-        <span id="e_msg" class="mut"></span>
-      </div>
-      <pre id="e_out" class="log" style="margin-top:10px;color:var(--dim)"></pre>
-    </div>
-    <p class="mut">Save & apply: the appliance's chat assistant is re-bound to this engine instantly — no restart. The key is stored server-side and never sent back to the browser (only its last 4 characters).</p></div>`);
-  root.appendChild(el);
-  const vals = () => ({ provider: document.getElementById("e_provider").value,
-    api_base: document.getElementById("e_base").value.trim(),
-    chat_model: document.getElementById("e_chat").value.trim(),
-    embedding_model: document.getElementById("e_emb").value.trim(),
-    api_key: document.getElementById("e_key").value.trim() });
-  document.getElementById("e_test").onclick = async () => {
-    const msg = document.getElementById("e_msg"); msg.textContent = "Testing…";
-    const v = vals();
-    try { const r = await api("/api/admin/panel/engine/test", {method:"POST", body: JSON.stringify(v)});
-      document.getElementById("e_out").textContent = JSON.stringify(r, null, 2);
-      msg.innerHTML = r.ok ? '<span class="ok-txt">Engine replied: '+esc(r.chat_reply||"PONG")+'</span>' : '<span class="bad-txt">Failed: '+esc(r.error||("HTTP "+r.chat_status))+'</span>';
-    } catch(e){ msg.innerHTML = '<span class="bad-txt">'+esc(e.message)+'</span>'; }
+  view.innerHTML =
+  '<div class="fade-in card">' +
+    '<div class="card-head"><h3>Engine connection</h3>'+(cfg.has_key?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>API key saved '+esc(cfg.api_key_tail)+'</span>':'<span class="bgd bgd-warn"><span class="bgd-dot"></span>no API key</span>')+'</div>' +
+    '<div class="field"><label>Provider preset</label><select class="select" id="e_preset">' +
+      PRESETS.map(p=>'<option value="'+p[0]+'">'+esc(p[1])+'</option>').join("") + '</select></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">' +
+      '<div class="field"><label>Provider label</label><input class="input" id="e_provider" value="'+esc(cfg.provider||"")+'" placeholder="My AI provider"/></div>' +
+      '<div class="field"><label>Base URL (OpenAI-compatible)</label><input class="input" id="e_base" value="'+esc(cfg.api_base||"")+'" placeholder="https://api.deepseek.com/v1"/></div>' +
+      '<div class="field"><label>Chat model</label><input class="input" id="e_chat" value="'+esc(cfg.chat_model||"")+'" placeholder="deepseek-chat"/></div>' +
+      '<div class="field"><label>Embedding model (optional)</label><input class="input" id="e_emb" value="'+esc(cfg.embedding_model||"")+'"/></div>' +
+      '<div class="field"><label>API key '+(cfg.has_key?'<span class="faint">(leave empty to keep the saved one)</span>':'')+'</label><input class="input" id="e_key" type="password" placeholder="'+(cfg.has_key?"••••••••••••":"sk-…")+'"/></div>' +
+    '</div>' +
+    '<div class="h-stack wrap" style="margin-top:18px">' +
+      '<button class="btn" id="e_test">Test connection</button>' +
+      '<button class="btn btn-gradient" id="e_save">Save &amp; apply to chat</button>' +
+      '<span id="e_msg" class="muted small"></span>' +
+    '</div>' +
+    '<pre class="out" id="e_out" hidden></pre>' +
+    '<p class="muted small" style="margin-top:14px">“Save &amp; apply” instantly re-binds the platform chat assistant to this engine — no restart. The API key is stored server-side only and never returned to the browser (you will only ever see its last 4 characters).</p>' +
+  '</div>';
+  const vals = () => ({ provider: $id("e_provider").value,
+    api_base: $id("e_base").value.trim(), chat_model: $id("e_chat").value.trim(),
+    embedding_model: $id("e_emb").value.trim(), api_key: $id("e_key").value.trim() });
+  $id("e_preset").onchange = () => {
+    const p = PRESETS.find(x=>x[0]===$id("e_preset").value);
+    if (p && p[0]) { if (p[2]) $id("e_base").value = p[2];
+      if (!$id("e_chat").value && p[3]) $id("e_chat").value = p[3];
+      if (p[0]==="deepseek" && !$id("e_provider").value) $id("e_provider").value = "DeepSeek"; }
   };
-  document.getElementById("e_save").onclick = async () => {
-    const msg = document.getElementById("e_msg"); msg.textContent = "Saving…";
+  $id("e_test").onclick = async () => {
+    const msg = $id("e_msg"), out = $id("e_out");
+    msg.textContent = "Testing…"; out.hidden = false; out.textContent = "…";
+    try {
+      const r = await api("/api/admin/panel/engine/test", {method:"POST", body: JSON.stringify(vals())});
+      out.textContent = JSON.stringify(r, null, 2);
+      msg.innerHTML = r.ok ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Engine replied: “'+esc((r.chat_reply||"PONG").slice(0,80))+'”</span>'
+                           : '<span class="bgd bgd-err"><span class="bgd-dot"></span>Failed: '+esc(r.error||("HTTP "+r.chat_status))+'</span>';
+    } catch(e){ msg.innerHTML = '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(e.message)+'</span>'; }
+  };
+  $id("e_save").onclick = async () => {
+    const msg = $id("e_msg"); msg.textContent = "Saving…";
     try {
       const v = vals(); v.apply = true; if (!v.api_key) delete v.api_key;
       const r = await api("/api/admin/panel/engine", {method:"POST", body: JSON.stringify(v)});
       const res = r.apply_result || {};
-      msg.innerHTML = res.applied ? '<span class="ok-txt">Saved & applied — chat now uses '+esc(res.chat_model||res.provider||"the engine")+'</span>'
-                                  : '<span class="bad-txt">'+esc(res.error||"saved")+'</span>';
-    } catch(e){ msg.innerHTML = '<span class="bad-txt">'+esc(e.message)+'</span>'; }
+      msg.innerHTML = res.applied ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Saved &amp; applied — chat now uses '+esc(res.chat_model||res.provider||"the engine")+'</span>'
+                                  : '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(res.error||"saved")+'</span>';
+      refreshSideStatus();
+    } catch(e){ msg.innerHTML = '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(e.message)+'</span>'; }
   };
 }
 
-/* ---------------- Tab: Modules ---------------- */
-async function tabModules(root) {
+/* ================= section: modules ================= */
+async function secModules(view) {
   const {modules} = await api("/api/admin/panel/modules");
-  const el = $(`<div class="card fade"><h3>Odoo Modules (${modules.length})</h3>
-    <table><thead><tr><th>Module</th><th>Description</th><th>Version</th><th>State</th><th></th></tr></thead>
-    <tbody>${modules.map(m=>`<tr>
-      <td><b>${esc(m.name)}</b></td><td class="mut">${esc(m.short_desc)}</td><td class="mut">${esc(m.version)}</td>
-      <td><span class="pill ${m.state==="installed"?"ok":(m.state==="uninstalled"?"":"warn")}">${esc(m.state)}</span></td>
-      <td>${m.state==="installed"
-        ? `<button class="ghost small" data-act="uninstall" data-n="${esc(m.name)}">Uninstall</button>`
-        : `<button class="small" data-act="install" data-n="${esc(m.name)}">Install</button>`}</td></tr>`).join("")}</tbody></table>
-    <div class="err" id="m_msg"></div></div>`);
-  root.appendChild(el);
-  el.querySelectorAll("button[data-act]").forEach(b => b.onclick = async () => {
+  const PROTECTED = ["base","web","mail","bus","web_tour","theme_common"];
+  const badge = (st) => st==="installed" ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>installed</span>'
+    : st==="uninstalled" ? '<span class="bgd">available</span>'
+    : '<span class="bgd bgd-warn"><span class="bgd-dot"></span>'+esc(st)+'</span>';
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="filter-row"><input class="input" id="m_q" placeholder="Search 700+ modules…"/>' +
+    '<select class="select" id="m_f" style="max-width:180px"><option value="">all states</option><option value="installed">installed</option><option value="uninstalled">available</option></select>' +
+    '<span class="bgd bgd-accent">'+modules.length+' modules</span></div>' +
+    '<div class="table-wrap"><table class="console-table"><thead><tr><th>Module</th><th>Description</th><th>Version</th><th>State</th><th></th></tr></thead><tbody>' +
+    modules.map(m=>'<tr data-name="'+esc(m.name).toLowerCase()+'" data-state="'+esc(m.state)+'"><td><b>'+esc(m.name)+'</b>'+(PROTECTED.includes(m.name)?' <span class="bgd" title="protected">🔒</span>':'')+'</td>' +
+      '<td class="muted">'+esc(m.short_desc)+'</td><td class="faint mono">'+esc(m.version)+'</td><td>'+badge(m.state)+'</td>' +
+      '<td style="text-align:right">'+(m.state==="installed"
+        ? (PROTECTED.includes(m.name) ? '' : '<button class="btn btn-danger btn-sm" data-act="uninstall" data-n="'+esc(m.name)+'">Uninstall</button>')
+        : '<button class="btn btn-primary btn-sm" data-act="install" data-n="'+esc(m.name)+'">Install</button>')+'</td></tr>').join("") +
+    '</tbody></table></div><div class="err" id="m_msg"></div></div>';
+  const applyFilter = () => {
+    const q = $id("m_q").value.trim().toLowerCase(), f = $id("m_f").value;
+    view.querySelectorAll("tbody tr").forEach(tr => {
+      tr.style.display = (!q || tr.dataset.name.includes(q)) && (!f || tr.dataset.state===f) ? "" : "none";
+    });
+  };
+  $id("m_q").oninput = applyFilter; $id("m_f").onchange = applyFilter;
+  view.querySelectorAll("button[data-act]").forEach(b => b.onclick = async () => {
     const act = b.dataset.act, n = b.dataset.n;
-    if (act === "uninstall" && !confirm("Uninstall module "+n+"? Its data will be removed.")) return;
-    b.disabled = true; b.textContent = "…";
-    try { const r = await api("/api/admin/panel/modules/act", {method:"POST", body: JSON.stringify({names:[n], action:act})});
+    if (act==="uninstall" && !confirm("Uninstall module “"+n+"”? Its data will be removed.")) return;
+    b.disabled = true; b.textContent = "Working…";
+    try {
+      const r = await api("/api/admin/panel/modules/act", {method:"POST", body: JSON.stringify({names:[n], action:act})});
       if (r.errors && r.errors.length) throw new Error(r.errors[0].error || "failed");
-      tabModules(root.parentNode ? root : null, root);
-      root.innerHTML=""; tabModules(root);
-    } catch(e) { document.getElementById("m_msg").textContent = e.message; b.disabled = false; b.textContent = act; }
+      renderSection();
+    } catch(e) { $id("m_msg").textContent = e.message; b.disabled = false; b.textContent = act; }
   });
 }
 
-/* ---------------- Tab: Users ---------------- */
-async function tabUsers(root) {
+/* ================= section: users ================= */
+async function secUsers(view) {
   const {users} = await api("/api/admin/panel/users");
-  const el = $(`<div class="card fade"><h3>Internal users (${users.length})</h3>
-    <table><thead><tr><th>User</th><th>Login</th><th>Role</th><th>State</th><th>Set password</th></tr></thead>
-    <tbody>${users.map(u=>`<tr>
-      <td>${esc(u.name)}</td><td class="mut">${esc(u.login)}</td>
-      <td>${u.admin?'<span class="pill ok">admin</span>':'<span class="pill">user</span>'}</td>
-      <td>${u.active?'<span class="pill ok">active</span>':'<span class="pill bad">blocked</span>'}</td>
-      <td><div class="row"><input id="pw_${u.id}" type="password" placeholder="new password" style="width:150px;padding:7px 10px"/>
-      <button class="ghost small" data-login="${esc(u.login)}" data-in="pw_${u.id}">Save</button></div></td></tr>`).join("")}
-    </tbody></table><div class="err" id="u_msg"></div></div>`);
-  root.appendChild(el);
-  el.querySelectorAll("button[data-login]").forEach(b => b.onclick = async () => {
-    const pw = document.getElementById(b.dataset.in).value;
-    try { await api("/api/admin/panel/users/password", {method:"POST", body: JSON.stringify({login:b.dataset.login, password:pw})});
-      document.getElementById("u_msg").innerHTML = '<span class="ok-txt">Password updated for '+esc(b.dataset.login)+'</span>';
-    } catch(e){ document.getElementById("u_msg").innerHTML = '<span class="bad-txt">'+esc(e.message)+'</span>'; }
+  view.innerHTML =
+  '<div class="fade-in card"><div class="card-head"><h3>Internal users ('+users.length+')</h3></div>' +
+  '<div class="table-wrap"><table class="console-table"><thead><tr><th>User</th><th>Login</th><th>Role</th><th>State</th><th>Set new password</th></tr></thead><tbody>' +
+  users.map(u=>'<tr><td><b>'+esc(u.name)+'</b></td><td class="muted mono">'+esc(u.login)+'</td>' +
+    '<td>'+(u.admin?'<span class="bgd bgd-accent">admin</span>':'<span class="bgd">user</span>')+'</td>' +
+    '<td>'+(u.active?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>active</span>':'<span class="bgd bgd-err"><span class="bgd-dot"></span>blocked</span>')+'</td>' +
+    '<td><div class="pw-cell"><input class="input" id="pw_'+u.id+'" type="password" placeholder="new password"/>' +
+    '<button class="btn btn-sm" data-login="'+esc(u.login)+'" data-in="pw_'+u.id+'">Save</button></div></td></tr>').join("") +
+  '</tbody></table></div><div class="err" id="u_msg"></div></div>';
+  view.querySelectorAll("button[data-login]").forEach(b => b.onclick = async () => {
+    const pw = $id(b.dataset.in).value;
+    if (!pw) { $id("u_msg").textContent = "Type a password first."; return; }
+    try {
+      await api("/api/admin/panel/users/password", {method:"POST", body: JSON.stringify({login:b.dataset.login, password:pw})});
+      $id("u_msg").innerHTML = '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Password updated for '+esc(b.dataset.login)+'</span>';
+      $id(b.dataset.in).value = "";
+    } catch(e){ $id("u_msg").textContent = e.message; }
   });
 }
 
-/* ---------------- Tab: Health ---------------- */
-async function tabHealth(root) {
-  const h = await api("/api/admin/panel/health");
-  const c = h.counts || {};
-  const el = $(`<div class="fade">
-    <div class="grid4">
-      <div class="stat"><b><span class="dot" style="background:${h.database==="up"?"var(--ok)":"var(--bad)"}"></span>${esc(h.database)}</b><span>Database</span></div>
-      <div class="stat"><b><span class="dot" style="background:${h.redis==="up"?"var(--ok)":"var(--warn)"}"></span>${esc(h.redis)}</b><span>Redis</span></div>
-      <div class="stat"><b style="font-size:15px;padding-top:4px">${esc(h.ai_engine)}</b><span>AI engine</span></div>
-      <div class="stat"><b>${h.modules_installed}</b><span>Modules installed</span></div>
-    </div>
-    <div class="card" style="margin-top:16px"><h3>Data</h3><div class="grid4">
-      ${Object.entries(c).map(([k,v])=>`<div class="stat"><b>${v==null?"-":v}</b><span>${esc(k)}</span></div>`).join("")}
-    </div></div></div>`);
-  root.appendChild(el);
-}
-
-/* ---------------- Tab: Logs ---------------- */
-async function tabLogs(root) {
+/* ================= section: logs ================= */
+async function secLogs(view) {
   const {logs} = await api("/api/admin/panel/logs");
-  const el = $(`<div class="card fade"><h3>Audit log (last ${logs.length})</h3>
-    <div class="log">${logs.map(l=>`<div><span class="mut">${esc(l.date)}</span> · ${esc(l.user||"system")} · <b>${esc(l.action)}</b> · ${l.success?'<span class="ok-txt">ok</span>':'<span class="bad-txt">'+esc(l.error||"failed")+'</span>'}</div>`).join("") || '<span class="mut">no events yet</span>'}</div></div>`);
-  root.appendChild(el);
+  view.innerHTML =
+  '<div class="fade-in card"><div class="card-head"><h3>Audit log (last '+logs.length+')</h3></div>' +
+  (logs.length ? logs.map(l=>'<div class="logline"><span class="faint mono">'+esc(l.date)+'</span><b>'+esc(l.action)+'</b><span class="muted">'+esc(l.user||"system")+'</span>' +
+    (l.success?'<span class="bgd bgd-ok" style="margin-inline-start:auto"><span class="bgd-dot"></span>ok</span>'
+              :'<span class="bgd bgd-err" style="margin-inline-start:auto"><span class="bgd-dot"></span>'+esc(l.error||"failed")+'</span>')+'</div>').join("")
+   : '<span class="muted small">No events yet.</span>') + '</div>';
 }
 
-/* ---------------- boot ---------------- */
+/* ================= boot ================= */
 (async function boot(){
-  try { await api("/api/admin/panel/session"); renderPanel(); }
-  catch(e){ /* renderLogin already invoked by api() on 401 */ if (!document.getElementById("lu")) renderLogin(); }
+  try { await api("/api/admin/panel/session"); showConsole(); }
+  catch(e){ /* 401 already switched to the login card; network errors too */ showAuth(); }
 })();
 </script>
 </body>
