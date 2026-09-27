@@ -11,7 +11,7 @@
 <style>
 /* Fallback tokens (mirror the app bundle) — the real stylesheet below
    overrides them when it loads. Keeps the page on-brand even offline. */
-:root{--font-sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:"Space Grotesk","Inter",system-ui,sans-serif;--fs-xs:12px;--fs-sm:13px;--fs-base:14.5px;--fs-md:15.5px;--fs-lg:17px;--fs-xl:21px;--fs-2xl:27px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-full:999px;--accent:#5a5ad6;--accent-soft:#5a5ad61a;--accent-contrast:#fff;--ring-accent:0 0 0 4px #5a5ad629;--grad-brand:linear-gradient(135deg,#6a5cff 0%,#9b5cff 55%,#e05d8f 100%);--shadow-glow:0 8px 32px #6a5cff47;--ok:#0e9f6e;--ok-soft:#0e9f6e1f;--warn:#d97706;--warn-soft:#d977061f;--err:#dc2626;--err-soft:#dc26261a;--info:#2563eb;--info-soft:#2563eb1a;--bg:#f7f6f2;--bg-elev:#faf9f5;--surface:#fff;--surface-2:#f1efe9;--surface-3:#e8e5dd;--border:#e8e5dd;--border-strong:#d9d5ca;--text:#1b1a17;--text-muted:#6f6a60;--text-faint:#a39d92;--sidebar-w:268px;--topbar-h:56px;--ease-out:cubic-bezier(.22,.61,.36,1)}
+:root{--font-sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:"Space Grotesk","Inter",system-ui,sans-serif;--fs-xs:12px;--fs-sm:13px;--fs-base:14.5px;--fs-md:15.5px;--fs-lg:17px;--fs-xl:21px;--fs-2xl:27px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-full:999px;--accent:#5a5ad6;--accent-soft:#5a5ad61a;--accent-softer:#5a5ad60f;--accent-contrast:#fff;--ring-accent:0 0 0 4px #5a5ad629;--grad-brand:linear-gradient(135deg,#6a5cff 0%,#9b5cff 55%,#e05d8f 100%);--shadow-glow:0 8px 32px #6a5cff47;--ok:#0e9f6e;--ok-soft:#0e9f6e1f;--warn:#d97706;--warn-soft:#d977061f;--err:#dc2626;--err-soft:#dc26261a;--info:#2563eb;--info-soft:#2563eb1a;--bg:#f7f6f2;--bg-elev:#faf9f5;--surface:#fff;--surface-2:#f1efe9;--surface-3:#e8e5dd;--border:#e8e5dd;--border-strong:#d9d5ca;--text:#1b1a17;--text-muted:#6f6a60;--text-faint:#a39d92;--sidebar-w:268px;--topbar-h:56px;--ease-out:cubic-bezier(.22,.61,.36,1)}
 </style>
 <link rel="stylesheet" href="assets/index-B7tjfh8Z.css" />
 <style>
@@ -42,7 +42,22 @@ body{font-family:var(--font-sans)}
 @keyframes fadeUp{0%{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .pw-cell{display:flex;gap:8px;align-items:center}
 .pw-cell .input{width:160px;padding:6px 10px;font-size:var(--fs-sm)}
-.mono{font-size:12px}
+.nav-label{font-size:10.5px;font-weight:var(--fw-bold);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);padding:14px 10px 4px}
+/* workspace embed */
+#work{position:fixed;inset:0;display:none}
+#work iframe{width:100%;height:100%;border:none;display:block}
+.fab-stack{position:fixed;bottom:22px;inset-inline-end:22px;display:flex;flex-direction:column;gap:10px;z-index:90}
+.fab{display:flex;align-items:center;gap:9px;background:var(--grad-brand);color:#fff;border:none;border-radius:var(--r-full);padding:12px 20px;font:inherit;font-size:var(--fs-sm);font-weight:var(--fw-semibold);cursor:pointer;box-shadow:var(--shadow-glow);transition:transform .15s var(--ease-out),filter .15s}
+.fab:hover{transform:translateY(-2px);filter:brightness(1.06)}
+.fab svg{flex:none}
+/* usage bars */
+.bar{height:8px;border-radius:var(--r-full);background:var(--surface-3);overflow:auto}
+.bar i{display:block;height:100%;border-radius:var(--r-full);background:var(--grad-brand)}
+.chart{display:flex;align-items:flex-end;gap:6px;height:120px;padding:10px 4px 0}
+.chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.chart .col b{font-size:10px;color:var(--text-faint);font-weight:var(--fw-medium)}
+.chart .col .stick{width:100%;max-width:38px;border-radius:8px 8px 3px 3px;background:var(--grad-brand);opacity:.9;min-height:3px}
+.dnum{font-size:11px;color:var(--text-faint);direction:ltr}
 @media (max-width:960px){.console-table th:nth-child(3),.console-table td:nth-child(3){display:none}}
 </style>
 </head>
@@ -54,23 +69,34 @@ body{font-family:var(--font-sans)}
   <div class="auth-card">
     <span class="orb" style="width:46px;height:46px"></span>
     <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Admin Console</h1>
-    <p class="sub">Platform management — a separate world from the workspace. Sign in with an administrator username &amp; password.</p>
+    <p class="sub">Administrator sign-in. After login you get the full Nova workspace <b>plus</b> the platform management console.</p>
     <div class="field"><label>Username</label><input class="input" id="lu" autocomplete="username" value="admin" /></div>
     <div class="field"><label>Password</label><input class="input" id="lp" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
-    <button class="btn btn-gradient btn-block" id="lb">Sign in to console</button>
+    <button class="btn btn-gradient btn-block" id="lb">Sign in</button>
     <div class="err" id="lerr"></div>
     <div class="auth-foot">Nova Enterprise · restricted area</div>
   </div>
 </div>
 
-<!-- ==================== CONSOLE ==================== -->
+<!-- ==================== FULL WORKSPACE (real app) ==================== -->
+<div id="work">
+  <iframe id="appFrame" title="Nova Workspace" src="about:blank"></iframe>
+  <div class="fab-stack">
+    <button class="fab" id="fabAdmin">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admin Console
+    </button>
+  </div>
+</div>
+
+<!-- ==================== ADMIN CONSOLE ==================== -->
 <div id="shell" class="shell" hidden>
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="orb" style="width:30px;height:30px"></span>
       <div><div class="brand-name">Nova Admin</div><div class="brand-sub">platform console</div></div>
     </div>
-    <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:10px"></nav>
+    <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
     <div style="flex:1"></div>
     <div class="side-foot">
       <div class="side-status" id="sideStatus"><span class="dot" style="background:var(--text-faint)"></span>checking services…</div>
@@ -110,9 +136,10 @@ const API = (() => {
     return sessionStorage.getItem("aibox.apiBase") || "";
   } catch(e) { return ""; }
 })();
+const APP_URL = "/aibox-odoo/" + (API ? "?api=" + encodeURIComponent(API) : "");
 const $id = (i) => document.getElementById(i);
 const esc = (s) => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let SEC = "overview";
+let SEC = "workspace";
 
 async function api(path, opts={}) {
   const o = {credentials:"include", headers:{}, ...opts};
@@ -135,7 +162,7 @@ try { const t = localStorage.getItem("aibox.admin.theme"); if (t) document.docum
 
 /* ================= auth ================= */
 function showAuth(msg) {
-  $id("shell").hidden = true;
+  $id("shell").hidden = true; $id("work").style.display = "none";
   $id("auth").hidden = false;
   $id("lerr").textContent = msg || "";
   $id("lp").value = "";
@@ -145,39 +172,71 @@ async function doLogin() {
   const b = $id("lb"); b.disabled = true; b.textContent = "Signing in…";
   $id("lerr").textContent = "";
   try {
-    await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
+    const r = await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
       username: $id("lu").value.trim(), password: $id("lp").value })});
-    showConsole();
+    if (r.gateway_api_key) { try { localStorage.setItem("aibox.apiKey", r.gateway_api_key); } catch(e){} }
+    showWorkspace();
   } catch(e) { $id("lerr").textContent = e.message; }
-  b.disabled = false; b.textContent = "Sign in to console";
+  b.disabled = false; b.textContent = "Sign in";
 }
 $id("lb").onclick = doLogin;
 $id("lp").onkeydown = (e)=>{ if(e.key==="Enter") doLogin(); };
 $id("lu").onkeydown = (e)=>{ if(e.key==="Enter") $id("lp").focus(); };
 $id("btnLogout").onclick = async () => {
   try { await api("/api/admin/panel/logout", {method:"POST"}); } catch(e){}
-  SEC = "overview"; showAuth();
+  try { await fetch(API + "/api/logout", {method:"POST", credentials:"include"}); } catch(e){}
+  try { localStorage.removeItem("aibox.apiKey"); } catch(e){}
+  SEC = "workspace"; showAuth();
 };
 $id("btnBurger").onclick = () => $id("sidebar").classList.toggle("open");
+$id("fabAdmin").onclick = () => showConsole();
+
+/* ================= views: workspace / console ================= */
+function showWorkspace() {
+  $id("auth").hidden = true; $id("shell").hidden = true;
+  const w = $id("work"); w.style.display = "block";
+  const f = $id("appFrame");
+  if (f.src === "about:blank" || !f.src) f.src = APP_URL;
+}
+function showConsole() {
+  $id("work").style.display = "none";
+  $id("auth").hidden = true;
+  $id("shell").hidden = false;
+  renderNav(); renderSection(); refreshSideStatus();
+}
 
 /* ================= console shell ================= */
 const ICONS = {
+  workspace: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
   overview: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
   engine: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>',
+  usage: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
   modules: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
   users: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   logs: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
 };
 const SECTIONS = [
+  ["workspace","Nova Workspace","", "ws"],
   ["overview","Overview","Platform status at a glance — services, engine and recent activity."],
   ["engine","AI Engine","Connect the AI brain of the whole platform: provider, endpoint, models and API key. Test before you apply."],
+  ["usage","Token Usage","Real recorded AI consumption — total, per department and per employee, with the daily trend."],
   ["modules","Modules","Install, update or remove Odoo apps on this appliance. Critical platform modules are protected."],
   ["users","Users","Internal accounts and passwords."],
   ["logs","Audit Log","Every admin action recorded by the panel."],
 ];
 function renderNav() {
   const nav = $id("nav"); nav.innerHTML = "";
-  SECTIONS.forEach(([k,label]) => {
+  const wsFirst = SECTIONS[0];
+  const a0 = document.createElement("a");
+  a0.href = "#"; a0.className = "nav-item" + (SEC==="workspace" ? " active" : "");
+  a0.style.color = SEC==="workspace" ? "var(--accent)" : "";
+  a0.innerHTML = ICONS.workspace + "<span>" + esc(wsFirst[1]) + "</span>";
+  a0.onclick = (ev) => { ev.preventDefault(); showWorkspace(); };
+  nav.appendChild(a0);
+  const lbl = document.createElement("div");
+  lbl.className = "nav-label"; lbl.textContent = "Platform management";
+  nav.appendChild(lbl);
+  SECTIONS.slice(1).forEach(([k,label]) => {
     const a = document.createElement("a");
     a.href = "#"; a.className = "nav-item" + (k===SEC ? " active" : "");
     a.innerHTML = ICONS[k] + "<span>" + esc(label) + "</span>";
@@ -185,11 +244,6 @@ function renderNav() {
       $id("sidebar").classList.remove("open"); };
     nav.appendChild(a);
   });
-}
-function showConsole() {
-  $id("auth").hidden = true;
-  $id("shell").hidden = false;
-  renderNav(); renderSection(); refreshSideStatus();
 }
 async function refreshSideStatus() {
   const el = $id("sideStatus");
@@ -210,7 +264,7 @@ function renderSection() {
   setHead(meta[1], meta[2]);
   const view = $id("view");
   view.innerHTML = '<div class="card"><span class="muted small">Loading…</span></div>';
-  const fn = {overview:secOverview, engine:secEngine, modules:secModules, users:secUsers, logs:secLogs}[SEC];
+  const fn = {overview:secOverview, engine:secEngine, usage:secUsage, modules:secModules, users:secUsers, logs:secLogs}[SEC];
   fn(view).catch(e => { if (e.message !== "unauthorized")
     view.innerHTML = '<div class="card"><span style="color:var(--err)">'+esc(e.message)+'</span> <button class="btn btn-sm" style="margin-left:10px" onclick="renderSection()">Retry</button></div>'; });
 }
@@ -310,6 +364,51 @@ async function secEngine(view) {
   };
 }
 
+/* ================= section: token usage (real, per dept & employee) ================= */
+const fmtN = (n) => String(n==null?0:n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+async function secUsage(view) {
+  let days = 30;
+  try { days = parseInt(sessionStorage.getItem("aibox.admin.usageDays")||"30",10)||30; } catch(e){}
+  const u = await api("/api/admin/panel/usage?days="+days);
+  const maxTok = Math.max(1, ...u.users.map(x=>x.tokens));
+  const maxDept = Math.max(1, ...u.departments.map(x=>x.tokens));
+  const maxDay = Math.max(1, ...u.daily.map(x=>x.tokens));
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="filter-row">' +
+      '<select class="select" id="u_days" style="max-width:170px">' +
+        [7,30,90,365].map(d=>'<option value="'+d+'"'+(d===days?' selected':'')+'>'+(d===365?'last year':'last '+d+' days')+'</option>').join("") +
+      '</select>' +
+      '<span class="bgd bgd-accent">'+esc(u.label)+'</span>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:16px">' +
+      '<div class="card stat-tile"><b>'+fmtN(u.total_tokens)+'</b><span>tokens · '+days+'d</span></div>' +
+      '<div class="card stat-tile"><b>'+fmtN(u.total_turns)+'</b><span>chat turns</span></div>' +
+      '<div class="card stat-tile"><b>'+u.users.length+'</b><span>employees using AI</span></div>' +
+      '<div class="card stat-tile"><b>'+u.departments.length+'</b><span>departments</span></div>' +
+    '</div>' +
+    (u.daily.length?'<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Daily trend</h3></div><div class="chart">' +
+      u.daily.slice(-14).map(d=>'<div class="col" title="'+esc(d.day)+' · '+fmtN(d.tokens)+' tokens"><span class="dnum">'+d.day.slice(5)+'</span><div class="stick" style="height:'+Math.max(3,Math.round(d.tokens/maxDay*86))+'px"></div><b>'+fmtN(d.tokens)+'</b></div>').join("") +
+    '</div></div>':'') +
+    '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>By department</h3></div>' +
+    (u.departments.length?'<div class="table-wrap"><table class="console-table"><thead><tr><th>Department</th><th>Employees</th><th>Turns</th><th style="width:34%">Tokens</th></tr></thead><tbody>' +
+      u.departments.map(d=>'<tr><td><b>'+esc(d.department)+'</b></td><td>'+d.employees+'</td><td>'+fmtN(d.turns)+'</td>' +
+        '<td><div class="h-stack" style="gap:10px"><span class="dnum" style="min-width:64px">'+fmtN(d.tokens)+'</span><div class="bar" style="flex:1"><i style="width:'+Math.round(d.tokens/maxDept*100)+'%"></i></div></div></td></tr>').join("") +
+      '</tbody></table></div>':'<span class="muted small">No AI usage recorded yet in this period.</span>') +
+    '</div>' +
+    '<div class="card"><div class="card-head"><h3>By employee</h3></div>' +
+    (u.users.length?'<div class="table-wrap"><table class="console-table"><thead><tr><th>Employee</th><th>Department</th><th>Turns</th><th style="width:30%">Tokens</th><th>Last activity</th></tr></thead><tbody>' +
+      u.users.map(x=>'<tr><td><b>'+esc(x.name)+'</b> <span class="faint small">'+esc(x.login)+'</span></td><td>'+esc(x.department||"—")+'</td><td>'+fmtN(x.turns)+'</td>' +
+        '<td><div class="h-stack" style="gap:10px"><span class="dnum" style="min-width:64px">'+fmtN(x.tokens)+'</span><div class="bar" style="flex:1"><i style="width:'+Math.round(x.tokens/maxTok*100)+'%"></i></div></div></td>' +
+        '<td class="faint small">'+esc((x.last||"").replace("T"," ").slice(0,16))+'</td></tr>').join("") +
+      '</tbody></table></div>':'<span class="muted small">No AI usage recorded yet in this period.</span>') +
+    '</div></div>';
+  $id("u_days").onchange = async () => {
+    try { sessionStorage.setItem("aibox.admin.usageDays", $id("u_days").value); } catch(e){}
+    renderSection();
+  };
+}
+
 /* ================= section: modules ================= */
 async function secModules(view) {
   const {modules} = await api("/api/admin/panel/modules");
@@ -384,7 +483,11 @@ async function secLogs(view) {
 
 /* ================= boot ================= */
 (async function boot(){
-  try { await api("/api/admin/panel/session"); showConsole(); }
+  try {
+    const s = await api("/api/admin/panel/session");
+    if (s.gateway_api_key) { try { localStorage.setItem("aibox.apiKey", s.gateway_api_key); } catch(e){} }
+    showWorkspace();
+  }
   catch(e){ /* 401 already switched to the login card; network errors too */ showAuth(); }
 })();
 </script>

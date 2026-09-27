@@ -40,6 +40,18 @@ def _panel_env():
     return request.env(user=odoo.SUPERUSER_ID)["ai.gateway.admin.panel"]
 
 
+
+def _issue_gateway_session(user):
+    """Mint (or re-issue) the user's revocable gateway session token for the
+    embedded workspace app (same contract as /api/login). Returns (key, exp)."""
+    try:
+        if "ai.gateway.session" in request.env:
+            return _panel_env().env["ai.gateway.session"].sudo().issue(user)
+    except Exception:  # noqa: BLE001
+        _logger.warning("admin panel: gateway session issue failed",
+                        exc_info=True)
+    return "", ""
+
 def _require_admin():
     """Return (admin_user, None) or (None, error_response)."""
     token = request.httprequest.cookies.get(_COOKIE, "").strip()
@@ -97,9 +109,29 @@ class AdminPanelController(http.Controller):
         token = request.env["ai.gateway.admin.panel.session"].sudo().issue_for(user)
         if not token:
             return _json({"error": "not an administrator"}, status=403)
-        resp = _json({"ok": True, "user": {"name": user.name, "login": user.login}})
+        # Also open the normal Odoo session for this admin, so the embedded
+        # workspace (chat, tasks, ...) inside the admin console is already
+        # authenticated - one admin/admin login unlocks both worlds.
+        try:
+            request.session.authenticate(request.db, {
+                "login": user.login, "password": password, "type": "password"})
+        except Exception:  # noqa: BLE001
+            _logger.warning("admin panel: odoo session authenticate failed",
+                            exc_info=True)
+        # Issue the user's gateway session token as well: the embedded Nova
+        # workspace app authenticates with X-API-Key (same contract as
+        # /api/login), so the console hands it over once here and the app
+        # comes up fully logged-in - no second password prompt.
+        gateway_key, gateway_expires = _issue_gateway_session(user)
+        resp = _json({"ok": True, "user": {"name": user.name, "login": user.login},
+                      "gateway_api_key": gateway_key,
+                      "gateway_expires_at": gateway_expires})
         resp.set_cookie(_COOKIE, token, max_age=8 * 3600, httponly=True,
                         secure=_SECURE_COOKIE, samesite="Lax", path="/")
+        if gateway_key:
+            resp.set_cookie("ai_session", gateway_key, max_age=8 * 3600,
+                            httponly=True, secure=_SECURE_COOKIE,
+                            samesite="Lax", path="/")
         return resp
 
     @http.route("/api/admin/panel/logout", type="http", auth="none", csrf=False,
@@ -125,7 +157,17 @@ class AdminPanelController(http.Controller):
         user, err = _require_admin()
         if err:
             return err
-        return _json({"ok": True, "user": {"name": user.name, "login": user.login}})
+        # Hand the embedded workspace its gateway token as well (see login):
+        # a page reload mints a fresh 8h session so the app stays logged in.
+        gateway_key, gateway_expires = _issue_gateway_session(user)
+        resp = _json({"ok": True, "user": {"name": user.name, "login": user.login},
+                      "gateway_api_key": gateway_key,
+                      "gateway_expires_at": gateway_expires})
+        if gateway_key:
+            resp.set_cookie("ai_session", gateway_key, max_age=8 * 3600,
+                            httponly=True, secure=_SECURE_COOKIE,
+                            samesite="Lax", path="/")
+        return resp
 
     # ---------------------------------------------------------- AI engine
     @http.route("/api/admin/panel/engine", type="http", auth="none", csrf=False,
@@ -241,6 +283,17 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         return _json(_panel_env().health())
+
+    # ---------------------------------------------------------- token usage
+    @http.route("/api/admin/panel/usage", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def usage(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _json({"ok": True})
+        user, err = _require_admin()
+        if err:
+            return err
+        return _json(_panel_env().token_usage(kwargs.get("days", 30)))
 
     # ---------------------------------------------------------------- logs
     @http.route("/api/admin/panel/logs", type="http", auth="none", csrf=False,

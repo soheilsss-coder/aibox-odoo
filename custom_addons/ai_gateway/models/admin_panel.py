@@ -265,3 +265,81 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         return [{"id": l.id, "date": str(l.create_date), "user": l.user_id.name or "",
                  "action": l.action, "success": l.success,
                  "error": (l.error_message or "")[:120]} for l in logs]
+
+    # --------------------------------------------------------- token usage
+    @staticmethod
+    def _plain_name(value):
+        """Translatable columns come back as {'en_US': ...} JSONB maps in
+        this Odoo build - flatten to the plain display string."""
+        if isinstance(value, dict):
+            value = value.get("en_US") or next(iter(value.values()), "")
+        return str(value or "")
+
+    def token_usage(self, days=30):
+        """Real consumption recorded by the gateway: chat turns and token
+        footprint per employee and per department, plus a daily series.
+
+        token_count is the gateway's documented estimate (~4 chars/token);
+        the label travels with the payload so the UI never presents it as
+        provider billing data."""
+        try:
+            days = max(1, min(int(days or 30), 365))
+        except (TypeError, ValueError):
+            days = 30
+        self.env.cr.execute(
+            """
+            SELECT ag.user_id, u.login, p.name,
+                   count(*) AS turns,
+                   coalesce(sum(ag.token_count), 0) AS tokens,
+                   max(ag.create_date) AS last_at,
+                   d.name AS department
+            FROM ai_gateway_audit_log ag
+            JOIN res_users u ON u.id = ag.user_id
+            JOIN res_partner p ON p.id = u.partner_id
+            LEFT JOIN hr_employee e ON e.user_id = u.id
+            LEFT JOIN hr_department d ON d.id = e.department_id
+            WHERE ag.create_date >= now() - (interval '1 day' * %s)
+              AND ag.source = 'chat'
+            GROUP BY ag.user_id, u.login, p.name, d.name
+            ORDER BY 5 DESC
+            """,
+            (days,),
+        )
+        users = [
+            {"user_id": r[0], "login": r[1], "name": self._plain_name(r[2]),
+             "turns": r[3], "tokens": r[4], "last": str(r[5] or ""),
+             "department": self._plain_name(r[6])}
+            for r in self.env.cr.fetchall()
+        ]
+        self.env.cr.execute(
+            """
+            SELECT date_trunc('day', create_date)::date AS day,
+                   coalesce(sum(token_count), 0) AS tokens,
+                   count(*) AS turns
+            FROM ai_gateway_audit_log
+            WHERE create_date >= now() - (interval '1 day' * %s)
+              AND source = 'chat'
+            GROUP BY 1 ORDER BY 1
+            """,
+            (days,),
+        )
+        daily = [{"day": str(r[0]), "tokens": r[1], "turns": r[2]}
+                 for r in self.env.cr.fetchall()]
+        users.sort(key=lambda row: -int(row["tokens"] or 0))
+        dept_map = {}
+        for row in users:
+            key = str(row["department"] or "Without department")
+            ent = dept_map.setdefault(key, {"department": key, "employees": 0,
+                                            "turns": 0, "tokens": 0})
+            ent["employees"] += 1
+            ent["turns"] += int(row["turns"] or 0)
+            ent["tokens"] += int(row["tokens"] or 0)
+        return {
+            "days": days,
+            "label": "estimated tokens (chars/4) recorded by the gateway",
+            "total_tokens": sum(u["tokens"] for u in users),
+            "total_turns": sum(u["turns"] for u in users),
+            "users": users,
+            "departments": sorted(dept_map.values(), key=lambda d: -d["tokens"]),
+            "daily": daily,
+        }
