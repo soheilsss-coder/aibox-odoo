@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin Panel — Platform Console</title>
+<style>
+:root{--bg:#0f1420;--panel:#171e2e;--panel2:#1c2436;--line:#2a3450;--txt:#e8ecf6;--dim:#93a0bd;--acc:#6a5cff;--ok:#3ecf8e;--bad:#ff6b8b;--warn:#f5b14c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 60px}
+header{display:flex;align-items:center;gap:14px;padding:18px 0;border-bottom:1px solid var(--line);margin-bottom:22px}
+.logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#6a5cff,#ff6b8b);display:flex;align-items:center;justify-content:center;font-weight:700}
+h1{font-size:17px;letter-spacing:.4px}
+.badge{font-size:10px;letter-spacing:2px;color:var(--dim);border:1px solid var(--line);padding:3px 8px;border-radius:99px}
+.spacer{flex:1}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.login-box{max-width:400px;margin:12vh auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:34px}
+.login-box h2{font-size:20px;margin-bottom:6px}
+.login-box p{color:var(--dim);font-size:13px;margin-bottom:22px}
+label{display:block;font-size:12px;color:var(--dim);margin:14px 0 6px}
+input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--txt);font-size:14px;outline:none}
+input:focus{border-color:var(--acc)}
+button{background:var(--acc);border:none;color:#fff;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+button:hover{filter:brightness(1.1)}
+button:disabled{opacity:.55;cursor:wait}
+button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-weight:500}
+button.small{padding:7px 12px;font-size:12.5px}
+.err{color:var(--bad);font-size:13px;margin-top:12px;min-height:17px}
+.tabs{display:flex;gap:6px;margin:18px 0;flex-wrap:wrap}
+.tabs button{background:var(--panel2);border:1px solid var(--line);color:var(--dim);padding:9px 15px;border-radius:10px;font-weight:500}
+.tabs button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+.card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:760px){.grid2,.grid4{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--dim);font-weight:500;padding:8px 6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line)}
+.pill{font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
+.pill.ok{color:var(--ok);border-color:rgba(62,207,142,.4)}
+.pill.bad{color:var(--bad);border-color:rgba(255,107,139,.4)}
+.pill.warn{color:var(--warn);border-color:rgba(245,177,76,.4)}
+.stat{background:var(--panel2);border-radius:12px;padding:14px}
+.stat b{font-size:22px;display:block}
+.stat span{color:var(--dim);font-size:12px}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.mut{color:var(--dim);font-size:12.5px}
+.log{font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.75;max-height:420px;overflow:auto}
+.ok-txt{color:var(--ok)} .bad-txt{color:var(--bad)}
+.fade{animation:f .25s ease}@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">A</div>
+    <div><h1>Admin Panel</h1></div>
+    <span class="badge">PLATFORM CONSOLE</span>
+    <div class="spacer"></div>
+    <span id="hdrSvcs" class="mut"></span>
+    <button id="btnLogout" class="ghost small" style="display:none">Log out</button>
+  </header>
+  <div id="app" class="fade"></div>
+</div>
+<script>
+const API = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get("api");
+    if (q) { const o = decodeURIComponent(q).replace(/\/+$/,""); sessionStorage.setItem("aibox.apiBase", o); return o; }
+    return sessionStorage.getItem("aibox.apiBase") || "";
+  } catch(e) { return ""; }
+})();
+const $ = (h) => { const d = document.createElement("div"); d.innerHTML = h.trim(); return d.firstElementChild; };
+const esc = (s) => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let TAB = "engine";
+
+async function api(path, opts={}) {
+  const o = {credentials:"include", headers:{}, ...opts};
+  if (o.body) o.headers["Content-Type"] = "application/json";
+  const r = await fetch(API + path, o);
+  const d = await r.json().catch(()=>({}));
+  if (r.status === 401) { renderLogin(); throw new Error(d.error || "unauthorized"); }
+  if (!r.ok || d.error) throw new Error(d.error || ("request failed ("+r.status+")"));
+  return d;
+}
+
+/* ---------------- Login ---------------- */
+function renderLogin(msg) {
+  document.getElementById("btnLogout").style.display = "none";
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  app.appendChild($(`<div class="login-box fade"><h2>Admin sign in</h2>
+    <p>Platform console — separate from the workspace. Username + password only.</p>
+    <label>Username</label><input id="lu" autocomplete="username" value="admin"/>
+    <label>Password</label><input id="lp" type="password" autocomplete="current-password"/>
+    <div style="margin-top:20px"><button id="lb" style="width:100%">Sign in</button></div>
+    <div class="err" id="lerr">${esc(msg||"")}</div></div>`));
+  const go = async () => {
+    const b = document.getElementById("lb"); b.disabled = true;
+    try {
+      await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
+        username: document.getElementById("lu").value.trim(),
+        password: document.getElementById("lp").value })});
+      renderPanel();
+    } catch(e) { document.getElementById("lerr").textContent = e.message; }
+    b.disabled = false;
+  };
+  document.getElementById("lb").onclick = go;
+  document.getElementById("lp").onkeydown = (e)=>{ if(e.key==="Enter") go(); };
+  document.getElementById("lu").onkeydown = (e)=>{ if(e.key==="Enter") document.getElementById("lp").focus(); };
+  document.getElementById("lu").focus();
+}
+
+/* ---------------- Panel shell ---------------- */
+const TABS = [["engine","AI Engine"],["modules","Modules"],["users","Users"],["health","System Health"],["logs","Logs"]];
+function renderPanel() {
+  document.getElementById("btnLogout").style.display = "";
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  const tabs = $(`<div class="tabs"></div>`);
+  TABS.forEach(([k,label]) => {
+    const b = document.createElement("button");
+    b.textContent = label; if (k===TAB) b.className = "on";
+    b.onclick = () => { TAB = k; renderPanel(); };
+    tabs.appendChild(b);
+  });
+  app.appendChild(tabs);
+  const body = $("<div></div>"); app.appendChild(body);
+  ({engine: tabEngine, modules: tabModules, users: tabUsers, health: tabHealth, logs: tabLogs}[TAB])(body);
+}
+document.getElementById("btnLogout").onclick = async () => {
+  try { await api("/api/admin/panel/logout", {method:"POST"}); } catch(e){}
+  renderLogin();
+};
+
+/* ---------------- Tab: AI Engine ---------------- */
+async function tabEngine(root) {
+  const cfg = await api("/api/admin/panel/engine");
+  const el = $(`<div>
+    <div class="card fade"><h3>AI Engine</h3>
+      <div class="grid2">
+        <div><label>Provider label</label><input id="e_provider" value="${esc(cfg.provider||"")}"/></div>
+        <div><label>Base URL (OpenAI-compatible, ends without /v1 suffix)</label><input id="e_base" value="${esc(cfg.api_base||"")}" placeholder="https://api.deepseek.com/v1"/></div>
+        <div><label>Chat model</label><input id="e_chat" value="${esc(cfg.chat_model||"")}" placeholder="deepseek-chat"/></div>
+        <div><label>Embedding model</label><input id="e_emb" value="${esc(cfg.embedding_model||"")}"/></div>
+        <div><label>API key ${cfg.has_key?`<span class="pill ok">saved ${esc(cfg.api_key_tail)}</span>`:`<span class="pill">not set</span>`}</label><input id="e_key" type="password" placeholder="${cfg.has_key?"(keep current)":"sk-..."}"/></div>
+      </div>
+      <div class="row" style="margin-top:16px">
+        <button id="e_test">Test connection</button>
+        <button id="e_save">Save & apply to chat</button>
+        <span id="e_msg" class="mut"></span>
+      </div>
+      <pre id="e_out" class="log" style="margin-top:10px;color:var(--dim)"></pre>
+    </div>
+    <p class="mut">Save & apply: the appliance's chat assistant is re-bound to this engine instantly — no restart. The key is stored server-side and never sent back to the browser (only its last 4 characters).</p></div>`);
+  root.appendChild(el);
+  const vals = () => ({ provider: document.getElementById("e_provider").value,
+    api_base: document.getElementById("e_base").value.trim(),
+    chat_model: document.getElementById("e_chat").value.trim(),
+    embedding_model: document.getElementById("e_emb").value.trim(),
+    api_key: document.getElementById("e_key").value.trim() });
+  document.getElementById("e_test").onclick = async () => {
+    const msg = document.getElementById("e_msg"); msg.textContent = "Testing…";
+    const v = vals();
+    try { const r = await api("/api/admin/panel/engine/test", {method:"POST", body: JSON.stringify(v)});
+      document.getElementById("e_out").textContent = JSON.stringify(r, null, 2);
+      msg.innerHTML = r.ok ? '<span class="ok-txt">Engine replied: '+esc(r.chat_reply||"PONG")+'</span>' : '<span class="bad-txt">Failed: '+esc(r.error||("HTTP "+r.chat_status))+'</span>';
+    } catch(e){ msg.innerHTML = '<span class="bad-txt">'+esc(e.message)+'</span>'; }
+  };
+  document.getElementById("e_save").onclick = async () => {
+    const msg = document.getElementById("e_msg"); msg.textContent = "Saving…";
+    try {
+      const v = vals(); v.apply = true; if (!v.api_key) delete v.api_key;
+      const r = await api("/api/admin/panel/engine", {method:"POST", body: JSON.stringify(v)});
+      const res = r.apply_result || {};
+      msg.innerHTML = res.applied ? '<span class="ok-txt">Saved & applied — chat now uses '+esc(res.chat_model||res.provider||"the engine")+'</span>'
+                                  : '<span class="bad-txt">'+esc(res.error||"saved")+'</span>';
+    } catch(e){ msg.innerHTML = '<span class="bad-txt">'+esc(e.message)+'</span>'; }
+  };
+}
+
+/* ---------------- Tab: Modules ---------------- */
+async function tabModules(root) {
+  const {modules} = await api("/api/admin/panel/modules");
+  const el = $(`<div class="card fade"><h3>Odoo Modules (${modules.length})</h3>
+    <table><thead><tr><th>Module</th><th>Description</th><th>Version</th><th>State</th><th></th></tr></thead>
+    <tbody>${modules.map(m=>`<tr>
+      <td><b>${esc(m.name)}</b></td><td class="mut">${esc(m.short_desc)}</td><td class="mut">${esc(m.version)}</td>
+      <td><span class="pill ${m.state==="installed"?"ok":(m.state==="uninstalled"?"":"warn")}">${esc(m.state)}</span></td>
+      <td>${m.state==="installed"
+        ? `<button class="ghost small" data-act="uninstall" data-n="${esc(m.name)}">Uninstall</button>`
+        : `<button class="small" data-act="install" data-n="${esc(m.name)}">Install</button>`}</td></tr>`).join("")}</tbody></table>
+    <div class="err" id="m_msg"></div></div>`);
+  root.appendChild(el);
+  el.querySelectorAll("button[data-act]").forEach(b => b.onclick = async () => {
+    const act = b.dataset.act, n = b.dataset.n;
+    if (act === "uninstall" && !confirm("Uninstall module "+n+"? Its data will be removed.")) return;
+    b.disabled = true; b.textContent = "…";
+    try { const r = await api("/api/admin/panel/modules/act", {method:"POST", body: JSON.stringify({names:[n], action:act})});
+      if (r.errors && r.errors.length) throw new Error(r.errors[0].error || "failed");
+      tabModules(root.parentNode ? root : null, root);
+      root.innerHTML=""; tabModules(root);
+    } catch(e) { document.getElementById("m_msg").textContent = e.message; b.disabled = false; b.textContent = act; }
+  });
+}
+
+/* ---------------- Tab: Users ---------------- */
+async function tabUsers(root) {
+  const {users} = await api("/api/admin/panel/users");
+  const el = $(`<div class="card fade"><h3>Internal users (${users.length})</h3>
+    <table><thead><tr><th>User</th><th>Login</th><th>Role</th><th>State</th><th>Set password</th></tr></thead>
+    <tbody>${users.map(u=>`<tr>
+      <td>${esc(u.name)}</td><td class="mut">${esc(u.login)}</td>
+      <td>${u.admin?'<span class="pill ok">admin</span>':'<span class="pill">user</span>'}</td>
+      <td>${u.active?'<span class="pill ok">active</span>':'<span class="pill bad">blocked</span>'}</td>
+      <td><div class="row"><input id="pw_${u.id}" type="password" placeholder="new password" style="width:150px;padding:7px 10px"/>
+      <button class="ghost small" data-login="${esc(u.login)}" data-in="pw_${u.id}">Save</button></div></td></tr>`).join("")}
+    </tbody></table><div class="err" id="u_msg"></div></div>`);
+  root.appendChild(el);
+  el.querySelectorAll("button[data-login]").forEach(b => b.onclick = async () => {
+    const pw = document.getElementById(b.dataset.in).value;
+    try { await api("/api/admin/panel/users/password", {method:"POST", body: JSON.stringify({login:b.dataset.login, password:pw})});
+      document.getElementById("u_msg").innerHTML = '<span class="ok-txt">Password updated for '+esc(b.dataset.login)+'</span>';
+    } catch(e){ document.getElementById("u_msg").innerHTML = '<span class="bad-txt">'+esc(e.message)+'</span>'; }
+  });
+}
+
+/* ---------------- Tab: Health ---------------- */
+async function tabHealth(root) {
+  const h = await api("/api/admin/panel/health");
+  const c = h.counts || {};
+  const el = $(`<div class="fade">
+    <div class="grid4">
+      <div class="stat"><b><span class="dot" style="background:${h.database==="up"?"var(--ok)":"var(--bad)"}"></span>${esc(h.database)}</b><span>Database</span></div>
+      <div class="stat"><b><span class="dot" style="background:${h.redis==="up"?"var(--ok)":"var(--warn)"}"></span>${esc(h.redis)}</b><span>Redis</span></div>
+      <div class="stat"><b style="font-size:15px;padding-top:4px">${esc(h.ai_engine)}</b><span>AI engine</span></div>
+      <div class="stat"><b>${h.modules_installed}</b><span>Modules installed</span></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h3>Data</h3><div class="grid4">
+      ${Object.entries(c).map(([k,v])=>`<div class="stat"><b>${v==null?"-":v}</b><span>${esc(k)}</span></div>`).join("")}
+    </div></div></div>`);
+  root.appendChild(el);
+}
+
+/* ---------------- Tab: Logs ---------------- */
+async function tabLogs(root) {
+  const {logs} = await api("/api/admin/panel/logs");
+  const el = $(`<div class="card fade"><h3>Audit log (last ${logs.length})</h3>
+    <div class="log">${logs.map(l=>`<div><span class="mut">${esc(l.date)}</span> · ${esc(l.user||"system")} · <b>${esc(l.action)}</b> · ${l.success?'<span class="ok-txt">ok</span>':'<span class="bad-txt">'+esc(l.error||"failed")+'</span>'}</div>`).join("") || '<span class="mut">no events yet</span>'}</div></div>`);
+  root.appendChild(el);
+}
+
+/* ---------------- boot ---------------- */
+(async function boot(){
+  try { await api("/api/admin/panel/session"); renderPanel(); }
+  catch(e){ /* renderLogin already invoked by api() on 401 */ if (!document.getElementById("lu")) renderLogin(); }
+})();
+</script>
+</body>
+</html>
