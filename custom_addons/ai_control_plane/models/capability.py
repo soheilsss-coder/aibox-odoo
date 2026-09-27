@@ -19,10 +19,30 @@ class AiCapability(models.Model):
     group_ids = fields.Many2many("res.groups", string="Allowed Roles")
     active = fields.Boolean(default=True)
     source = fields.Selection([
-        ("manual", "Manual"), ("adapter", "Adapter"), ("discovered", "Discovered")
+        ("manual", "Manual"), ("adapter", "Adapter"), ("discovered", "Discovered"),
+        ("control_plane", "Control Plane")
     ], default="manual", required=True)
 
     _sql_constraints = [("name_unique", "unique(name)", "Capability name must be unique.")]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Idempotent registry seeding: capabilities are unique by name, so
+        re-seeding the same capability from another module UPDATES it instead
+        of crashing the install with UniqueViolation."""
+        to_create = []
+        updated = self.browse()
+        for vals in vals_list:
+            name = vals.get("name")
+            found = self.with_context(active_test=False).search(
+                [("name", "=", name)], limit=1) if name else self.browse()
+            if found:
+                found.write({k: v for k, v in vals.items() if k != "name"})
+                updated |= found
+            else:
+                to_create.append(vals)
+        created = super().create(to_create) if to_create else self.browse()
+        return updated | created
 
     @api.model
     def user_can(self, user, capability_name, record=None):

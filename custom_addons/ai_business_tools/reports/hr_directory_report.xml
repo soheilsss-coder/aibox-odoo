@@ -24,12 +24,15 @@
         </t>
     </template>
 
-    <report id="report_hr_directory"
-            string="HR Staff Directory"
-            model="hr.employee"
-            report_type="qweb-pdf"
-            file="ai_business_tools.report_hr_directory"
-            name="ai_business_tools.report_hr_directory"
-            print_report_name="('HR Directory - %s' % (object.name or 'Employee'))"/>
+    <!-- Odoo 18 removed the <report> shortcut; declare ir.actions.report. -->
+    <record id="report_hr_directory_action" model="ir.actions.report">
+        <field name="name">HR Staff Directory</field>
+        <field name="model">hr.employee</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">ai_business_tools.report_hr_directory</field>
+        <field name="report_file">ai_business_tools.report_hr_directory</field>
+        <field name="print_report_name">'HR Directory - %s' % (object.name or 'Employee')</field>
+        <field name="binding_model_id" ref="hr.model_hr_employee"/>
+    </record>
 
 </odoo>

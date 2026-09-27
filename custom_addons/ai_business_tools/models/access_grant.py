@@ -157,3 +157,37 @@ class AiGatewayAccessGrant(models.Model):
         for grant in expired:
             grant.write({"state": "expired", "active": False})
             _logger.info("access_grant expired: id=%s user=%s", grant.id, grant.to_user_id.login)
+
+
+class AiGatewayAccessGrantRoleWhitelist(models.Model):
+    """Whitelist: temporary access may only grant product roles.
+
+    Formerly an ir.rule with ref() in the domain, which Odoo 18 cannot
+    evaluate (no ref at request time). Same guarantee, enforced at write.
+    """
+
+    _inherit = "ai.gateway.access.grant"
+
+    _ALLOWED_ROLE_XMLIDS = [
+        "role_employee", "role_manager", "role_hr_staff", "role_hr_manager",
+        "role_finance_staff", "role_finance_manager", "role_warehouse_staff",
+        "role_warehouse_manager", "role_project_manager",
+        "role_manufacturing_manager", "role_sales_manager",
+        "role_purchase_manager", "role_executive", "role_security",
+        "role_system_admin",
+    ]
+
+    @api.constrains("group_id")
+    def _check_target_role(self):
+        allowed = {
+            self.env.ref("ai_business_tools.%s" % x).id
+            for x in self._ALLOWED_ROLE_XMLIDS
+            if self.env.ref("ai_business_tools.%s" % x, raise_if_not_found=False)
+        }
+        for rec in self:
+            if rec.group_id and rec.group_id.id not in allowed:
+                from odoo.exceptions import ValidationError
+
+                raise ValidationError(
+                    "Temporary access may target product roles only."
+                )

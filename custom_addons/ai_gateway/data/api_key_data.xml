@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_ceo')}]" />
+    <!-- create_key_by_id hashes the secret; a bare create() would violate
+         the key_hash not-null constraint on fresh installs. -->
+    <function model="ai.gateway.api.key" name="create_key_by_id">
+        <value eval="[ref('company_ai_demo.demo_user_ceo')]"/>
     </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_accountant')}]" />
+    <function model="ai.gateway.api.key" name="create_key_by_id">
+        <value eval="[ref('company_ai_demo.demo_user_accountant')]"/>
     </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_warehouse')}]" />
+    <function model="ai.gateway.api.key" name="create_key_by_id">
+        <value eval="[ref('company_ai_demo.demo_user_warehouse')]"/>
     </function>
-    <function model="ai.gateway.api.key" name="create">
-        <value eval="[{'user_id': ref('company_ai_demo.demo_user_hr_security')}]" />
+    <function model="ai.gateway.api.key" name="create_key_by_id">
+        <value eval="[ref('company_ai_demo.demo_user_hr_security')]"/>
     </function>
 </odoo>

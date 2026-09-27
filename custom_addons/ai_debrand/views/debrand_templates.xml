@@ -15,15 +15,8 @@
         </xpath>
     </template>
 
-    <template id="debrand_assets" inherit_id="web.assets_frontend">
-        <xpath expr="." position="inside">
-            <script type="text/javascript" src="/ai_debrand/static/src/js/debrand.js"/>
-        </xpath>
-    </template>
-
-    <template id="debrand_assets_backend" inherit_id="web.assets_backend">
-        <xpath expr="." position="inside">
-            <script type="text/javascript" src="/ai_debrand/static/src/js/debrand.js"/>
-        </xpath>
-    </template>
+    <!-- Odoo 18: web.assets_frontend/backend are t-call-assets bundles, not
+         templates - inheriting them as templates crashes fresh installs
+         (ir.model.data KeyError). The JS fallback is wired through the
+         manifest "assets" key instead. -->
 </odoo>

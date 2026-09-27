@@ -1,0 +1,87 @@
+worker_processes auto;
+pid /run/nginx.pid;
+error_log /dev/stderr warn;
+
+events { worker_connections 1024; }
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    access_log    /dev/stdout;
+
+    sendfile      on;
+    client_max_body_size 64m;
+
+    # Odoo installs 124 modules on a first boot with an empty database, which
+    # takes minutes. nginx answers on $PORT from the first second so the
+    # platform's health check passes while that happens in the background.
+    upstream odoo { server 127.0.0.1:18069; }
+
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ''      close;
+    }
+
+    server {
+        listen __PORT__;
+        server_name _;
+
+        # Cheap liveness probe for the platform and for the HEALTHCHECK.
+        location = /healthz {
+            add_header Content-Type text/plain;
+            return 200 "ok\n";
+        }
+
+        # The API gateway. Odoo's own /api/* routes live here.
+        location /api/ {
+            proxy_pass http://odoo;
+            proxy_http_version 1.1;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host  $host;
+            # SSE: /api/chat streams token by token, so nothing may buffer it.
+            proxy_buffering    off;
+            proxy_cache        off;
+            proxy_read_timeout 3600s;
+            proxy_send_timeout 3600s;
+            chunked_transfer_encoding on;
+        }
+
+        # Odoo 18 long-polling / websocket channel.
+        location /websocket {
+            proxy_pass http://odoo;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade    $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host       $host;
+            proxy_read_timeout 3600s;
+        }
+
+        # Odoo's own web client and static assets (needed for /web/login and
+        # for any module that serves a report or an image).
+        location /web { proxy_pass http://odoo; proxy_set_header Host $host; }
+        location /odoo { proxy_pass http://odoo; proxy_set_header Host $host; }
+        location ~ ^/(report|mail|web|longpolling)/ {
+            proxy_pass http://odoo;
+            proxy_set_header Host $host;
+        }
+
+        # Everything else is the React shell, built at image time.
+        root /opt/aibox/frontend/dist;
+        index index.html;
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Hashed asset filenames can be cached hard; the shell must not be.
+        location /assets/ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            try_files $uri =404;
+        }
+        location = /index.html {
+            add_header Cache-Control "no-cache";
+        }
+    }
+}

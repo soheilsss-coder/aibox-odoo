@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#f7f6f2" />
+<meta name="description" content="Nova Enterprise — platform admin console (separate from the workspace)." />
+<meta name="robots" content="noindex" />
+<title>Nova Enterprise — Admin Console</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%236a5cff'/><stop offset='1' stop-color='%23ff6b8b'/></linearGradient></defs><circle cx='50' cy='50' r='42' fill='url(%23g)'/></svg>" />
+<style>
+/* Fallback tokens (mirror the app bundle) — the real stylesheet below
+   overrides them when it loads. Keeps the page on-brand even offline. */
+:root{--font-sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:"Space Grotesk","Inter",system-ui,sans-serif;--fs-xs:12px;--fs-sm:13px;--fs-base:14.5px;--fs-md:15.5px;--fs-lg:17px;--fs-xl:21px;--fs-2xl:27px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-full:999px;--accent:#5a5ad6;--accent-soft:#5a5ad61a;--accent-softer:#5a5ad60f;--accent-contrast:#fff;--ring-accent:0 0 0 4px #5a5ad629;--grad-brand:linear-gradient(135deg,#6a5cff 0%,#9b5cff 55%,#e05d8f 100%);--shadow-glow:0 8px 32px #6a5cff47;--ok:#0e9f6e;--ok-soft:#0e9f6e1f;--warn:#d97706;--warn-soft:#d977061f;--err:#dc2626;--err-soft:#dc26261a;--info:#2563eb;--info-soft:#2563eb1a;--bg:#f7f6f2;--bg-elev:#faf9f5;--surface:#fff;--surface-2:#f1efe9;--surface-3:#e8e5dd;--border:#e8e5dd;--border-strong:#d9d5ca;--text:#1b1a17;--text-muted:#6f6a60;--text-faint:#a39d92;--sidebar-w:268px;--topbar-h:56px;--ease-out:cubic-bezier(.22,.61,.36,1)}
+</style>
+<link rel="stylesheet" href="assets/index-B7tjfh8Z.css" />
+<style>
+/* ---- vendor console layout (uses the app's tokens/classes) ---- */
+body{font-family:var(--font-sans)}
+.auth-card h1{display:flex;align-items:center;gap:10px}
+.auth-card h1 svg{color:var(--accent);flex:none}
+.err{color:var(--err);font-size:var(--fs-sm);min-height:18px;margin-top:12px}
+.console-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.console-table th{text-align:left;font-weight:var(--fw-semibold);color:var(--text-faint);font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;padding:10px 12px;border-bottom:1px solid var(--border)}
+.console-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.console-table tr:last-child td{border-bottom:none}
+.console-table tr:hover td{background:var(--accent-softer)}
+.out{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;font-family:ui-monospace,SF Mono,Menlo,Consolas,monospace;font-size:12px;line-height:1.7;max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;direction:ltr;text-align:left;margin-top:12px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.logline{display:flex;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px dashed var(--border);font-size:var(--fs-sm)}
+.logline:last-child{border-bottom:none}
+.stat-tile{display:flex;flex-direction:column;gap:8px}
+.stat-tile b{font-size:var(--fs-xl);font-family:var(--font-display)}
+.stat-tile span{font-size:var(--fs-xs);color:var(--text-muted);font-weight:var(--fw-medium);text-transform:uppercase;letter-spacing:.05em}
+.side-foot{display:flex;flex-direction:column;gap:6px}
+.side-status{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--text-muted);padding:8px 10px}
+.filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:var(--sp-4)}
+.filter-row .input{max-width:320px}
+.hero-engine{position:relative;overflow:hidden}
+.hero-engine:before{content:"";background:var(--grad-brand);opacity:.07;pointer-events:none;position:absolute;inset:0}
+.fade-in{animation:fadeUp .3s var(--ease-out) both}
+@keyframes fadeUp{0%{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.pw-cell{display:flex;gap:8px;align-items:center}
+.pw-cell .input{width:160px;padding:6px 10px;font-size:var(--fs-sm)}
+.nav-label{font-size:10.5px;font-weight:var(--fw-bold);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);padding:14px 10px 4px}
+.bar{height:8px;border-radius:var(--r-full);background:var(--surface-3);overflow:auto}
+.bar i{display:block;height:100%;border-radius:var(--r-full);background:var(--grad-brand)}
+.chart{display:flex;align-items:flex-end;gap:6px;height:120px;padding:10px 4px 0}
+.chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.chart .col b{font-size:10px;color:var(--text-faint);font-weight:var(--fw-medium)}
+.chart .col .stick{width:100%;max-width:38px;border-radius:8px 8px 3px 3px;background:var(--grad-brand);opacity:.9;min-height:3px}
+.dnum{font-size:11px;color:var(--text-faint);direction:ltr}
+/* branding */
+.color-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.color-field{display:grid;grid-template-columns:1fr 44px minmax(80px,1fr);align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--text-muted)}
+.color-field input[type=color]{width:44px;height:34px;margin:0;padding:2px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer}
+.brand-preview{border-radius:var(--r-md);padding:18px;display:flex;align-items:center;gap:12px;margin-bottom:14px;border:1px solid var(--border)}
+.brand-preview .bp-logo{width:40px;height:40px;border-radius:10px;object-fit:contain;background:#fff}
+@media (max-width:960px){.console-table th:nth-child(3),.console-table td:nth-child(3){display:none}}
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN (vendor only) ==================== -->
+<div id="auth" class="auth-wrap" hidden>
+  <div class="auth-blob b1"></div><div class="auth-blob b2"></div><div class="auth-blob b3"></div>
+  <div class="auth-card">
+    <span class="orb" style="width:46px;height:46px"></span>
+    <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Admin Console</h1>
+    <p class="sub">Vendor access only — prepare the platform, connect the AI engine, manage modules, then hand the appliance over.</p>
+    <div class="field"><label>Username</label><input class="input" id="lu" autocomplete="username" value="admin" /></div>
+    <div class="field"><label>Password</label><input class="input" id="lp" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
+    <button class="btn btn-gradient btn-block" id="lb">Sign in</button>
+    <div class="err" id="lerr"></div>
+    <div class="auth-foot">Nova Enterprise · restricted area</div>
+  </div>
+</div>
+
+<!-- ==================== VENDOR CONSOLE ==================== -->
+<div id="shell" class="shell" hidden>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="orb" style="width:30px;height:30px"></span>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console</div></div>
+    </div>
+    <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
+    <div style="flex:1"></div>
+    <div class="side-foot">
+      <div class="side-status" id="sideStatus"><span class="dot" style="background:var(--text-faint)"></span>checking services…</div>
+      <button class="btn btn-ghost btn-block" id="btnTheme" title="Toggle theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>Theme
+      </button>
+      <button class="btn btn-ghost btn-block" id="btnLogout" style="color:var(--err)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log out
+      </button>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <button class="btn btn-icon btn-ghost" id="btnBurger" title="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <div class="brand" style="padding:0"><span class="orb" style="width:24px;height:24px"></span><div class="brand-name" style="font-size:14px">Nova Admin</div></div>
+    </div>
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">VENDOR CONSOLE</div>
+          <h1 id="phTitle">System Health</h1>
+          <p id="phDesc"></p>
+        </div>
+        <div id="phActions" class="h-stack"></div>
+      </div>
+      <div id="view"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= API base (?api= or remembered) ================= */
+const API = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get("api");
+    if (q) { const o = decodeURIComponent(q).replace(/\/+$/,""); sessionStorage.setItem("aibox.apiBase", o); return o; }
+    return sessionStorage.getItem("aibox.apiBase") || "";
+  } catch(e) { return ""; }
+})();
+const $id = (i) => document.getElementById(i);
+const esc = (s) => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let SEC = "health";
+
+async function api(path, opts={}) {
+  const o = {credentials:"include", headers:{}, ...opts};
+  if (o.body) o.headers["Content-Type"] = "application/json";
+  const r = await fetch(API + path, o);
+  const d = await r.json().catch(()=>({}));
+  if (r.status === 401) { showAuth(); throw new Error(d.error || "unauthorized"); }
+  if (!r.ok || d.error) throw new Error(d.error || ("request failed ("+r.status+")"));
+  return d;
+}
+
+/* ================= theme ================= */
+$id("btnTheme").onclick = () => {
+  const el = document.documentElement;
+  const next = el.dataset.theme === "dark" ? "light" : "dark";
+  el.dataset.theme = next;
+  try { localStorage.setItem("aibox.admin.theme", next); } catch(e){}
+};
+try { const t = localStorage.getItem("aibox.admin.theme"); if (t) document.documentElement.dataset.theme = t; } catch(e){}
+
+/* ================= auth ================= */
+function showAuth(msg) {
+  $id("shell").hidden = true;
+  $id("auth").hidden = false;
+  $id("lerr").textContent = msg || "";
+  $id("lp").value = "";
+  $id("lu").focus();
+}
+async function doLogin() {
+  const b = $id("lb"); b.disabled = true; b.textContent = "Signing in…";
+  $id("lerr").textContent = "";
+  try {
+    await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
+      username: $id("lu").value.trim(), password: $id("lp").value })});
+    showConsole();
+  } catch(e) { $id("lerr").textContent = e.message; }
+  b.disabled = false; b.textContent = "Sign in";
+}
+$id("lb").onclick = doLogin;
+$id("lp").onkeydown = (e)=>{ if(e.key==="Enter") doLogin(); };
+$id("lu").onkeydown = (e)=>{ if(e.key==="Enter") $id("lp").focus(); };
+$id("btnLogout").onclick = async () => {
+  try { await api("/api/admin/panel/logout", {method:"POST"}); } catch(e){}
+  SEC = "health"; showAuth();
+};
+$id("btnBurger").onclick = () => $id("sidebar").classList.toggle("open");
+
+/* ================= console shell ================= */
+const ICONS = {
+  health: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+  engine: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>',
+  usage: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
+  branding: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>',
+  modules: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+  users: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  logs: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+};
+const SECTIONS = [
+  ["health","System Health","Live status of this appliance: database, cache, AI engine and installed apps."],
+  ["engine","AI Engine","Connect the AI brain of the whole platform: provider, endpoint, models and API key. Test before you apply."],
+  ["usage","Token Usage","Real recorded AI consumption — total, per department and per employee, with the daily trend."],
+  ["branding","Branding","White-label the platform for the customer: name, tagline, colors and logo before handover."],
+  ["modules","Modules","Install, update or remove Odoo apps on this appliance. Critical platform modules are protected."],
+  ["users","Users","Internal accounts and passwords."],
+  ["logs","Audit Log","Every admin action recorded by the panel."],
+];
+function renderNav() {
+  const nav = $id("nav"); nav.innerHTML = "";
+  const lbl = document.createElement("div");
+  lbl.className = "nav-label"; lbl.textContent = "Platform management";
+  nav.appendChild(lbl);
+  SECTIONS.forEach(([k,label]) => {
+    const a = document.createElement("a");
+    a.href = "#"; a.className = "nav-item" + (k===SEC ? " active" : "");
+    a.innerHTML = ICONS[k] + "<span>" + esc(label) + "</span>";
+    a.onclick = (ev) => { ev.preventDefault(); SEC = k; renderNav(); renderSection();
+      $id("sidebar").classList.remove("open"); };
+    nav.appendChild(a);
+  });
+}
+function showConsole() {
+  $id("auth").hidden = true;
+  $id("shell").hidden = false;
+  renderNav(); renderSection(); refreshSideStatus();
+}
+async function refreshSideStatus() {
+  const el = $id("sideStatus");
+  try {
+    const h = await api("/api/admin/panel/health");
+    const allUp = h.database==="up" && h.ai_engine==="up";
+    const col = allUp ? "var(--ok)" : (h.database==="up" ? "var(--warn)" : "var(--err)");
+    el.innerHTML = '<span class="dot" style="background:'+col+'"></span>db '+esc(h.database)+' · engine '+esc(h.ai_engine);
+  } catch(e) { /* 401 handled centrally */ }
+}
+function setHead(title, desc) {
+  $id("phTitle").textContent = title;
+  $id("phDesc").textContent = desc || "";
+  $id("phActions").innerHTML = "";
+}
+function renderSection() {
+  const meta = SECTIONS.find(s=>s[0]===SEC);
+  setHead(meta[1], meta[2]);
+  const view = $id("view");
+  view.innerHTML = '<div class="card"><span class="muted small">Loading…</span></div>';
+  const fn = {health:secHealth, engine:secEngine, usage:secUsage, branding:secBranding, modules:secModules, users:secUsers, logs:secLogs}[SEC];
+  fn(view).catch(e => { if (e.message !== "unauthorized")
+    view.innerHTML = '<div class="card"><span style="color:var(--err)">'+esc(e.message)+'</span> <button class="btn btn-sm" style="margin-left:10px" onclick="renderSection()">Retry</button></div>'; });
+}
+
+/* ================= section: system health (landing) ================= */
+async function secHealth(view) {
+  const [h, lg] = await Promise.all([
+    api("/api/admin/panel/health"),
+    api("/api/admin/panel/logs").catch(()=>({logs:[]}))]);
+  const c = h.counts || {};
+  const engineUp = h.ai_engine === "up";
+  const tile = (val,label,col)=>'<div class="card stat-tile"><b style="'+(col?'color:'+col:'')+'">'+esc(val)+'</b><span>'+esc(label)+'</span></div>';
+  const countsHtml = Object.entries(c).map(([k,v])=>
+    '<div class="card stat-tile"><b>'+(v==null?"-":esc(v))+'</b><span>'+esc(k)+'</span></div>').join("");
+  const recent = (lg.logs||[]).slice(0,6);
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="card hero-engine" style="margin-bottom:16px"><div class="h-stack spread wrap">' +
+      '<div><span class="bgd '+(engineUp?'bgd-ok':'bgd-warn')+'" style="margin-bottom:10px"><span class="bgd-dot"></span>AI engine '+esc(h.ai_engine)+'</span>' +
+      '<h2 style="font-size:var(--fs-xl);margin:6px 0 4px">Appliance is '+(h.database==="up"?"ready":"not ready")+' for handover</h2>' +
+      '<p class="muted small">Services below must be green before you ship this device to the customer.</p></div>' +
+      '<button class="btn" id="h_refresh">Refresh</button>' +
+    '</div></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:16px">' +
+      tile(h.database,"Database", h.database==="up"?"var(--ok)":"var(--err)") +
+      tile(h.redis,"Redis cache", h.redis==="up"?"var(--ok)":null) +
+      tile(h.modules_installed,"Modules installed") +
+      '<div class="card stat-tile"><b style="font-size:var(--fs-md)">'+esc(h.ai_engine)+'</b><span>AI engine</span></div>' +
+    '</div>' +
+    (countsHtml?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:16px">'+countsHtml+'</div>':'') +
+    '<div class="card"><div class="card-head"><h3>Recent admin activity</h3><a href="#" id="hLogs" class="small" style="color:var(--accent)">view all →</a></div>' +
+    (recent.length ? recent.map(l=>'<div class="logline"><span class="faint mono">'+esc(l.date)+'</span><b>'+esc(l.action)+'</b><span class="muted">'+esc(l.user||"system")+'</span>'+(l.success?'<span class="bgd bgd-ok" style="margin-inline-start:auto"><span class="bgd-dot"></span>ok</span>':'<span class="bgd bgd-err" style="margin-inline-start:auto"><span class="bgd-dot"></span>'+esc(l.error||"failed")+'</span>')+'</div>').join("") : '<span class="muted small">No events yet.</span>') +
+    '</div></div>';
+  $id("h_refresh").onclick = () => renderSection();
+  $id("hLogs").onclick = (ev)=>{ ev.preventDefault(); SEC="logs"; renderNav(); renderSection(); };
+}
+
+/* ================= section: AI engine ================= */
+const PRESETS = [
+  ["", "— choose a provider preset —", "", ""],
+  ["deepseek", "DeepSeek API", "https://api.deepseek.com/v1", "deepseek-chat"],
+  ["openai", "OpenAI API", "https://api.openai.com/v1", "gpt-4o-mini"],
+  ["compat", "Other OpenAI-compatible API", "", ""],
+  ["local", "Local server on this appliance (Nova brain)", "http://127.0.0.1:8001/v1", "nova-local-brain"],
+];
+async function secEngine(view) {
+  const cfg = await api("/api/admin/panel/engine");
+  view.innerHTML =
+  '<div class="fade-in card">' +
+    '<div class="card-head"><h3>Engine connection</h3>'+(cfg.has_key?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>API key saved '+esc(cfg.api_key_tail)+'</span>':'<span class="bgd bgd-warn"><span class="bgd-dot"></span>no API key</span>')+'</div>' +
+    '<div class="field"><label>Provider preset</label><select class="select" id="e_preset">' +
+      PRESETS.map(p=>'<option value="'+p[0]+'">'+esc(p[1])+'</option>').join("") + '</select></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">' +
+      '<div class="field"><label>Provider label</label><input class="input" id="e_provider" value="'+esc(cfg.provider||"")+'" placeholder="My AI provider"/></div>' +
+      '<div class="field"><label>Base URL (OpenAI-compatible)</label><input class="input" id="e_base" value="'+esc(cfg.api_base||"")+'" placeholder="https://api.deepseek.com/v1"/></div>' +
+      '<div class="field"><label>Chat model</label><input class="input" id="e_chat" value="'+esc(cfg.chat_model||"")+'" placeholder="deepseek-chat"/></div>' +
+      '<div class="field"><label>Embedding model (optional)</label><input class="input" id="e_emb" value="'+esc(cfg.embedding_model||"")+'"/></div>' +
+      '<div class="field"><label>API key '+(cfg.has_key?'<span class="faint">(leave empty to keep the saved one)</span>':'')+'</label><input class="input" id="e_key" type="password" placeholder="'+(cfg.has_key?"••••••••••••":"sk-…")+'"/></div>' +
+    '</div>' +
+    '<div class="h-stack wrap" style="margin-top:18px">' +
+      '<button class="btn" id="e_test">Test connection</button>' +
+      '<button class="btn btn-gradient" id="e_save">Save &amp; apply to chat</button>' +
+      '<span id="e_msg" class="muted small"></span>' +
+    '</div>' +
+    '<pre class="out" id="e_out" hidden></pre>' +
+    '<p class="muted small" style="margin-top:14px">“Save &amp; apply” instantly re-binds the platform chat assistant to this engine — no restart. The API key is stored server-side only and never returned to the browser (you will only ever see its last 4 characters).</p>' +
+  '</div>';
+  const vals = () => ({ provider: $id("e_provider").value,
+    api_base: $id("e_base").value.trim(), chat_model: $id("e_chat").value.trim(),
+    embedding_model: $id("e_emb").value.trim(), api_key: $id("e_key").value.trim() });
+  $id("e_preset").onchange = () => {
+    const p = PRESETS.find(x=>x[0]===$id("e_preset").value);
+    if (p && p[0]) { if (p[2]) $id("e_base").value = p[2];
+      if (!$id("e_chat").value && p[3]) $id("e_chat").value = p[3];
+      if (p[0]==="deepseek" && !$id("e_provider").value) $id("e_provider").value = "DeepSeek"; }
+  };
+  $id("e_test").onclick = async () => {
+    const msg = $id("e_msg"), out = $id("e_out");
+    msg.textContent = "Testing…"; out.hidden = false; out.textContent = "…";
+    try {
+      const r = await api("/api/admin/panel/engine/test", {method:"POST", body: JSON.stringify(vals())});
+      out.textContent = JSON.stringify(r, null, 2);
+      msg.innerHTML = r.ok ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Engine replied: “'+esc((r.chat_reply||"PONG").slice(0,80))+'”</span>'
+                           : '<span class="bgd bgd-err"><span class="bgd-dot"></span>Failed: '+esc(r.error||("HTTP "+r.chat_status))+'</span>';
+    } catch(e){ msg.innerHTML = '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(e.message)+'</span>'; }
+  };
+  $id("e_save").onclick = async () => {
+    const msg = $id("e_msg"); msg.textContent = "Saving…";
+    try {
+      const v = vals(); v.apply = true; if (!v.api_key) delete v.api_key;
+      const r = await api("/api/admin/panel/engine", {method:"POST", body: JSON.stringify(v)});
+      const res = r.apply_result || {};
+      msg.innerHTML = res.applied ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Saved &amp; applied — chat now uses '+esc(res.chat_model||res.provider||"the engine")+'</span>'
+                                  : '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(res.error||"saved")+'</span>';
+      refreshSideStatus();
+    } catch(e){ msg.innerHTML = '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(e.message)+'</span>'; }
+  };
+}
+
+/* ================= section: token usage (real, per dept & employee) ================= */
+const fmtN = (n) => String(n==null?0:n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+async function secUsage(view) {
+  let days = 30;
+  try { days = parseInt(sessionStorage.getItem("aibox.admin.usageDays")||"30",10)||30; } catch(e){}
+  const u = await api("/api/admin/panel/usage?days="+days);
+  const maxTok = Math.max(1, ...u.users.map(x=>x.tokens));
+  const maxDept = Math.max(1, ...u.departments.map(x=>x.tokens));
+  const maxDay = Math.max(1, ...u.daily.map(x=>x.tokens));
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="filter-row">' +
+      '<select class="select" id="u_days" style="max-width:170px">' +
+        [7,30,90,365].map(d=>'<option value="'+d+'"'+(d===days?' selected':'')+'>'+(d===365?'last year':'last '+d+' days')+'</option>').join("") +
+      '</select>' +
+      '<span class="bgd bgd-accent">'+esc(u.label)+'</span>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:16px">' +
+      '<div class="card stat-tile"><b>'+fmtN(u.total_tokens)+'</b><span>tokens · '+days+'d</span></div>' +
+      '<div class="card stat-tile"><b>'+fmtN(u.total_turns)+'</b><span>chat turns</span></div>' +
+      '<div class="card stat-tile"><b>'+u.users.length+'</b><span>employees using AI</span></div>' +
+      '<div class="card stat-tile"><b>'+u.departments.length+'</b><span>departments</span></div>' +
+    '</div>' +
+    (u.daily.length?'<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Daily trend</h3></div><div class="chart">' +
+      u.daily.slice(-14).map(d=>'<div class="col" title="'+esc(d.day)+' · '+fmtN(d.tokens)+' tokens"><span class="dnum">'+d.day.slice(5)+'</span><div class="stick" style="height:'+Math.max(3,Math.round(d.tokens/maxDay*86))+'px"></div><b>'+fmtN(d.tokens)+'</b></div>').join("") +
+    '</div></div>':'') +
+    '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>By department</h3></div>' +
+    (u.departments.length?'<div class="table-wrap"><table class="console-table"><thead><tr><th>Department</th><th>Employees</th><th>Turns</th><th style="width:34%">Tokens</th></tr></thead><tbody>' +
+      u.departments.map(d=>'<tr><td><b>'+esc(d.department)+'</b></td><td>'+d.employees+'</td><td>'+fmtN(d.turns)+'</td>' +
+        '<td><div class="h-stack" style="gap:10px"><span class="dnum" style="min-width:64px">'+fmtN(d.tokens)+'</span><div class="bar" style="flex:1"><i style="width:'+Math.round(d.tokens/maxDept*100)+'%"></i></div></div></td></tr>').join("") +
+      '</tbody></table></div>':'<span class="muted small">No AI usage recorded yet in this period.</span>') +
+    '</div>' +
+    '<div class="card"><div class="card-head"><h3>By employee</h3></div>' +
+    (u.users.length?'<div class="table-wrap"><table class="console-table"><thead><tr><th>Employee</th><th>Department</th><th>Turns</th><th style="width:30%">Tokens</th><th>Last activity</th></tr></thead><tbody>' +
+      u.users.map(x=>'<tr><td><b>'+esc(x.name)+'</b> <span class="faint small">'+esc(x.login)+'</span></td><td>'+esc(x.department||"—")+'</td><td>'+fmtN(x.turns)+'</td>' +
+        '<td><div class="h-stack" style="gap:10px"><span class="dnum" style="min-width:64px">'+fmtN(x.tokens)+'</span><div class="bar" style="flex:1"><i style="width:'+Math.round(x.tokens/maxTok*100)+'%"></i></div></div></td>' +
+        '<td class="faint small">'+esc((x.last||"").replace("T"," ").slice(0,16))+'</td></tr>').join("") +
+      '</tbody></table></div>':'<span class="muted small">No AI usage recorded yet in this period.</span>') +
+    '</div></div>';
+  $id("u_days").onchange = async () => {
+    try { sessionStorage.setItem("aibox.admin.usageDays", $id("u_days").value); } catch(e){}
+    renderSection();
+  };
+}
+
+/* ================= section: branding (white-label before handover) ================= */
+async function secBranding(view) {
+  const b = await api("/api/admin/panel/branding");
+  const colors = [["primary_color","Primary"],["secondary_color","Secondary"],["accent_color","Accent"],["danger_color","Danger"],["warning_color","Warning"]];
+  const def = (k, d) => esc(b[k] || d);
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Customer brand</h3>'+(b.logo_uploaded?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>logo uploaded</span>':'<span class="bgd bgd-warn"><span class="bgd-dot"></span>no logo</span>')+'</div>' +
+    '<div class="brand-preview" style="background:'+ (b.primary_color||'#5a5ad6') +'1a"><span class="orb" style="width:40px;height:40px"></span>' +
+      '<div><b style="font-family:var(--font-display);font-size:var(--fs-lg)">'+esc(b.brand_name||"Customer AI")+'</b><div class="muted small">'+esc(b.tagline||"Your tagline appears here")+'</div></div></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">' +
+      '<div class="field"><label>Brand name *</label><input class="input" id="b_name" value="'+def("brand_name","")+'"/></div>' +
+      '<div class="field"><label>Tagline</label><input class="input" id="b_tag" value="'+def("tagline","")+'"/></div>' +
+      '<div class="field"><label>Product title</label><input class="input" id="b_prod" value="'+def("product_title","")+'"/></div>' +
+      '<div class="field"><label>Support email</label><input class="input" id="b_semail" value="'+def("support_email","")+'" dir="ltr"/></div>' +
+      '<div class="field"><label>Support URL</label><input class="input" id="b_surl" value="'+def("support_url","")+'" dir="ltr"/></div>' +
+      '<div class="field"><label>Footer text</label><input class="input" id="b_foot" value="'+def("footer_text","")+'"/></div>' +
+      '<div class="field"><label>Login screen message</label><input class="input" id="b_lmsg" value="'+def("login_message","")+'"/></div>' +
+    '</div>' +
+    '<div class="card-head" style="margin-top:16px"><h3>Colors</h3></div>' +
+    '<div class="color-grid">' +
+      colors.map(([k,label])=>'<div class="color-field"><span>'+label+'</span><input type="color" id="b_'+k+'" value="'+def(k,"#5a5ad6")+'"/><input class="input" style="padding:5px 8px;font-size:12px" id="b_'+k+'_txt" value="'+def(k,"#5a5ad6")+'" dir="ltr"/></div>').join("") +
+    '</div>' +
+    '<div class="h-stack wrap" style="margin-top:18px;align-items:flex-end">' +
+      '<div class="field" style="margin:0"><label>Logo (PNG/SVG)</label><input class="input" id="b_logo" type="file" accept="image/png,image/jpeg,image/svg+xml"/></div>' +
+      '<button class="btn btn-gradient" id="b_save">Save branding</button>' +
+      '<span id="b_msg" class="muted small"></span>' +
+    '</div>' +
+    '<p class="muted small" style="margin-top:14px">This white-label profile is what the customer sees on their platform. It does not touch the vendor console itself.</p>' +
+  '</div></div>';
+  colors.forEach(([k]) => {
+    $id("b_"+k).oninput = () => { $id("b_"+k+"_txt").value = $id("b_"+k).value; };
+    $id("b_"+k+"_txt").oninput = () => { if (/^#[0-9a-fA-F]{6}$/.test($id("b_"+k+"_txt").value)) $id("b_"+k).value = $id("b_"+k+"_txt").value; };
+  });
+  $id("b_save").onclick = async () => {
+    const msg = $id("b_msg"); msg.textContent = "Saving…";
+    try {
+      const payload = { brand_name: $id("b_name").value.trim(), tagline: $id("b_tag").value.trim(),
+        product_title: $id("b_prod").value.trim(), support_email: $id("b_semail").value.trim(),
+        support_url: $id("b_surl").value.trim(), footer_text: $id("b_foot").value.trim(),
+        login_message: $id("b_lmsg").value.trim() };
+      colors.forEach(([k]) => { payload[k] = $id("b_"+k+"_txt").value.trim(); });
+      const f = $id("b_logo").files[0];
+      if (f) {
+        if (f.size > 2*1024*1024) throw new Error("logo must be under 2 MB");
+        payload.logo_b64 = await new Promise((res,rej)=>{ const rd = new FileReader();
+          rd.onload = ()=>res(String(rd.result)); rd.onerror = ()=>rej(new Error("read failed")); rd.readAsDataURL(f); });
+        payload.logo_filename = f.name; payload.logo_mimetype = f.type || "image/png";
+      }
+      const r = await api("/api/admin/panel/branding", {method:"POST", body: JSON.stringify(payload)});
+      msg.innerHTML = r.ok ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Branding saved — “'+esc(r.brand_name)+'”</span>'
+                           : '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(r.error||"failed")+'</span>';
+    } catch(e){ msg.innerHTML = '<span class="bgd bgd-err"><span class="bgd-dot"></span>'+esc(e.message)+'</span>'; }
+  };
+}
+
+/* ================= section: modules ================= */
+async function secModules(view) {
+  const {modules} = await api("/api/admin/panel/modules");
+  const PROTECTED = ["base","web","mail","bus","web_tour","theme_common"];
+  const badge = (st) => st==="installed" ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>installed</span>'
+    : st==="uninstalled" ? '<span class="bgd">available</span>'
+    : '<span class="bgd bgd-warn"><span class="bgd-dot"></span>'+esc(st)+'</span>';
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="filter-row"><input class="input" id="m_q" placeholder="Search 700+ modules…"/>' +
+    '<select class="select" id="m_f" style="max-width:180px"><option value="">all states</option><option value="installed">installed</option><option value="uninstalled">available</option></select>' +
+    '<span class="bgd bgd-accent">'+modules.length+' modules</span></div>' +
+    '<div class="table-wrap"><table class="console-table"><thead><tr><th>Module</th><th>Description</th><th>Version</th><th>State</th><th></th></tr></thead><tbody>' +
+    modules.map(m=>'<tr data-name="'+esc(m.name).toLowerCase()+'" data-state="'+esc(m.state)+'"><td><b>'+esc(m.name)+'</b>'+(PROTECTED.includes(m.name)?' <span class="bgd" title="protected">🔒</span>':'')+'</td>' +
+      '<td class="muted">'+esc(m.short_desc)+'</td><td class="faint mono">'+esc(m.version)+'</td><td>'+badge(m.state)+'</td>' +
+      '<td style="text-align:right">'+(m.state==="installed"
+        ? (PROTECTED.includes(m.name) ? '' : '<button class="btn btn-danger btn-sm" data-act="uninstall" data-n="'+esc(m.name)+'">Uninstall</button>')
+        : '<button class="btn btn-primary btn-sm" data-act="install" data-n="'+esc(m.name)+'">Install</button>')+'</td></tr>').join("") +
+    '</tbody></table></div><div class="err" id="m_msg"></div></div>';
+  const applyFilter = () => {
+    const q = $id("m_q").value.trim().toLowerCase(), f = $id("m_f").value;
+    view.querySelectorAll("tbody tr").forEach(tr => {
+      tr.style.display = (!q || tr.dataset.name.includes(q)) && (!f || tr.dataset.state===f) ? "" : "none";
+    });
+  };
+  $id("m_q").oninput = applyFilter; $id("m_f").onchange = applyFilter;
+  view.querySelectorAll("button[data-act]").forEach(b => b.onclick = async () => {
+    const act = b.dataset.act, n = b.dataset.n;
+    if (act==="uninstall" && !confirm("Uninstall module “"+n+"”? Its data will be removed.")) return;
+    b.disabled = true; b.textContent = "Working…";
+    try {
+      const r = await api("/api/admin/panel/modules/act", {method:"POST", body: JSON.stringify({names:[n], action:act})});
+      if (r.errors && r.errors.length) throw new Error(r.errors[0].error || "failed");
+      renderSection();
+    } catch(e) { $id("m_msg").textContent = e.message; b.disabled = false; b.textContent = act; }
+  });
+}
+
+/* ================= section: users ================= */
+async function secUsers(view) {
+  const {users} = await api("/api/admin/panel/users");
+  view.innerHTML =
+  '<div class="fade-in card"><div class="card-head"><h3>Internal users ('+users.length+')</h3></div>' +
+  '<div class="table-wrap"><table class="console-table"><thead><tr><th>User</th><th>Login</th><th>Role</th><th>State</th><th>Set new password</th></tr></thead><tbody>' +
+  users.map(u=>'<tr><td><b>'+esc(u.name)+'</b></td><td class="muted mono">'+esc(u.login)+'</td>' +
+    '<td>'+(u.admin?'<span class="bgd bgd-accent">admin</span>':'<span class="bgd">user</span>')+'</td>' +
+    '<td>'+(u.active?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>active</span>':'<span class="bgd bgd-err"><span class="bgd-dot"></span>blocked</span>')+'</td>' +
+    '<td><div class="pw-cell"><input class="input" id="pw_'+u.id+'" type="password" placeholder="new password"/>' +
+    '<button class="btn btn-sm" data-login="'+esc(u.login)+'" data-in="pw_'+u.id+'">Save</button></div></td></tr>').join("") +
+  '</tbody></table></div><div class="err" id="u_msg"></div></div>';
+  view.querySelectorAll("button[data-login]").forEach(b => b.onclick = async () => {
+    const pw = $id(b.dataset.in).value;
+    if (!pw) { $id("u_msg").textContent = "Type a password first."; return; }
+    try {
+      await api("/api/admin/panel/users/password", {method:"POST", body: JSON.stringify({login:b.dataset.login, password:pw})});
+      $id("u_msg").innerHTML = '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Password updated for '+esc(b.dataset.login)+'</span>';
+      $id(b.dataset.in).value = "";
+    } catch(e){ $id("u_msg").textContent = e.message; }
+  });
+}
+
+/* ================= section: logs ================= */
+async function secLogs(view) {
+  const {logs} = await api("/api/admin/panel/logs");
+  view.innerHTML =
+  '<div class="fade-in card"><div class="card-head"><h3>Audit log (last '+logs.length+')</h3></div>' +
+  (logs.length ? logs.map(l=>'<div class="logline"><span class="faint mono">'+esc(l.date)+'</span><b>'+esc(l.action)+'</b><span class="muted">'+esc(l.user||"system")+'</span>' +
+    (l.success?'<span class="bgd bgd-ok" style="margin-inline-start:auto"><span class="bgd-dot"></span>ok</span>'
+              :'<span class="bgd bgd-err" style="margin-inline-start:auto"><span class="bgd-dot"></span>'+esc(l.error||"failed")+'</span>')+'</div>').join("")
+   : '<span class="muted small">No events yet.</span>') + '</div>';
+}
+
+/* ================= boot ================= */
+(async function boot(){
+  try { await api("/api/admin/panel/session"); showConsole(); }
+  catch(e){ /* 401 already switched to the login card; network errors too */ showAuth(); }
+})();
+</script>
+</body>
+</html>

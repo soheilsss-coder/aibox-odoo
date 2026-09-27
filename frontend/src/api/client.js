@@ -1,3 +1,24 @@
+// API base resolution (hybrid wiring for GitHub Pages):
+// 1. ?api=<encoded-origin> query parameter wins (so the Pages site can be
+//    pointed at any appliance URL) and is remembered for the tab session.
+// 2. sessionStorage "aibox_api_base" (set by a previous ?api= load).
+// 3. "" (same origin) - the sandbox preview proxies /api itself.
+const API_BASE = (() => {
+  try {
+    if (typeof window === "undefined") return "";
+    const q = new URLSearchParams(window.location.search).get("api");
+    if (q) {
+      const origin = decodeURIComponent(q).replace(/\/+$/, "");
+      sessionStorage.setItem("aibox_api_base", origin);
+      return origin;
+    }
+    return sessionStorage.getItem("aibox_api_base") || "";
+  } catch (_e) { return ""; }
+})();
+
+function apiUrl(path) { return API_BASE + path; }
+
+export function getApiBase() { return API_BASE; }
 export function getApiKey() { return ""; }
 export function setApiKey(_key) {}
 export function clearApiKey() {}
@@ -13,7 +34,7 @@ async function request(path, { method = "GET", body, jsonRpc = false } = {}) {
     headers["Content-Type"] = "application/json";
     fetchBody = JSON.stringify(body);
   }
-  const resp = await fetch(path, { method, headers, body: fetchBody, credentials: "include" });
+  const resp = await fetch(apiUrl(path), { method, headers, body: fetchBody, credentials: "include" });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok || data.error) throw new ApiError(data.error || `request failed (${resp.status})`, resp.status);
   return data;
@@ -36,7 +57,7 @@ export const sendChatMessage = (message, threadId) => request("/api/chat", { met
 
 export function streamChat(payload, handlers) {
   const { onThinking, onDelta, onDone, onError } = handlers || {};
-  return fetch("/api/chat/stream", {
+  return fetch(apiUrl("/api/chat/stream"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
