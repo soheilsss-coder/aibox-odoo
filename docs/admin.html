@@ -82,7 +82,7 @@ body{font-family:var(--font-sans)}
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="orb" style="width:30px;height:30px"></span>
-      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v6</div></div>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v7</div></div>
     </div>
     <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
     <div style="flex:1"></div>
@@ -281,6 +281,7 @@ const PRESETS = [
   ["openai", "OpenAI API", "https://api.openai.com/v1", "gpt-4o-mini"],
   ["compat", "Other OpenAI-compatible API", "", ""],
   ["local", "Local server on this appliance (Nova brain)", "http://127.0.0.1:8001/v1", "nova-local-brain"],
+  ["ollama", "Ollama on this device (fully local AI, no internet)", "http://127.0.0.1:11434/v1", ""],
 ];
 async function secEngine(view) {
   const cfg = await api("/api/admin/panel/engine");
