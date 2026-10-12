@@ -303,9 +303,13 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                         "name": name, "user_id": user.id, "department_id": int(dept)})
             except Exception:  # noqa: BLE001
                 pass
-        group_user = self.env.ref("base.group_user", raise_if_not_found=False)
-        if group_user:
-            user.write({"groups_id": [(4, group_user.id)]})
+        # Internal access = the platform's own default ROLE. Granting bare
+        # base.group_user is not enough: the role reconciler strips managed
+        # groups from role-less users, so the account would end up share=True.
+        role = self.env.ref("ai_business_tools.role_employee", raise_if_not_found=False)
+        group = role or self.env.ref("base.group_user", raise_if_not_found=False)
+        if group:
+            user.write({"groups_id": [(4, group.id)]})
         return {"ok": True, "id": user.id, "login": user.login}
 
     # ---------------------------------------------------- module presets
