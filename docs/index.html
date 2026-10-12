@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f6f2" />
+    <meta name="description" content="Nova Enterprise — your AI operating system for everyday work." />
+    <title>Nova Enterprise — AI Workspace</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%236a5cff'/><stop offset='1' stop-color='%23ff6b8b'/></linearGradient></defs><circle cx='50' cy='50' r='42' fill='url(%23g)'/></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Restore the saved theme before first paint (default: light).
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("nova.theme") || "light";
+      } catch (e) {}
+    </script>
+    <script>
+      // VENDOR ROUTING LAYER (backend console wiring - the bundle is
+      // untouched): the appliance administrator (vendor) must land in the
+      // admin console, not the company workspace. If an admin logs in here,
+      // or already has a live admin session, send them to /admin.
+      (function () {
+        var REDIRECT_DONE = "__aiboxAdminChecked";
+        function toAdmin() {
+          if (sessionStorage.getItem(REDIRECT_DONE)) return;
+          sessionStorage.setItem(REDIRECT_DONE, "1");
+          location.replace("/admin");
+        }
+        function whoAmI(base) {
+          try {
+            fetch((base || "") + "/api/bootstrap", {
+              credentials: "include",
+              headers: (function () {
+                var h = {};
+                try {
+                  var k = localStorage.getItem("aibox.apiKey");
+                  if (k) h["X-API-Key"] = k;
+                } catch (e) {}
+                return h;
+              })(),
+            })
+              .then(function (r) {
+                return r.ok ? r.json() : null;
+              })
+              .then(function (d) {
+                if (d && d.user && d.user.login === "admin") toAdmin();
+              })
+              .catch(function () {});
+          } catch (e) {}
+        }
+        var _fetch = window.fetch;
+        if (_fetch) {
+          window.fetch = function (input, init) {
+            var p = _fetch.apply(this, arguments);
+            try {
+              var url = typeof input === "string" ? input : (input && input.url) || "";
+              var li = url.indexOf("/api/login");
+              if (li !== -1) {
+                p.then(function (r) {
+                  if (r && r.status === 200) {
+                    r.clone().json().then(function (d) {
+                      if (d && d.authenticated && d.user && d.user.login === "admin") {
+                        // land on the console of the SAME origin the login
+                        // was sent to (works on the appliance preview and
+                        // on GitHub Pages with an explicit api base).
+                        if (!sessionStorage.getItem(REDIRECT_DONE)) {
+                          sessionStorage.setItem(REDIRECT_DONE, "1");
+                          location.replace(url.slice(0, li) + "/admin");
+                        }
+                      }
+                    }).catch(function () {});
+                  }
+                }).catch(function () {});
+              }
+            } catch (e) {}
+            return p;
+          };
+        }
+        // Customer login branding: show the white-label welcome line on the
+        // app sign-in screen (vendor sets it in the admin console). Purely
+        // cosmetic - the bundle itself is untouched.
+        function brandBanner() {
+          try {
+            var hasPw = document.querySelector("input[type=password]");
+            if (!hasPw || document.getElementById("aiboxBrandBanner")) return;
+            fetch("/api/branding/public", { credentials: "include" })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (b) {
+                if (!b || (!b.login_message && !b.brand_name)) return;
+                if (document.getElementById("aiboxBrandBanner")) return;
+                var el = document.createElement("div");
+                el.id = "aiboxBrandBanner";
+                el.style.cssText = "position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;" +
+                  "background:color-mix(in srgb," + (b.primary_color || "#5a5ad6") + " 12%,transparent);" +
+                  "border:1px solid " + (b.primary_color || "#5a5ad6") + "55;border-radius:14px;padding:9px 18px;" +
+                  "font:500 13px/1.5 system-ui,sans-serif;color:" + (b.primary_color || "#5a5ad6") + ";max-width:88vw;text-align:center";
+                el.textContent = b.login_message || ("Welcome to " + b.brand_name);
+                document.body.appendChild(el);
+              })
+              .catch(function () {});
+          } catch (e) {}
+        }
+        var ticks = 0;
+        var timer = setInterval(function () {
+          brandBanner();
+          if (++ticks > 25) clearInterval(timer);
+        }, 900);
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", function () { whoAmI(""); });
+        } else {
+          whoAmI("");
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/aibox-odoo/assets/index-BKB2eATq.js"></script>
+    <link rel="stylesheet" crossorigin href="/aibox-odoo/assets/index-B7tjfh8Z.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

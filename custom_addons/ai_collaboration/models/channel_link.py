@@ -25,7 +25,7 @@ class AiChannelLink(models.Model):
         help="The assistant replies only to messages containing this "
              "text, e.g. '@assistant'. The trigger is the opt-in.")
     created_by_id = fields.Many2one("res.users", string="Opted in by",
-                                    required=True, ondelete="set null",
+                                    required=True, ondelete="restrict",
                                     default=lambda self: self.env.user)
     last_seen_message_id = fields.Integer(string="Last scanned message", default=0)
     active = fields.Boolean(string="Active", default=True)
