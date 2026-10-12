@@ -81,6 +81,35 @@
             return p;
           };
         }
+        // Customer login branding: show the white-label welcome line on the
+        // app sign-in screen (vendor sets it in the admin console). Purely
+        // cosmetic - the bundle itself is untouched.
+        function brandBanner() {
+          try {
+            var hasPw = document.querySelector("input[type=password]");
+            if (!hasPw || document.getElementById("aiboxBrandBanner")) return;
+            fetch("/api/branding/public", { credentials: "include" })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (b) {
+                if (!b || (!b.login_message && !b.brand_name)) return;
+                if (document.getElementById("aiboxBrandBanner")) return;
+                var el = document.createElement("div");
+                el.id = "aiboxBrandBanner";
+                el.style.cssText = "position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;" +
+                  "background:color-mix(in srgb," + (b.primary_color || "#5a5ad6") + " 12%,transparent);" +
+                  "border:1px solid " + (b.primary_color || "#5a5ad6") + "55;border-radius:14px;padding:9px 18px;" +
+                  "font:500 13px/1.5 system-ui,sans-serif;color:" + (b.primary_color || "#5a5ad6") + ";max-width:88vw;text-align:center";
+                el.textContent = b.login_message || ("Welcome to " + b.brand_name);
+                document.body.appendChild(el);
+              })
+              .catch(function () {});
+          } catch (e) {}
+        }
+        var ticks = 0;
+        var timer = setInterval(function () {
+          brandBanner();
+          if (++ticks > 25) clearInterval(timer);
+        }, 900);
         if (document.readyState === "loading") {
           document.addEventListener("DOMContentLoaded", function () { whoAmI(""); });
         } else {

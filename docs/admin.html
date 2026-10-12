@@ -82,7 +82,7 @@ body{font-family:var(--font-sans)}
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="orb" style="width:30px;height:30px"></span>
-      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v4</div></div>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v5</div></div>
     </div>
     <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
     <div style="flex:1"></div>
@@ -353,6 +353,14 @@ async function secUsage(view) {
       '</select>' +
       '<span class="bgd bgd-accent">'+esc(u.label)+'</span>' +
     '</div>' +
+    '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>This month vs cap</h3></div>' +
+      '<div class="h-stack wrap" style="gap:14px">' +
+      '<div style="flex:1;min-width:220px"><div class="bar" style="height:12px"><i style="width:'+(u.cap_monthly?Math.min(100,Math.round(u.month_tokens/u.cap_monthly*100)):0)+'%"></i></div>' +
+      '<div class="muted small" style="margin-top:8px">'+fmtN(u.month_tokens)+' used this month · cap: <b>'+(u.cap_monthly?fmtN(u.cap_monthly):"unlimited")+'</b></div></div>' +
+      '<div class="pw-cell"><input class="input" id="cap_in" dir="ltr" placeholder="monthly token cap (0 = none)" style="width:230px"/>' +
+      '<button class="btn btn-sm" id="cap_set">Set cap</button></div>' +
+      '<span class="muted small" id="cap_msg"></span>' +
+    '</div></div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:16px">' +
       '<div class="card stat-tile"><b>'+fmtN(u.total_tokens)+'</b><span>tokens · '+days+'d</span></div>' +
       '<div class="card stat-tile"><b>'+fmtN(u.total_turns)+'</b><span>chat turns</span></div>' +
@@ -378,6 +386,14 @@ async function secUsage(view) {
   $id("u_days").onchange = async () => {
     try { sessionStorage.setItem("aibox.admin.usageDays", $id("u_days").value); } catch(e){}
     renderSection();
+  };
+  $id("cap_set").onclick = async () => {
+    const msg = $id("cap_msg");
+    try {
+      const r = await api("/api/admin/panel/usage/cap", {method:"POST", body: JSON.stringify({cap: $id("cap_in").value})});
+      msg.innerHTML = r.ok ? '<span class="ok-txt">cap set: '+(r.cap?fmtN(r.cap):"unlimited")+'</span>' : esc(r.error||"failed");
+      if (r.ok) setTimeout(renderSection, 700);
+    } catch(e){ msg.textContent = e.message; }
   };
 }
 
@@ -406,6 +422,8 @@ async function secBranding(view) {
     '</div>' +
     '<div class="h-stack wrap" style="margin-top:18px;align-items:flex-end">' +
       '<div class="field" style="margin:0"><label>Logo (PNG/SVG)</label><input class="input" id="b_logo" type="file" accept="image/png,image/jpeg,image/svg+xml"/></div>' +
+      '<div class="field" style="margin:0"><label>Favicon (.png/.ico)</label><input class="input" id="b_favicon" type="file" accept="image/png,image/x-icon,image/svg+xml"/></div>' +
+      '<div class="field" style="margin:0;max-width:340px"><label>Login screen message (customer sees this on their sign-in)</label><input class="input" id="b_lmsg2" value="'+def("login_message","")+'"/></div>' +
       '<button class="btn btn-gradient" id="b_save">Save branding</button>' +
       '<span id="b_msg" class="muted small"></span>' +
     '</div>' +
@@ -423,12 +441,20 @@ async function secBranding(view) {
         support_url: $id("b_surl").value.trim(), footer_text: $id("b_foot").value.trim(),
         login_message: $id("b_lmsg").value.trim() };
       colors.forEach(([k]) => { payload[k] = $id("b_"+k+"_txt").value.trim(); });
+      const lmsg = $id("b_lmsg2").value.trim(); if (lmsg || document.getElementById("b_lmsg").value.trim()) payload.login_message = lmsg || document.getElementById("b_lmsg").value.trim();
       const f = $id("b_logo").files[0];
       if (f) {
         if (f.size > 2*1024*1024) throw new Error("logo must be under 2 MB");
         payload.logo_b64 = await new Promise((res,rej)=>{ const rd = new FileReader();
           rd.onload = ()=>res(String(rd.result)); rd.onerror = ()=>rej(new Error("read failed")); rd.readAsDataURL(f); });
         payload.logo_filename = f.name; payload.logo_mimetype = f.type || "image/png";
+      }
+      const fv = $id("b_favicon").files[0];
+      if (fv) {
+        if (fv.size > 512*1024) throw new Error("favicon must be under 512 KB");
+        payload.favicon_b64 = await new Promise((res,rej)=>{ const rd = new FileReader();
+          rd.onload = ()=>res(String(rd.result)); rd.onerror = ()=>rej(new Error("read failed")); rd.readAsDataURL(fv); });
+        payload.favicon_filename = fv.name; payload.favicon_mimetype = fv.type || "image/png";
       }
       const r = await api("/api/admin/panel/branding", {method:"POST", body: JSON.stringify(payload)});
       msg.innerHTML = r.ok ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Branding saved — “'+esc(r.brand_name)+'”</span>'
@@ -500,8 +526,6 @@ async function secUsers(view) {
       '<div class="field"><label>Full name</label><input class="input" id="nu_name" placeholder="Sara Ahmadi"/></div>' +
       '<div class="field"><label>Login (email)</label><input class="input" id="nu_login" dir="ltr" placeholder="sara@customer.com"/></div>' +
       '<div class="field"><label>Password</label><input class="input" id="nu_pw" type="password" placeholder="min 4 chars"/></div>' +
-      '<div class="field"><label>Department</label><select class="select" id="nu_dept"><option value="">—</option>' +
-        (departments||[]).map(d=>'<option value="'+d.id+'">'+esc(d.name)+'</option>').join("") + '</select></div>' +
       '<div class="field"><label>&nbsp;</label><button class="btn btn-gradient" id="nu_go" style="width:100%">Create user</button></div>' +
     '</div><div class="err" id="nu_msg"></div></div>' +
   '<div class="card"><div class="card-head"><h3>Internal users ('+users.length+')</h3></div>' +
@@ -526,7 +550,7 @@ async function secUsers(view) {
     try {
       const r = await api("/api/admin/panel/users", {method:"POST", body: JSON.stringify({
         name: $id("nu_name").value.trim(), login: $id("nu_login").value.trim(),
-        password: $id("nu_pw").value, department_id: $id("nu_dept").value || ""})});
+        password: $id("nu_pw").value})});
       if (r.ok) { msg.innerHTML = '<span class="bgd bgd-ok"><span class="bgd-dot"></span>User “'+esc(r.login)+'” created</span>';
         setTimeout(renderSection, 700); }
       else msg.textContent = r.error || "failed";

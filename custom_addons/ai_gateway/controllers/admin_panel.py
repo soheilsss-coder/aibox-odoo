@@ -380,6 +380,45 @@ class AdminPanelController(http.Controller):
             return err
         return _json(_panel_env().handover_checklist())
 
+    # ------------------------------------------------------------ token cap
+    @http.route("/api/admin/panel/usage/cap", type="http", auth="none",
+                csrf=False, methods=["POST", "OPTIONS"])
+    def usage_cap(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        try:
+            body = __import__("json").loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            return _json({"error": "invalid body"}, status=400)
+        return _json(_panel_env().token_cap_set(body.get("cap", 0)))
+
+    # --------------------------------------------- public branding (login)
+    @http.route("/api/branding/public", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def branding_public(self, **kwargs):
+        """Unauthenticated white-label info for the customer-facing login
+        screen: brand name, optional welcome message, accent color. Public
+        marketing data only - never keys or internals."""
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        try:
+            Branding = _panel_env()
+            rec = Branding.env["ai.customer.branding"].sudo().search([], limit=1)
+        except Exception:  # noqa: BLE001
+            rec = None
+        out = {"brand_name": "", "login_message": "", "primary_color": "",
+               "tagline": "", "favicon_uploaded": False}
+        if rec:
+            out = {"brand_name": rec.brand_name or "",
+                   "login_message": rec.login_message or "",
+                   "primary_color": rec.primary_color or "",
+                   "tagline": rec.tagline or "",
+                   "favicon_uploaded": bool(rec.favicon)}
+        return _json(out)
+
     # ---------------------------------------------------------------- logs
     @http.route("/api/admin/panel/logs", type="http", auth="none", csrf=False,
                 methods=["GET", "OPTIONS"])

@@ -342,7 +342,6 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         h = self.health()
         eng = self.engine_get()
         branding = self.branding_get()
-        dept_count = len(self.env["hr.department"].sudo().search([]))
         non_admin_users = self.env["res.users"].sudo().search_count([
             ("share", "=", False), ("id", "!=", 2)])
         items = [
@@ -354,8 +353,6 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
              "ok": bool(branding.get("exists")) and bool(branding.get("brand_name"))},
             {"key": "users", "label": "Customer users created",
              "ok": non_admin_users > 0, "info": str(non_admin_users) + " non-admin user(s)"},
-            {"key": "departments", "label": "Departments defined",
-             "ok": dept_count > 0, "info": str(dept_count) + " department(s)"},
             {"key": "modules", "label": "Required modules installed",
              "ok": int(h.get("modules_installed") or 0) >= 80,
              "info": str(h.get("modules_installed")) + " installed"},
@@ -375,7 +372,8 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
             return {"exists": False, "brand_name": ""}
         out = {"exists": True, "brand_name": rec.brand_name or "",
                "logo_uploaded": bool(rec.logo),
-               "logo_mimetype": rec.logo_mimetype or ""}
+               "logo_mimetype": rec.logo_mimetype or "",
+               "favicon_uploaded": bool(rec.favicon)}
         for f in self.BRANDING_TEXT + self.BRANDING_COLORS:
             out[f] = rec[f] or ""
         out["font_family"] = rec.font_family or "system"
@@ -406,6 +404,15 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                 return {"error": "logo file could not be decoded"}
             data["logo_filename"] = vals.get("logo_filename") or "logo.png"
             data["logo_mimetype"] = vals.get("logo_mimetype") or "image/png"
+        if vals.get("favicon_b64"):
+            import base64 as _b64
+
+            try:
+                data["favicon"] = _b64.b64decode(vals["favicon_b64"].split(",")[-1])
+            except Exception:  # noqa: BLE001
+                return {"error": "favicon file could not be decoded"}
+            data["favicon_filename"] = vals.get("favicon_filename") or "favicon.png"
+            data["favicon_mimetype"] = vals.get("favicon_mimetype") or "image/png"
         try:
             rec = Branding.get_for_company() or Branding.search([], limit=1)
             if rec:
@@ -417,6 +424,20 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         except Exception as exc:  # noqa: BLE001
             return {"error": str(exc)[:200]}
         return {"ok": True, "brand_name": rec.brand_name}
+
+    # ------------------------------------------------------------ token cap
+    CAP_PARAM = "admin_panel.token_cap_monthly"
+
+    def token_cap_get(self):
+        return int(self.env["ir.config_parameter"].sudo().get_param(self.CAP_PARAM, "0") or 0)
+
+    def token_cap_set(self, cap):
+        try:
+            cap = max(0, int(cap or 0))
+        except (TypeError, ValueError):
+            return {"error": "cap must be a number (0 = unlimited)"}
+        self.env["ir.config_parameter"].sudo().set_param(self.CAP_PARAM, str(cap))
+        return {"ok": True, "cap": cap}
 
     # --------------------------------------------------------- token usage
     @staticmethod
@@ -486,9 +507,18 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
             ent["employees"] += 1
             ent["turns"] += int(row["turns"] or 0)
             ent["tokens"] += int(row["tokens"] or 0)
+        self.env.cr.execute(
+            """
+            SELECT coalesce(sum(token_count), 0) FROM ai_gateway_audit_log
+            WHERE source = 'chat'
+              AND create_date >= date_trunc('month', now())
+            """)
+        month_tokens = int(self.env.cr.fetchone()[0] or 0)
         return {
             "days": days,
             "label": "estimated tokens (chars/4) recorded by the gateway",
+            "cap_monthly": self.token_cap_get(),
+            "month_tokens": month_tokens,
             "total_tokens": sum(u["tokens"] for u in users),
             "total_turns": sum(u["turns"] for u in users),
             "users": users,
