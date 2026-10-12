@@ -68,6 +68,7 @@ body{font-family:var(--font-sans)}
     <span class="orb" style="width:46px;height:46px"></span>
     <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Admin Console</h1>
     <p class="sub">Vendor access only — prepare the platform, connect the AI engine, manage modules, then hand the appliance over.</p>
+    <div class="field"><label>Appliance address <span class="faint">(only when opening from GitHub — leave empty on the appliance itself)</span></label><input class="input" id="lbase" dir="ltr" placeholder="https://your-appliance-host" /></div>
     <div class="field"><label>Username</label><input class="input" id="lu" autocomplete="username" value="admin" /></div>
     <div class="field"><label>Password</label><input class="input" id="lp" type="password" autocomplete="current-password" placeholder="••••••••" /></div>
     <button class="btn btn-gradient btn-block" id="lb">Sign in</button>
@@ -81,7 +82,7 @@ body{font-family:var(--font-sans)}
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="orb" style="width:30px;height:30px"></span>
-      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v3</div></div>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v4</div></div>
     </div>
     <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
     <div style="flex:1"></div>
@@ -152,12 +153,15 @@ function showAuth(msg) {
   $id("auth").hidden = false;
   $id("lerr").textContent = msg || "";
   $id("lp").value = "";
+  try { $id("lbase").value = sessionStorage.getItem("aibox.apiBase") || ""; } catch(e){}
   $id("lu").focus();
 }
 async function doLogin() {
   const b = $id("lb"); b.disabled = true; b.textContent = "Signing in…";
   $id("lerr").textContent = "";
   try {
+    const base = $id("lbase").value.trim().replace(/\/+$/,"");
+    if (base) { try { sessionStorage.setItem("aibox.apiBase", base); } catch(e){} window.location.reload(); return; }
     await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
       username: $id("lu").value.trim(), password: $id("lp").value })});
     showConsole();
@@ -182,6 +186,7 @@ const ICONS = {
   modules: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
   users: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   logs: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  handover: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
 };
 const SECTIONS = [
   ["health","System Health","Live status of this appliance: database, cache, AI engine and installed apps."],
@@ -191,6 +196,7 @@ const SECTIONS = [
   ["modules","Modules","Install, update or remove Odoo apps on this appliance. Critical platform modules are protected."],
   ["users","Users","Internal accounts and passwords."],
   ["logs","Audit Log","Every admin action recorded by the panel."],
+  ["handover","Handover","Final pre-delivery checklist — everything green means the appliance is ready to ship."],
 ];
 function renderNav() {
   const nav = $id("nav"); nav.innerHTML = "";
@@ -230,7 +236,7 @@ function renderSection() {
   setHead(meta[1], meta[2]);
   const view = $id("view");
   view.innerHTML = '<div class="card"><span class="muted small">Loading…</span></div>';
-  const fn = {health:secHealth, engine:secEngine, usage:secUsage, branding:secBranding, modules:secModules, users:secUsers, logs:secLogs}[SEC];
+  const fn = {health:secHealth, engine:secEngine, usage:secUsage, branding:secBranding, modules:secModules, users:secUsers, logs:secLogs, handover:secHandover}[SEC];
   fn(view).catch(e => { if (e.message !== "unauthorized")
     view.innerHTML = '<div class="card"><span style="color:var(--err)">'+esc(e.message)+'</span> <button class="btn btn-sm" style="margin-left:10px" onclick="renderSection()">Retry</button></div>'; });
 }
@@ -438,8 +444,15 @@ async function secModules(view) {
   const badge = (st) => st==="installed" ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>installed</span>'
     : st==="uninstalled" ? '<span class="bgd">available</span>'
     : '<span class="bgd bgd-warn"><span class="bgd-dot"></span>'+esc(st)+'</span>';
+  let presets = [];
+  try { presets = (await api("/api/admin/panel/modules/presets")).presets || []; } catch(e){}
   view.innerHTML =
   '<div class="fade-in">' +
+    (presets.length?'<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Quick tailoring — preset bundles</h3></div>' +
+      '<div class="h-stack wrap">' +
+      presets.map(p=>'<button class="btn '+(p.installed?'btn-soft':'btn-primary')+' btn-sm" data-preset="'+p.key+'">'+esc(p.key.charAt(0).toUpperCase()+p.key.slice(1))+'</button>').join("") +
+      '<span class="muted small" id="preset_msg"></span></div>' +
+      '<p class="muted small" style="margin-top:10px">One click installs the bundle\'s apps on this appliance (already-installed apps are skipped).</p></div>':'') +
     '<div class="filter-row"><input class="input" id="m_q" placeholder="Search 700+ modules…"/>' +
     '<select class="select" id="m_f" style="max-width:180px"><option value="">all states</option><option value="installed">installed</option><option value="uninstalled">available</option></select>' +
     '<span class="bgd bgd-accent">'+modules.length+' modules</span></div>' +
@@ -457,6 +470,14 @@ async function secModules(view) {
     });
   };
   $id("m_q").oninput = applyFilter; $id("m_f").onchange = applyFilter;
+  view.querySelectorAll("button[data-preset]").forEach(b => b.onclick = async () => {
+    const msg = $id("preset_msg"); msg.textContent = "Installing…"; b.disabled = true;
+    try {
+      const r = await api("/api/admin/panel/modules/preset", {method:"POST", body: JSON.stringify({key: b.dataset.preset})});
+      msg.innerHTML = r.done && r.done.length ? '<span class="ok-txt">done: '+esc(r.done.join(", "))+'</span>' : esc(r.error||"nothing to do");
+      b.disabled = false;
+    } catch(e){ msg.textContent = e.message; b.disabled = false; }
+  });
   view.querySelectorAll("button[data-act]").forEach(b => b.onclick = async () => {
     const act = b.dataset.act, n = b.dataset.n;
     if (act==="uninstall" && !confirm("Uninstall module “"+n+"”? Its data will be removed.")) return;
@@ -471,16 +492,26 @@ async function secModules(view) {
 
 /* ================= section: users ================= */
 async function secUsers(view) {
-  const {users} = await api("/api/admin/panel/users");
+  const {users, departments} = await api("/api/admin/panel/users");
   view.innerHTML =
-  '<div class="fade-in card"><div class="card-head"><h3>Internal users ('+users.length+')</h3></div>' +
+  '<div class="fade-in">' +
+  '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Create customer user</h3></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
+      '<div class="field"><label>Full name</label><input class="input" id="nu_name" placeholder="Sara Ahmadi"/></div>' +
+      '<div class="field"><label>Login (email)</label><input class="input" id="nu_login" dir="ltr" placeholder="sara@customer.com"/></div>' +
+      '<div class="field"><label>Password</label><input class="input" id="nu_pw" type="password" placeholder="min 4 chars"/></div>' +
+      '<div class="field"><label>Department</label><select class="select" id="nu_dept"><option value="">—</option>' +
+        (departments||[]).map(d=>'<option value="'+d.id+'">'+esc(d.name)+'</option>').join("") + '</select></div>' +
+      '<div class="field"><label>&nbsp;</label><button class="btn btn-gradient" id="nu_go" style="width:100%">Create user</button></div>' +
+    '</div><div class="err" id="nu_msg"></div></div>' +
+  '<div class="card"><div class="card-head"><h3>Internal users ('+users.length+')</h3></div>' +
   '<div class="table-wrap"><table class="console-table"><thead><tr><th>User</th><th>Login</th><th>Role</th><th>State</th><th>Set new password</th></tr></thead><tbody>' +
   users.map(u=>'<tr><td><b>'+esc(u.name)+'</b></td><td class="muted mono">'+esc(u.login)+'</td>' +
     '<td>'+(u.admin?'<span class="bgd bgd-accent">admin</span>':'<span class="bgd">user</span>')+'</td>' +
     '<td>'+(u.active?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>active</span>':'<span class="bgd bgd-err"><span class="bgd-dot"></span>blocked</span>')+'</td>' +
     '<td><div class="pw-cell"><input class="input" id="pw_'+u.id+'" type="password" placeholder="new password"/>' +
     '<button class="btn btn-sm" data-login="'+esc(u.login)+'" data-in="pw_'+u.id+'">Save</button></div></td></tr>').join("") +
-  '</tbody></table></div><div class="err" id="u_msg"></div></div>';
+  '</tbody></table></div><div class="err" id="u_msg"></div></div></div>';
   view.querySelectorAll("button[data-login]").forEach(b => b.onclick = async () => {
     const pw = $id(b.dataset.in).value;
     if (!pw) { $id("u_msg").textContent = "Type a password first."; return; }
@@ -489,6 +520,40 @@ async function secUsers(view) {
       $id("u_msg").innerHTML = '<span class="bgd bgd-ok"><span class="bgd-dot"></span>Password updated for '+esc(b.dataset.login)+'</span>';
       $id(b.dataset.in).value = "";
     } catch(e){ $id("u_msg").textContent = e.message; }
+  });
+  $id("nu_go").onclick = async () => {
+    const msg = $id("nu_msg");
+    try {
+      const r = await api("/api/admin/panel/users", {method:"POST", body: JSON.stringify({
+        name: $id("nu_name").value.trim(), login: $id("nu_login").value.trim(),
+        password: $id("nu_pw").value, department_id: $id("nu_dept").value || ""})});
+      if (r.ok) { msg.innerHTML = '<span class="bgd bgd-ok"><span class="bgd-dot"></span>User “'+esc(r.login)+'” created</span>';
+        setTimeout(renderSection, 700); }
+      else msg.textContent = r.error || "failed";
+    } catch(e){ msg.textContent = e.message; }
+  };
+}
+
+/* ================= section: handover checklist ================= */
+async function secHandover(view) {
+  const h = await api("/api/admin/panel/handover");
+  view.innerHTML =
+  '<div class="fade-in">' +
+    '<div class="card '+(h.ready?'':'hero-engine')+'" style="margin-bottom:16px">' +
+      (h.ready
+        ? '<div class="h-stack"><span class="bgd bgd-ok"><span class="bgd-dot"></span>READY</span><b style="font-family:var(--font-display);font-size:var(--fs-lg)">This appliance is ready to ship.</b></div>'
+        : '<div class="h-stack"><span class="bgd bgd-warn"><span class="bgd-dot"></span>NOT READY</span><b style="font-family:var(--font-display);font-size:var(--fs-lg)">Finish the items below, then ship.</b></div>') +
+    '</div>' +
+    '<div class="card"><div class="card-head"><h3>Pre-delivery checklist</h3><button class="btn btn-sm" id="hv_refresh">Refresh</button></div>' +
+    h.items.map(i=>'<div class="logline">' +
+      (i.ok?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>ok</span>':'<span class="bgd bgd-err"><span class="bgd-dot"></span>todo</span>') +
+      '<b>'+esc(i.label)+'</b>'+(i.info?'<span class="muted">'+esc(i.info)+'</span>':'') +
+      (["ai_engine","branding","users","modules"].includes(i.key)?'<button class="btn btn-sm" style="margin-inline-start:auto" data-fix="'+i.key+'">Fix</button>':'') +
+    '</div>').join("") +
+    '</div></div>';
+  $id("hv_refresh").onclick = () => renderSection();
+  view.querySelectorAll("button[data-fix]").forEach(b => b.onclick = () => {
+    SEC = b.dataset.fix; renderNav(); renderSection();
   });
 }
 

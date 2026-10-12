@@ -266,6 +266,102 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                  "action": l.action, "success": l.success,
                  "error": (l.error_message or "")[:120]} for l in logs]
 
+    # --------------------------------------------------- users & departments
+    def departments_list(self):
+        try:
+            recs = self.env["hr.department"].sudo().search([])
+            return [{"id": d.id, "name": self._plain_name(d.name)} for d in recs]
+        except Exception:  # noqa: BLE001
+            return []
+
+    def users_create(self, vals):
+        name = (vals.get("name") or "").strip()
+        login = (vals.get("login") or "").strip().lower()
+        password = vals.get("password") or ""
+        if not name or not login:
+            return {"error": "name and login are required"}
+        if len(password) < 4:
+            return {"error": "password too short (min 4)"}
+        Users = self.env["res.users"].sudo()
+        if Users.search([("login", "=", login)], limit=1):
+            return {"error": "login already exists"}
+        try:
+            user = Users.create({"name": name, "login": login, "password": password})
+        except Exception as exc:  # noqa: BLE001
+            return {"error": str(exc)[:200]}
+        dept = vals.get("department_id")
+        if dept:
+            try:
+                emp = self.env["hr.employee"].sudo().search([("user_id", "=", user.id)], limit=1)
+                if emp:
+                    emp.write({"department_id": int(dept)})
+                else:
+                    self.env["hr.employee"].sudo().create({
+                        "name": name, "user_id": user.id, "department_id": int(dept)})
+            except Exception:  # noqa: BLE001
+                pass
+        group_user = self.env.ref("base.group_user", raise_if_not_found=False)
+        if group_user:
+            user.write({"groups_id": [(4, group_user.id)]})
+        return {"ok": True, "id": user.id, "login": user.login}
+
+    # ---------------------------------------------------- module presets
+    PRESETS = {
+        "sales": ["sale_management", "crm", "contacts"],
+        "accounting": ["account"],
+        "inventory": ["stock", "stock_barcode"],
+        "hr": ["hr", "hr_holidays", "hr_attendance"],
+        "project": ["project", "hr_timesheet"],
+        "website": ["website", "website_blog"],
+    }
+
+    def modules_presets(self):
+        IrModule = self.env["ir.module.module"].sudo()
+        out = []
+        for key, names in self.PRESETS.items():
+            states = []
+            for n in names:
+                m = IrModule.search([("name", "=", n)], limit=1)
+                states.append({"name": n, "state": m.state if m else "missing"})
+            out.append({"key": key, "modules": states,
+                        "installed": all(x["state"] in ("installed", "to upgrade", "to install") for x in states)})
+        return out
+
+    def preset_apply(self, key):
+        names = self.PRESETS.get(key)
+        if not names:
+            return {"error": "unknown preset"}
+        IrModule = self.env["ir.module.module"].sudo()
+        present = [n for n in names if IrModule.search([("name", "=", n)], limit=1)]
+        if not present:
+            return {"error": "none of the preset modules exist on this appliance"}
+        return self.modules_act(present, "install")
+
+    # ------------------------------------------------------ handover check
+    def handover_checklist(self):
+        h = self.health()
+        eng = self.engine_get()
+        branding = self.branding_get()
+        dept_count = len(self.env["hr.department"].sudo().search([]))
+        non_admin_users = self.env["res.users"].sudo().search_count([
+            ("share", "=", False), ("id", "!=", 2)])
+        items = [
+            {"key": "database", "label": "Database reachable",
+             "ok": h.get("database") == "up"},
+            {"key": "ai_engine", "label": "AI engine configured and reachable",
+             "ok": h.get("ai_engine") == "up" and bool(eng.get("chat_model"))},
+            {"key": "branding", "label": "Customer branding set",
+             "ok": bool(branding.get("exists")) and bool(branding.get("brand_name"))},
+            {"key": "users", "label": "Customer users created",
+             "ok": non_admin_users > 0, "info": str(non_admin_users) + " non-admin user(s)"},
+            {"key": "departments", "label": "Departments defined",
+             "ok": dept_count > 0, "info": str(dept_count) + " department(s)"},
+            {"key": "modules", "label": "Required modules installed",
+             "ok": int(h.get("modules_installed") or 0) >= 80,
+             "info": str(h.get("modules_installed")) + " installed"},
+        ]
+        return {"ready": all(i["ok"] for i in items), "items": items}
+
     # ------------------------------------------------------------- branding
     BRANDING_TEXT = ("brand_name", "legal_name", "tagline", "product_title",
                      "support_email", "support_url", "footer_text", "login_message")

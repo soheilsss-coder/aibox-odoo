@@ -16,14 +16,39 @@ _logger = logging.getLogger(__name__)
 _COOKIE = "aibox_admin_session"
 _SECURE_COOKIE = os.environ.get("AI_GATEWAY_COOKIE_SECURE",
                                 "1" if os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", "").startswith("https://") else "0") == "1"
+# Managing the appliance from GitHub Pages is a CROSS-SITE flow: browsers
+# only attach such cookies with SameSite=None + Secure. Same-origin
+# (appliance preview) keeps Lax.
+_SAMESITE_COOKIE = os.environ.get("AI_GATEWAY_COOKIE_SAMESITE",
+                                  "None" if _SECURE_COOKIE else "Lax")
+
+
+# Vendor pages live on GitHub Pages while the appliance serves the API -
+# responses carry CORS-with-credentials headers ONLY for the configured
+# allowlist origin (AI_GATEWAY_ALLOWED_ORIGIN), never a wildcard.
+def _admin_cors_headers():
+    origin = request.httprequest.headers.get("Origin", "")
+    allowed = [o for o in (os.environ.get("AI_GATEWAY_ALLOWED_ORIGIN", ""),
+                           "http://localhost:5173", "http://127.0.0.1:5173") if o]
+    if origin and origin in allowed:
+        return [("Access-Control-Allow-Origin", origin),
+                ("Access-Control-Allow-Credentials", "true"),
+                ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
+                ("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization"),
+                ("Vary", "Origin")]
+    return []
 
 
 def _json(data, status=200):
     return request.make_response(
         __import__("json").dumps(data, ensure_ascii=False, default=str),
-        headers=[("Content-Type", "application/json; charset=utf-8")],
+        headers=[("Content-Type", "application/json; charset=utf-8")] + _admin_cors_headers(),
         status=status,
     )
+
+
+def _preflight():
+    return request.make_response("", headers=_admin_cors_headers())
 
 
 
@@ -67,7 +92,7 @@ class AdminPanelController(http.Controller):
                 methods=["POST", "OPTIONS"])
     def login(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         try:
             body = __import__("json").loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
@@ -127,18 +152,18 @@ class AdminPanelController(http.Controller):
                       "gateway_api_key": gateway_key,
                       "gateway_expires_at": gateway_expires})
         resp.set_cookie(_COOKIE, token, max_age=8 * 3600, httponly=True,
-                        secure=_SECURE_COOKIE, samesite="Lax", path="/")
+                        secure=_SECURE_COOKIE, samesite=_SAMESITE_COOKIE, path="/")
         if gateway_key:
             resp.set_cookie("ai_session", gateway_key, max_age=8 * 3600,
                             httponly=True, secure=_SECURE_COOKIE,
-                            samesite="Lax", path="/")
+                            samesite=_SAMESITE_COOKIE, path="/")
         return resp
 
     @http.route("/api/admin/panel/logout", type="http", auth="none", csrf=False,
                 methods=["POST", "OPTIONS"])
     def logout(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         token = request.httprequest.cookies.get(_COOKIE, "").strip()
         if token:
             sess = request.env["ai.gateway.admin.panel.session"].sudo()
@@ -153,7 +178,7 @@ class AdminPanelController(http.Controller):
                 methods=["GET", "OPTIONS"])
     def session(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -166,7 +191,7 @@ class AdminPanelController(http.Controller):
         if gateway_key:
             resp.set_cookie("ai_session", gateway_key, max_age=8 * 3600,
                             httponly=True, secure=_SECURE_COOKIE,
-                            samesite="Lax", path="/")
+                            samesite=_SAMESITE_COOKIE, path="/")
         return resp
 
     # ---------------------------------------------------------- AI engine
@@ -174,7 +199,7 @@ class AdminPanelController(http.Controller):
                 methods=["GET", "OPTIONS"])
     def engine_get(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -184,7 +209,7 @@ class AdminPanelController(http.Controller):
                 methods=["POST", "OPTIONS"])
     def engine_set(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -205,7 +230,7 @@ class AdminPanelController(http.Controller):
                 methods=["POST", "OPTIONS"])
     def engine_test(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -222,7 +247,7 @@ class AdminPanelController(http.Controller):
                 methods=["GET", "OPTIONS"])
     def modules(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -232,7 +257,7 @@ class AdminPanelController(http.Controller):
                 methods=["POST", "OPTIONS"])
     def modules_act(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -249,20 +274,27 @@ class AdminPanelController(http.Controller):
 
     # --------------------------------------------------------------- users
     @http.route("/api/admin/panel/users", type="http", auth="none", csrf=False,
-                methods=["GET", "OPTIONS"])
+                methods=["GET", "POST", "OPTIONS"])
     def users(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
-        return _json({"users": _panel_env().users_list()})
+        if request.httprequest.method == "GET":
+            return _json({"users": _panel_env().users_list(),
+                          "departments": _panel_env().departments_list()})
+        try:
+            body = __import__("json").loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            return _json({"error": "invalid body"}, status=400)
+        return _json(_panel_env().users_create(body))
 
     @http.route("/api/admin/panel/users/password", type="http", auth="none", csrf=False,
                 methods=["POST", "OPTIONS"])
     def users_password(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -278,7 +310,7 @@ class AdminPanelController(http.Controller):
                 methods=["GET", "OPTIONS"])
     def health(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -289,7 +321,7 @@ class AdminPanelController(http.Controller):
                 methods=["GET", "POST", "OPTIONS"])
     def branding(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
@@ -306,18 +338,54 @@ class AdminPanelController(http.Controller):
                 methods=["GET", "OPTIONS"])
     def usage(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
         return _json(_panel_env().token_usage(kwargs.get("days", 30)))
+
+    # ------------------------------------------------------ module presets
+    @http.route("/api/admin/panel/modules/presets", type="http", auth="none",
+                csrf=False, methods=["GET", "OPTIONS"])
+    def modules_presets(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        return _json({"presets": _panel_env().modules_presets()})
+
+    @http.route("/api/admin/panel/modules/preset", type="http", auth="none",
+                csrf=False, methods=["POST", "OPTIONS"])
+    def modules_preset_apply(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        try:
+            body = __import__("json").loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            return _json({"error": "invalid body"}, status=400)
+        return _json(_panel_env().preset_apply(body.get("key") or ""))
+
+    # ------------------------------------------------------ handover check
+    @http.route("/api/admin/panel/handover", type="http", auth="none",
+                csrf=False, methods=["GET", "OPTIONS"])
+    def handover(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        return _json(_panel_env().handover_checklist())
 
     # ---------------------------------------------------------------- logs
     @http.route("/api/admin/panel/logs", type="http", auth="none", csrf=False,
                 methods=["GET", "OPTIONS"])
     def logs(self, **kwargs):
         if request.httprequest.method == "OPTIONS":
-            return _json({"ok": True})
+            return _preflight()
         user, err = _require_admin()
         if err:
             return err
