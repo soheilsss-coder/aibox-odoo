@@ -82,7 +82,7 @@ body{font-family:var(--font-sans)}
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="orb" style="width:30px;height:30px"></span>
-      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v5</div></div>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v6</div></div>
     </div>
     <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
     <div style="flex:1"></div>
@@ -579,6 +579,67 @@ async function secHandover(view) {
   view.querySelectorAll("button[data-fix]").forEach(b => b.onclick = () => {
     SEC = b.dataset.fix; renderNav(); renderSection();
   });
+  const us = await api("/api/admin/panel/users").catch(()=>({users:[]}));
+  const others = (us.users||[]).filter(x=>!x.admin);
+  view.insertAdjacentHTML("beforeend",
+  '<div class="card" style="margin-top:16px"><div class="card-head"><h3>1 · Lock the door — change admin password</h3></div>' +
+    '<div class="h-stack wrap" style="align-items:flex-end">' +
+      '<div class="field" style="margin:0"><label>Current password</label><input class="input" id="pw_cur" type="password" style="width:180px"/></div>' +
+      '<div class="field" style="margin:0"><label>New password (min 6)</label><input class="input" id="pw_new" type="password" style="width:180px"/></div>' +
+      '<button class="btn btn-primary" id="pw_change">Change password</button>' +
+      '<span class="muted small" id="pw_msg"></span>' +
+    '</div></div>' +
+  '<div class="card" style="margin-top:16px"><div class="card-head"><h3>2 · Wipe testing data</h3></div>' +
+    '<p class="muted small">Deletes <b>all conversations and uploaded files</b>, blocks the users you tick, and revokes every session &amp; API key so nothing from your testing survives. The audit log is kept (it is the delivery record).</p>' +
+    (others.length?'<details style="margin:10px 0"><summary class="small" style="cursor:pointer;color:var(--accent)">Tick test users to block ('+others.length+')</summary>' +
+      others.map(x=>'<label style="display:flex;gap:8px;align-items:center;padding:5px 0;font-size:var(--fs-sm)"><input type="checkbox" class="arc-chk" value="'+esc(x.login)+'"/> '+esc(x.name)+' <span class="faint mono small">'+esc(x.login)+'</span></label>').join("")+'</details>':'') +
+    '<div class="h-stack"><button class="btn btn-danger" id="wipe_go">Clean test data</button><span class="muted small" id="wipe_msg"></span></div>' +
+    '<p class="faint small" style="margin-top:8px">Note: after this, everyone (including the embedded app) must sign in again. Do it right before shipping.</p></div>' +
+  '<div class="card" style="margin-top:16px"><div class="card-head"><h3>3 · Backups</h3></div>' +
+    '<div class="h-stack wrap">' +
+      '<a class="btn btn-sm" href="'+API+'/api/admin/panel/backup/config" download>Config backup (JSON)</a>' +
+      '<button class="btn btn-sm" id="bk_full">Full backup (zip)</button><span class="muted small" id="bk_msg"></span>' +
+    '</div></div>' +
+  '<div class="card" style="margin-top:16px"><div class="card-head"><h3>4 · Handover certificate</h3></div>' +
+    '<div class="h-stack"><button class="btn btn-gradient" id="cert_go">Generate certificate</button><span class="muted small" id="cert_msg"></span></div>' +
+    '<div id="cert_out"></div></div>');
+  $id("pw_change").onclick = async () => {
+    const msg = $id("pw_msg");
+    try {
+      const r = await api("/api/admin/panel/admin/password", {method:"POST", body: JSON.stringify({current: $id("pw_cur").value, new: $id("pw_new").value})});
+      msg.innerHTML = r.ok ? '<span class="ok-txt">Password changed — use it from now on.</span>' : esc(r.error||"failed");
+    } catch(e){ msg.textContent = e.message; }
+  };
+  $id("wipe_go").onclick = async () => {
+    if (!confirm("This permanently deletes ALL conversations and files on this appliance. Continue?")) return;
+    const msg = $id("wipe_msg"); msg.textContent = "Cleaning…";
+    try {
+      const logins = Array.from(view.querySelectorAll(".arc-chk:checked")).map(c=>c.value);
+      const r = await api("/api/admin/panel/cleanup", {method:"POST", body: JSON.stringify({archive_logins: logins})});
+      msg.innerHTML = '<span class="ok-txt">Deleted: '+r.threads+' chats · '+r.messages+' messages · '+r.attachments+' files · blocked '+r.users_archived.length+' users · revoked '+r.sessions_revoked+' sessions / '+r.api_keys_revoked+' keys</span>';
+    } catch(e){ msg.textContent = e.message; }
+  };
+  $id("bk_full").onclick = async () => {
+    const msg = $id("bk_msg"); msg.textContent = "Building backup…";
+    try {
+      const r = await realFetch(API + "/api/admin/panel/backup/full", {credentials:"include"});
+      if (!r.ok) { const d = await r.json().catch(()=>({})); throw new Error(d.error || "HTTP "+r.status); }
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = "aibox-backup.zip"; a.click();
+      msg.innerHTML = '<span class="ok-txt">backup downloaded ('+Math.round(blob.size/1024)+' KB)</span>';
+    } catch(e){ msg.textContent = e.message; }
+  };
+  $id("cert_go").onclick = async () => {
+    const msg = $id("cert_msg");
+    try {
+      const r = await api("/api/admin/panel/handover/certificate", {method:"POST"});
+      msg.innerHTML = '<span class="bgd '+(r.ready?'bgd-ok':'bgd-warn')+'"><span class="bgd-dot"></span>'+(r.ready?'READY':'NOT READY')+'</span>';
+      $id("cert_out").innerHTML =
+        '<div class="out" style="margin-top:10px">' + esc(JSON.stringify(r, null, 2)) + '</div>' +
+        '<p class="faint small" style="margin-top:8px">This snapshot was recorded in the appliance audit log at '+esc(r.generated_at)+'.</p>';
+    } catch(e){ msg.textContent = e.message; }
+  };
 }
 
 /* ================= section: logs ================= */

@@ -359,6 +359,119 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         ]
         return {"ready": all(i["ok"] for i in items), "items": items}
 
+    # ------------------------------------------------- phase C: handover kit
+    def cleanup_test_data(self, archive_logins=None):
+        """Pre-delivery hygiene: purge every conversation (with its messages
+        and uploaded files), archive the picked test users, and revoke ALL
+        gateway sessions and API keys so no token from the vendor's testing
+        survives into the customer's hands. The audit log is intentionally
+        KEPT - it is append-only, hash-chained, and part of the delivery
+        record."""
+        out = {}
+        threads = self.env["llm.thread"].sudo().search([])
+        atts = self.env["ir.attachment"].sudo().search([("res_model", "=", "llm.thread")])
+        msgs = self.env["mail.message"].sudo().search([
+            ("model", "=", "llm.thread"), ("res_id", "in", threads.ids or [0])])
+        out["attachments"] = len(atts)
+        atts.unlink()
+        out["messages"] = len(msgs)
+        msgs.unlink()
+        out["threads"] = len(threads)
+        threads.unlink()
+        archived = []
+        for login in (archive_logins or []):
+            u = self.env["res.users"].sudo().search([
+                ("login", "=", login), ("id", "!=", 2)], limit=1)
+            if u and u.active:
+                u.write({"active": False})
+                archived.append(login)
+        out["users_archived"] = archived
+        if "ai.gateway.session" in self.env:
+            recs = self.env["ai.gateway.session"].sudo().search([("revoked_at", "=", False)])
+            out["sessions_revoked"] = len(recs)
+            for rec in recs:
+                rec.revoke()
+        if "ai.gateway.api.key" in self.env:
+            recs = self.env["ai.gateway.api.key"].sudo().search([("active", "=", True)])
+            out["api_keys_revoked"] = len(recs)
+            for rec in recs:
+                rec.revoke(reason="handover_cleanup")
+        return out
+
+    def admin_change_password(self, current, new):
+        if len(new or "") < 6:
+            return {"error": "new password too short (min 6)"}
+        admin = self.env["res.users"].sudo().search([("login", "=", "admin")], limit=1)
+        if not admin:
+            return {"error": "admin user not found"}
+        # verify the CURRENT password with the same recipe the panel login
+        # uses (dedicated cursor as the target user) before replacing it.
+        import odoo as _odoo
+
+        registry = _odoo.registry(self.env.cr.dbname)
+        with registry.cursor() as cr:
+            env2 = _odoo.api.Environment(cr, admin.id, {})
+            try:
+                env2["res.users"].browse(admin.id)._check_credentials(
+                    {"type": "password", "password": current}, {"interactive": True})
+            except Exception:  # noqa: BLE001
+                return {"error": "current password is wrong"}
+        admin.write({"password": new})
+        return {"ok": True}
+
+    def backup_config(self):
+        """Config-only export (JSON download). The engine API key is
+        deliberately NOT included - re-enter it after a restore."""
+        eng = dict(self.engine_get())
+        eng.pop("api_key", None)
+        eng.pop("api_key_tail", None)
+        return {
+            "exported_at": str(fields.Datetime.now()),
+            "engine": eng,
+            "branding": self.branding_get(),
+            "presets": self.modules_presets(),
+            "token_cap_monthly": self.token_cap_get(),
+            "modules_installed": self.env["ir.module.module"].sudo().search_count([("state", "=", "installed")]),
+            "note": "engine API key is not exported - re-enter it in the console after restore",
+        }
+
+    def backup_zip_bytes(self):
+        """Full database+filestore backup as a zip (Odoo dump service).
+        Returns None if the pg_dump binary is unavailable on this host."""
+        import io as _io
+
+        from odoo.service import db as db_service
+
+        buf = _io.BytesIO()
+        try:
+            db_service.dump_db(self.env.cr.dbname, buf, backup_format="zip")
+        except Exception:  # noqa: BLE001
+            return None
+        return buf.getvalue()
+
+    def handover_certificate(self):
+        """Snapshot the delivery state and record it in the append-only
+        audit chain (who/when/what shipped)."""
+        check = self.handover_checklist()
+        eng = self.engine_get()
+        branding = self.branding_get()
+        cert = {
+            "generated_at": str(fields.Datetime.now()),
+            "ready": check["ready"],
+            "checklist": check["items"],
+            "engine": {"provider": eng.get("provider", ""),
+                       "chat_model": eng.get("chat_model", ""),
+                       "api_key_set": bool(eng.get("has_key"))},
+            "branding": {"brand_name": branding.get("brand_name", ""),
+                         "logo_uploaded": bool(branding.get("logo_uploaded"))},
+            "active_users": self.env["res.users"].sudo().search_count([("active", "=", True), ("share", "=", False)]),
+            "modules_installed": self.env["ir.module.module"].sudo().search_count([("state", "=", "installed")]),
+            "token_cap_monthly": self.token_cap_get(),
+        }
+        self.env["ai.gateway.audit.log"].sudo().log(
+            2, "rpc", "handover_certificate", payload=cert, success=check["ready"], context={})
+        return cert
+
     # ------------------------------------------------------------- branding
     BRANDING_TEXT = ("brand_name", "legal_name", "tagline", "product_title",
                      "support_email", "support_url", "footer_text", "login_message")

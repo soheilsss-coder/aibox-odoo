@@ -419,6 +419,79 @@ class AdminPanelController(http.Controller):
                    "favicon_uploaded": bool(rec.favicon)}
         return _json(out)
 
+    # --------------------------------------------------- phase C: delivery
+    @http.route("/api/admin/panel/cleanup", type="http", auth="none",
+                csrf=False, methods=["POST", "OPTIONS"])
+    def cleanup(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        try:
+            body = __import__("json").loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            return _json({"error": "invalid body"}, status=400)
+        return _json(_panel_env().cleanup_test_data(body.get("archive_logins") or []))
+
+    @http.route("/api/admin/panel/admin/password", type="http", auth="none",
+                csrf=False, methods=["POST", "OPTIONS"])
+    def admin_password(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        try:
+            body = __import__("json").loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            return _json({"error": "invalid body"}, status=400)
+        return _json(_panel_env().admin_change_password(
+            body.get("current") or "", body.get("new") or ""))
+
+    @http.route("/api/admin/panel/backup/config", type="http", auth="none",
+                csrf=False, methods=["GET", "OPTIONS"])
+    def backup_config(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        data = __import__("json").dumps(
+            _panel_env().backup_config(), ensure_ascii=False, default=str)
+        resp = request.make_response(data, headers=[
+            ("Content-Type", "application/json; charset=utf-8"),
+            ("Content-Disposition", "attachment; filename=aibox-config.json"),
+        ] + _admin_cors_headers())
+        return resp
+
+    @http.route("/api/admin/panel/backup/full", type="http", auth="none",
+                csrf=False, methods=["GET", "OPTIONS"])
+    def backup_full(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        blob = _panel_env().backup_zip_bytes()
+        if not blob:
+            return _json({"error": "pg_dump is not available on this host - use the config backup"}, status=501)
+        resp = request.make_response(blob, headers=[
+            ("Content-Type", "application/zip"),
+            ("Content-Disposition", "attachment; filename=aibox-backup.zip"),
+        ] + _admin_cors_headers())
+        return resp
+
+    @http.route("/api/admin/panel/handover/certificate", type="http", auth="none",
+                csrf=False, methods=["POST", "OPTIONS"])
+    def handover_certificate(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_admin()
+        if err:
+            return err
+        return _json(_panel_env().handover_certificate())
+
     # ---------------------------------------------------------------- logs
     @http.route("/api/admin/panel/logs", type="http", auth="none", csrf=False,
                 methods=["GET", "OPTIONS"])
