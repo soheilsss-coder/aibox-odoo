@@ -202,7 +202,10 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
 
     # ------------------------------------------------------------- users
     def users_list(self):
-        users = self.env["res.users"].sudo().search([("share", "=", False)], order="login")
+        # active_test=False: blocked (archived) users must stay visible -
+        # the vendor needs to see every account they manage.
+        users = self.env["res.users"].sudo().with_context(active_test=False).search(
+            [("share", "=", False)], order="login")
         return [{"id": u.id, "login": u.login, "name": u.name,
                  "admin": u.has_group("base.group_system"),
                  "active": u.active} for u in users]
@@ -395,7 +398,8 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
             recs = self.env["ai.gateway.api.key"].sudo().search([("active", "=", True)])
             out["api_keys_revoked"] = len(recs)
             for rec in recs:
-                rec.revoke(reason="handover_cleanup")
+                # history event selection only knows rotated/revoked/expired
+                rec.revoke()
         return out
 
     def admin_change_password(self, current, new):
