@@ -23,7 +23,10 @@ class AiGatewayAuditLog(models.Model):
     _name = "ai.gateway.audit.log"
     _description = "AI Gateway Audit Log"
     _order = "create_date desc"
-    _log_access = False  # this model must never call itself recursively
+    # keep Odoo's automatic create_date/create_uid population ON: every
+    # time-windowed consumer (token report, rate limiting, admin console)
+    # filters on create_date - with _log_access=False the ORM leaves it
+    # NULL and every such query silently returns nothing.
 
     user_id = fields.Many2one("res.users", required=True, index=True, ondelete="cascade")
     source = fields.Selection(

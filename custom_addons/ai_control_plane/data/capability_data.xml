@@ -24,7 +24,7 @@
   </record>
   <record id="customer_config_manage" model="ai.control.capability">
     <field name="name">customer.config.manage</field><field name="module_name">ai_customer_plane</field>
-    <field name="operation">manage</field><field name="risk_level">3</field><field name="source">control_plane</field>
+    <field name="operation">execute</field><field name="risk_level">3</field><field name="source">control_plane</field>
     <field name="group_ids" eval="[(4, ref('ai_business_tools.role_system_admin')), (4, ref('ai_business_tools.role_executive'))]"/>
   </record>
   <record id="cap_artifact_generate" model="ai.control.capability">

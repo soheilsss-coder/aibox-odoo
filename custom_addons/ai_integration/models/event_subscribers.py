@@ -1,5 +1,5 @@
 import json
-from odoo import api, models
+from odoo import api, fields, models
 
 
 class _SubscriberBase(models.AbstractModel):
@@ -78,8 +78,8 @@ class AiModelSubscriber(_SubscriberBase):
 class AiEventForAi(models.Model):
     _name = "ai.integration.ai.event"
     _description = "Durable AI Event Subscriber Queue"
-    event_id = models.Many2one("ai.control.event", required=True, ondelete="cascade", index=True)
-    event_type = models.Char(required=True, index=True)
-    payload_json = models.Text(default="{}", required=True)
-    user_id = models.Many2one("res.users", ondelete="set null", index=True)
-    state = models.Selection([("queued","Queued"),("consumed","Consumed"),("failed","Failed")], default="queued", index=True)
+    event_id = fields.Many2one("ai.control.event", required=True, ondelete="cascade", index=True)
+    event_type = fields.Char(required=True, index=True)
+    payload_json = fields.Text(default="{}", required=True)
+    user_id = fields.Many2one("res.users", ondelete="set null", index=True)
+    state = fields.Selection([("queued","Queued"),("consumed","Consumed"),("failed","Failed")], default="queued", index=True)

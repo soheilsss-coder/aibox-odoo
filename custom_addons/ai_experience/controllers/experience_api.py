@@ -17,6 +17,8 @@ _logger = logging.getLogger(__name__)
 
 
 def _model(env, name):
+    """env[name] is an empty (falsy) recordset for an existing model -
+    registry membership is the only correct existence test."""
     return env[name] if name in env else None
 
 
@@ -166,7 +168,7 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         user = env.user
-        employee = _model(env, "hr.employee").search([("user_id", "=", user.id)], limit=1) if _model(env, "hr.employee") else None
+        employee = _model(env, "hr.employee").search([("user_id", "=", user.id)], limit=1) if "hr.employee" in env else None
         capabilities = env["ai.control.capability.resolver"].effective_capabilities(user=user) if "ai.control.capability.resolver" in env else []
         return _json_response({
             "user": {"id": user.id, "name": user.name, "login": user.login},
@@ -182,7 +184,7 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         dept_model = _model(env, "hr.department")
-        if not dept_model: return _json_response({"departments": []})
+        if dept_model is None: return _json_response({"departments": []})
         employee = _model(env, "hr.employee").search([("user_id", "=", env.user.id)], limit=1)
         privileged = env.user.has_group("base.group_system")
         depts = dept_model.search([]) if privileged else (employee.department_id | employee.child_ids.mapped("department_id"))
@@ -206,7 +208,7 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         model = _model(env, "project.task")
-        if not model: return _json_response({"tasks": []})
+        if model is None: return _json_response({"tasks": []})
         if request.httprequest.method == "POST":
             payload = json.loads(request.httprequest.data or b"{}")
             vals = {"name": payload.get("name"), "description": payload.get("description", "")}
@@ -223,7 +225,7 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         model = _model(env, "ai.gateway.approval")
-        if not model: return _json_response({"approvals": []})
+        if model is None: return _json_response({"approvals": []})
         recs = model.search([], order="create_date desc", limit=100)
         fields_map = {f: True for f in ("name", "state", "status", "risk_level", "requester_id", "expires_at") if f in model._fields}
         out=[]
@@ -238,7 +240,7 @@ class AiExperienceApi(http.Controller):
         if err: return err
         model = _model(env, "mail.notification")
         out=[]
-        if model:
+        if model is not None:
             recs = model.search([("res_partner_id", "=", env.user.partner_id.id)], order="id desc", limit=100)
             for r in recs:
                 msg = r.mail_message_id
@@ -252,7 +254,7 @@ class AiExperienceApi(http.Controller):
         if err: return err
         model = _model(env, "ai.model.profile")
         out=[]
-        if model:
+        if model is not None:
             for m in model.sudo().search([], order="purpose,name"):
                 out.append({"id": m.id, "name": m.name, "provider": m.provider, "model_id": m.model_id, "purpose": m.purpose, "quantization": m.quantization, "production": m.production, "active": m.active})
         return _json_response({"models": out})

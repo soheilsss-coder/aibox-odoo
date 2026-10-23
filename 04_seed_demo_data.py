@@ -119,9 +119,16 @@ else:
                     leave.sudo().action_confirm()
                 leave_count += 1
         # Approve a few of them for realism (some stay pending on purpose)
+        from odoo.exceptions import ValidationError as _VE
+
         pending = env["hr.leave"].search([("state", "in", ("confirm", "validate1"))], limit=4)
         for l in pending:
-            l.sudo().action_approve()
+            try:
+                l.sudo().action_approve()
+            except _VE as e:
+                # hr_holidays refuses leaves overlapping non-working days for
+                # some calendars; leave those pending - fine for the demo.
+                print(f"  (leave #{l.id} stays pending: {str(e)[:80]}...)")
     print(f"Created {leave_count} leave requests (some approved, some left pending for the demo).")
 
     # -----------------------------------------------------------------
@@ -179,11 +186,26 @@ else:
     #    so the Admin Console isn't empty either.
     # -----------------------------------------------------------------
     ceo_env = env(user=ceo_emp.user_id.id)
-    decree_res = ceo_env["llm.tool"].generate_hr_decree(
+
+    def _expect_approval(fn, **kw):
+        """These tools raise UserError('approval_required: ...') BY DESIGN when
+        the execution gate needs a human decision - the approval row is real.
+        Catch it so the seed keeps going."""
+        from odoo.exceptions import UserError as _UE
+
+        try:
+            return fn(**kw)
+        except _UE as e:
+            print(f"  (approval pending by design: {e})")
+            return {"status": "approval_required"}
+
+    decree_res = _expect_approval(
+        ceo_env["llm.tool"].generate_hr_decree,
         employee_name=created_users["demo.eng1@yourbrand.example"][1].name,
         decree_type="raise", decree_text="افزایش حقوق سالانه بر اساس عملکرد.",
     )
-    grant_res = ceo_env["llm.tool"].grant_temporary_access(
+    grant_res = _expect_approval(
+        ceo_env["llm.tool"].grant_temporary_access,
         user_name=created_users["demo.hr.staff@yourbrand.example"][1].name,
         role_name="HR Manager",
         expires_on=str(today + timedelta(days=14)),
@@ -191,6 +213,63 @@ else:
     )
     print(f"Pending HR decree approval: {decree_res.get('status')}")
     print(f"Temporary access grant: {grant_res.get('status')}")
+
+    # -----------------------------------------------------------------
+    # 8. The bootstrap admin owns the system-admin role, so the Admin
+    #    Console (admin.console.read) is visible and reachable on a real
+    #    appliance, not only in the static demo.
+    # -----------------------------------------------------------------
+    # 7b. The demo identity the product UI ships with (prefilled on the
+    #     login screen): Sara Mohammadi <sara@example.com> / demo.
+    sara = env["res.users"].with_context(no_reset_password=True).search(
+        [("login", "=", "sara@example.com")], limit=1)
+    if not sara:
+        sara = env["res.users"].with_context(no_reset_password=True).create({
+            "name": "Sara Mohammadi", "login": "sara@example.com",
+            "email": "sara@example.com", "password": "demo",
+        })
+    sara.password = "demo"
+    for _xml in ("ai_business_tools.role_executive",
+                 "ai_business_tools.role_sales_manager"):
+        try:
+            _g = env.ref(_xml)
+            if _g.id not in sara.groups_id.ids:
+                sara.groups_id = [(4, _g.id)]
+        except Exception:
+            pass
+    if not env["hr.employee"].search([("user_id", "=", sara.id)], limit=1):
+        _dept = env["hr.department"].search([("name", "ilike", "Sales")], limit=1)
+        env["hr.employee"].create({"name": "Sara Mohammadi", "user_id": sara.id,
+                                   "department_id": _dept.id if _dept else False})
+    if "ai.gateway.api.key" in env:
+        env["ai.gateway.api.key"].sudo().create_key_by_id(sara.id)
+    # A few real tasks for Sara so her dashboard isn't empty on a fresh box.
+    _proj = env["project.project"].search([("name", "=", "AI Tasks")], limit=1)
+    if _proj:
+        for _t in ("Prepare quote for Aria Industries",
+                   "Review the 2026 leave policy draft",
+                   "Board demo preparation"):
+            if not env["project.task"].search_count(
+                    [("project_id", "=", _proj.id), ("name", "=", _t)]):
+                env["project.task"].create({
+                    "name": _t, "project_id": _proj.id,
+                    "user_ids": [(6, 0, [sara.id])],
+                    "description": "Seeded demo task.",
+                })
+    print("Demo identity ready: sara@example.com / demo")
+
+    admin_user = env["res.users"].search([("login", "=", "admin")], limit=1)
+    if admin_user:
+        # Fresh installs can leave the bootstrap admin group-less depending on
+        # install order, which locks them out of the console AND of basic
+        # internal-user ACLs (chat included). Grant explicitly and idempotently.
+        for xmlid in ("base.group_user", "base.group_system",
+                      "ai_business_tools.role_system_admin",
+                      "ai_business_tools.role_executive"):
+            group = env.ref(xmlid, raise_if_not_found=False)
+            if group and group not in admin_user.groups_id:
+                admin_user.groups_id = [(4, group.id)]
+                print("Granted %s to admin." % xmlid)
 
     env.cr.commit()
     print("\n=== Demo data seeded and committed. ===")
