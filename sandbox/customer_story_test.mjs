@@ -79,7 +79,7 @@ async function adminPart(){
   check("vendor creates a fresh customer user from the form", /created/.test($id("nu_msg").textContent), $id("nu_msg").textContent.slice(0,80));
   await sleep(1300);
   let saveBtn = null;
-  await waitFor(()=>{ saveBtn = [...w.document.querySelectorAll("button[data-login]")].find(b=>b.dataset.login==="sara@acme.test") || null; return !!saveBtn; }, "save button for sara");
+  await waitFor(()=>{ saveBtn = [...w.document.querySelectorAll("button[data-login]")].find(b=>b.dataset.login===STORY_USER) || null; return !!saveBtn; }, "save button for the new customer user");
   type(w.document.getElementById(saveBtn.dataset.in), "Customer123");
   click(saveBtn);
   await waitFor(()=>/Password updated/.test($id("u_msg").textContent), "pw updated");
