@@ -11,6 +11,13 @@ class AiRoleReconciler(models.Model):
             managed |= role.implied_ids
         managed |= product_roles
         for user in self: 
+            # Administrators (base.group_system) and the superuser are
+            # hand-managed vendor accounts: the reconciler must never strip
+            # their groups. During mass module installs Odoo writes groups_id
+            # on users to apply new implied groups, which used to wipe
+            # group_system off admin and lock the whole console out.
+            if user.id == self.env.uid or user._is_superuser() or user.has_group("base.group_system"):
+                continue
             direct_roles = user.groups_id & product_roles
             desired = Role.browse()
             for role in direct_roles:
