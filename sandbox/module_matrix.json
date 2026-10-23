@@ -1,0 +1,6492 @@
+{
+ "generated": "2026-10-24",
+ "counts": {
+  "installed": 699,
+  "uninstallable_by_manifest": 24,
+  "excluded_with_reason": 4
+ },
+ "exclusions": [
+  {
+   "module": "auth_ldap",
+   "reason": "نیاز به کتابخانه سیستمی python-ldap (ساخت C در این محیط ممکن نیست)"
+  },
+  {
+   "module": "account_invoice_import_llm",
+   "reason": "وابسته OCA account_invoice_import در این بیلد موجود نیست"
+  },
+  {
+   "module": "llm_document_page",
+   "reason": "وابسته OCA document_page در این بیلد موجود نیست"
+  },
+  {
+   "module": "llm_tool_mis_builder",
+   "reason": "وابسته OCA mis_builder در این بیلد موجود نیست"
+  }
+ ],
+ "modules": [
+  {
+   "name": "account",
+   "shortdesc": {
+    "en_US": "Invoicing",
+    "tr_TR": "Faturalama"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "account_add_gln",
+   "shortdesc": {
+    "en_US": "Add Partner GLN"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_check_printing",
+   "shortdesc": {
+    "en_US": "Check Printing Base",
+    "tr_TR": "Çek Yazdırma Temeli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_debit_note",
+   "shortdesc": {
+    "en_US": "Debit Notes",
+    "tr_TR": "Borç Fiyat Farkları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_edi",
+   "shortdesc": {
+    "en_US": "Import/Export Invoices From XML/PDF",
+    "tr_TR": "Import/Export Invoices From XML/PDF"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_edi_proxy_client",
+   "shortdesc": {
+    "en_US": "Proxy features for account_edi",
+    "tr_TR": "Account_edi için proxy özellikleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_edi_ubl_cii",
+   "shortdesc": {
+    "en_US": "Import/Export electronic invoices with UBL/CII",
+    "tr_TR": "UBL/CII ile elektronik fatura içe/dışa aktarma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_edi_ubl_cii_tax_extension",
+   "shortdesc": {
+    "en_US": "Tax extension for UBL/CII",
+    "tr_TR": "UBL/CII için Vergi Uzantısı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_fleet",
+   "shortdesc": {
+    "en_US": "Accounting/Fleet bridge",
+    "tr_TR": "Muhasebe/Filo köprüsü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_invoice_import_llm",
+   "shortdesc": {
+    "en_US": "Account Invoice Import LLM"
+   },
+   "state": "uninstalled",
+   "application": false
+  },
+  {
+   "name": "account_payment",
+   "shortdesc": {
+    "en_US": "Payment - Account",
+    "tr_TR": "Ödeme - Hesap"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_peppol",
+   "shortdesc": {
+    "en_US": "Peppol",
+    "tr_TR": "Peppol"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_peppol_response",
+   "shortdesc": {
+    "en_US": "Peppol Business Response"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_peppol_selfbilling",
+   "shortdesc": {
+    "en_US": "Peppol Self Billing"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_qr_code_emv",
+   "shortdesc": {
+    "en_US": "account_qr_code_emv",
+    "tr_TR": "account_qr_code_emv"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_qr_code_sepa",
+   "shortdesc": {
+    "en_US": "Account SEPA QR Code",
+    "tr_TR": "Hesap SEPA QR Kodu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_tax_python",
+   "shortdesc": {
+    "en_US": "Define Taxes as Python Code",
+    "tr_TR": "Vergileri Python Kodu Olarak Tanımlayın"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_test",
+   "shortdesc": {
+    "en_US": "Accounting Consistency Tests",
+    "tr_TR": "Muhasebe Tutarlılık Testleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "account_update_tax_tags",
+   "shortdesc": {
+    "en_US": "Account - Allow updating tax grids",
+    "tr_TR": "Muhasebe - Vergi tablolarını güncellemeye izin ver"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "accountant",
+   "shortdesc": {
+    "en_US": "Accounting",
+    "tr_TR": "Muhasebe"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "ai_business_tools",
+   "shortdesc": {
+    "en_US": "AI Business Tools"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_collaboration",
+   "shortdesc": {
+    "en_US": "AI Collaboration Workspaces"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_control_plane",
+   "shortdesc": {
+    "en_US": "AI Control Plane"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_correspondence",
+   "shortdesc": {
+    "en_US": "Official Correspondence Engine"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_customer_plane",
+   "shortdesc": {
+    "en_US": "AI Customer Control Plane"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_debrand",
+   "shortdesc": {
+    "en_US": "White Label / Debranding"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_document_intelligence",
+   "shortdesc": {
+    "en_US": "Secure File Intelligence"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_experience",
+   "shortdesc": {
+    "en_US": "AI Experience API"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_gateway",
+   "shortdesc": {
+    "en_US": "AI Gateway"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_integration",
+   "shortdesc": {
+    "en_US": "AI Universal Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_production",
+   "shortdesc": {
+    "en_US": "AI Production Operations"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_rag",
+   "shortdesc": {
+    "en_US": "AI Document RAG"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_semantic_api",
+   "shortdesc": {
+    "en_US": "AI Semantic API"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_telegram_bridge",
+   "shortdesc": {
+    "en_US": "AI Telegram Bridge"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "ai_workflow",
+   "shortdesc": {
+    "en_US": "Durable AI Workflow Engine"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "analytic",
+   "shortdesc": {
+    "en_US": "Analytic Accounting",
+    "tr_TR": "Analitik Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "appointment",
+   "shortdesc": {
+    "en_US": "Appointments",
+    "tr_TR": "Randevular"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "attachment_indexation",
+   "shortdesc": {
+    "en_US": "Attachments List and Document Indexation",
+    "tr_TR": "Ek Listeleri ve Belge Endeksleme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_ldap",
+   "shortdesc": {
+    "en_US": "Authentication via LDAP",
+    "tr_TR": "LDAP ile kimlik doğrulama"
+   },
+   "state": "uninstalled",
+   "application": false
+  },
+  {
+   "name": "auth_oauth",
+   "shortdesc": {
+    "en_US": "OAuth2 Authentication",
+    "tr_TR": "OAuth2 Authentication"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_passkey",
+   "shortdesc": {
+    "en_US": "Passkeys",
+    "tr_TR": "Anahtarlar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_password_policy",
+   "shortdesc": {
+    "en_US": "Password Policy",
+    "tr_TR": "Şifre Politikası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_password_policy_portal",
+   "shortdesc": {
+    "en_US": "Password Policy support for Signup",
+    "tr_TR": "Kayıt için şifre politikası desteği"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_password_policy_signup",
+   "shortdesc": {
+    "en_US": "Password Policy support for Signup",
+    "tr_TR": "Kayıt için şifre politikası desteği"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_signup",
+   "shortdesc": {
+    "en_US": "Signup",
+    "tr_TR": "Bağlanma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_totp",
+   "shortdesc": {
+    "en_US": "Two-Factor Authentication (TOTP)",
+    "tr_TR": "Two-Factor Authentication (TOTP)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_totp_mail",
+   "shortdesc": {
+    "en_US": "2FA Invite mail",
+    "tr_TR": "2FA Davet postası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_totp_mail_enforce",
+   "shortdesc": {
+    "en_US": "2FA by mail",
+    "tr_TR": "2FA Davet postası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "auth_totp_portal",
+   "shortdesc": {
+    "en_US": "TOTPortal",
+    "tr_TR": "TOTPortal"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "barcodes",
+   "shortdesc": {
+    "en_US": "Barcode",
+    "tr_TR": "Barkod"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "barcodes_gs1_nomenclature",
+   "shortdesc": {
+    "en_US": "Barcode - GS1 Nomenclature",
+    "tr_TR": "Barkod - GS1 Adlandırması"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base",
+   "shortdesc": {
+    "en_US": "Base",
+    "tr_TR": "Temel"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_address_extended",
+   "shortdesc": {
+    "en_US": "Extended Addresses",
+    "tr_TR": "Genişletilmiş Adresler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_automation",
+   "shortdesc": {
+    "en_US": "Automation Rules",
+    "tr_TR": "Otomasyon Kuralları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_geolocalize",
+   "shortdesc": {
+    "en_US": "Partners Geolocation",
+    "tr_TR": "İş Ortağı Coğrafik Konumu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_iban",
+   "shortdesc": {
+    "en_US": "IBAN Bank Accounts",
+    "tr_TR": "IBAN Banka Hesapları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_import",
+   "shortdesc": {
+    "en_US": "Base import",
+    "tr_TR": "İçe aktarım"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_import_module",
+   "shortdesc": {
+    "en_US": "Base import module",
+    "tr_TR": "İçeri Aktarma Modülü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_install_request",
+   "shortdesc": {
+    "en_US": "Base - Module Install Request",
+    "tr_TR": "Base - Modül Yükleme İsteği"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_setup",
+   "shortdesc": {
+    "en_US": "Initial Setup Tools",
+    "tr_TR": "İlk Kurulum Araçları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_sparse_field",
+   "shortdesc": {
+    "en_US": "Sparse Fields",
+    "tr_TR": "Aralıklı Alanlar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "base_vat",
+   "shortdesc": {
+    "en_US": "VAT Number Validation",
+    "tr_TR": "KDV Numara Doğrulaması"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "board",
+   "shortdesc": {
+    "en_US": "Dashboards",
+    "tr_TR": "Kontrol Panelleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "bus",
+   "shortdesc": {
+    "en_US": "IM Bus",
+    "tr_TR": "IM Bus"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "calendar",
+   "shortdesc": {
+    "en_US": "Calendar",
+    "tr_TR": "Takvim"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "calendar_sms",
+   "shortdesc": {
+    "en_US": "Calendar - SMS",
+    "tr_TR": "Takvim - SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "certificate",
+   "shortdesc": {
+    "en_US": "Certificate",
+    "tr_TR": "Sertifika"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "cloud_storage",
+   "shortdesc": {
+    "en_US": "Cloud Storage",
+    "tr_TR": "Bulut Depolama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "cloud_storage_azure",
+   "shortdesc": {
+    "en_US": "Cloud Storage Azure",
+    "tr_TR": "Bulut Depolama Azure"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "cloud_storage_google",
+   "shortdesc": {
+    "en_US": "Cloud Storage Google",
+    "tr_TR": "Bulut Depolama Google"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "cloud_storage_migration",
+   "shortdesc": {
+    "en_US": "Cloud Storage Migration",
+    "tr_TR": "Bulut Depolama Geçişi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "company_ai_demo",
+   "shortdesc": {
+    "en_US": "Company AI Demo"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "contacts",
+   "shortdesc": {
+    "en_US": "Contacts",
+    "tr_TR": "Kontaklar"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "crm",
+   "shortdesc": {
+    "en_US": "CRM",
+    "tr_TR": "CRM"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "crm_iap_enrich",
+   "shortdesc": {
+    "en_US": "Lead Enrichment",
+    "tr_TR": "Aday Zenginleştirme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "crm_iap_mine",
+   "shortdesc": {
+    "en_US": "Lead Generation",
+    "tr_TR": "Adayı Oluşturma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "crm_livechat",
+   "shortdesc": {
+    "en_US": "CRM Livechat",
+    "tr_TR": "CRM Canlı Sohbet"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "crm_mail_plugin",
+   "shortdesc": {
+    "en_US": "CRM Mail Plugin",
+    "tr_TR": "CRM Posta Eklentisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "crm_sms",
+   "shortdesc": {
+    "en_US": "SMS in CRM",
+    "tr_TR": "CRM'de SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "data_recycle",
+   "shortdesc": {
+    "en_US": "Data Recycle",
+    "tr_TR": "Veri Geri Dönüşümü"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "delivery",
+   "shortdesc": {
+    "en_US": "Delivery Costs",
+    "tr_TR": "Teslimat Maliyetleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "delivery_mondialrelay",
+   "shortdesc": {
+    "en_US": "delivery_mondialrelay",
+    "tr_TR": "delivery_mondialrelay"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "delivery_stock_picking_batch",
+   "shortdesc": {
+    "en_US": "Delivery Stock Picking Batch",
+    "tr_TR": "Teslimat Stok Toplu Transfer"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "digest",
+   "shortdesc": {
+    "en_US": "KPI Digests",
+    "tr_TR": "KPI Özetleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "event",
+   "shortdesc": {
+    "en_US": "Events Organization",
+    "tr_TR": "Etkinlik Organizasyonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "event_booth",
+   "shortdesc": {
+    "en_US": "Events Booths",
+    "tr_TR": "Etkinlikler Kabinleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "event_booth_sale",
+   "shortdesc": {
+    "en_US": "Events Booths Sales",
+    "tr_TR": "Etkinlikler Kabinleri Satışları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "event_crm",
+   "shortdesc": {
+    "en_US": "Event CRM",
+    "tr_TR": "Etkinlik CRM'i"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "event_crm_sale",
+   "shortdesc": {
+    "en_US": "Event CRM Sale",
+    "tr_TR": "Event CRM Satış"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "event_product",
+   "shortdesc": {
+    "en_US": "Events Product",
+    "tr_TR": "Etkinlik Ürünü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "event_sale",
+   "shortdesc": {
+    "en_US": "Events Sales",
+    "tr_TR": "Etkinlik Satışı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "event_sms",
+   "shortdesc": {
+    "en_US": "SMS on Events",
+    "tr_TR": "Etkinliklerde SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "fleet",
+   "shortdesc": {
+    "en_US": "Fleet",
+    "tr_TR": "Filo"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "gamification",
+   "shortdesc": {
+    "en_US": "Gamification",
+    "tr_TR": "Ödüllendirme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "gamification_sale_crm",
+   "shortdesc": {
+    "en_US": "CRM Gamification",
+    "tr_TR": "CRM Ödüllendirme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "google_account",
+   "shortdesc": {
+    "en_US": "Google Users",
+    "tr_TR": "Google Kullanıcıları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "google_calendar",
+   "shortdesc": {
+    "en_US": "Google Calendar",
+    "tr_TR": "Google Takvim"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "google_gmail",
+   "shortdesc": {
+    "en_US": "Google Gmail",
+    "tr_TR": "Google Gmail"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "google_recaptcha",
+   "shortdesc": {
+    "en_US": "Google reCAPTCHA integration",
+    "tr_TR": "Google reCAPTCHA entegrasyonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "helpdesk",
+   "shortdesc": {
+    "en_US": "Helpdesk",
+    "tr_TR": "Yardım Masası"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "hr",
+   "shortdesc": {
+    "en_US": "Employees",
+    "tr_TR": "Çalışanlar"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "hr_appraisal",
+   "shortdesc": {
+    "en_US": "Appraisal",
+    "tr_TR": "Değerlendirmeler"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "hr_attendance",
+   "shortdesc": {
+    "en_US": "Attendances",
+    "tr_TR": "Katılımcılar"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "hr_calendar",
+   "shortdesc": {
+    "en_US": "Display Working Hours in Calendar",
+    "tr_TR": "Takvimde Çalışma Saatlerini Göster"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_contract",
+   "shortdesc": {
+    "en_US": "Employee Contracts",
+    "tr_TR": "Personel Sözleşmeleri"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "hr_expense",
+   "shortdesc": {
+    "en_US": "Expenses",
+    "tr_TR": "Masraflar"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "hr_fleet",
+   "shortdesc": {
+    "en_US": "Fleet History",
+    "tr_TR": "Filo Tarihi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_gamification",
+   "shortdesc": {
+    "en_US": "HR Gamification",
+    "tr_TR": "IK Ödüllendirme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_holidays",
+   "shortdesc": {
+    "en_US": "Time Off",
+    "tr_TR": "İzin"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "hr_holidays_attendance",
+   "shortdesc": {
+    "en_US": "HR Attendance Holidays",
+    "tr_TR": "İK Katılım Tatilleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_holidays_contract",
+   "shortdesc": {
+    "en_US": "Hr Holidays Contract",
+    "tr_TR": "İK Tatil Sözleşmesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_homeworking",
+   "shortdesc": {
+    "en_US": "Remote Work",
+    "tr_TR": "Uzaktan Çalışma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_homeworking_calendar",
+   "shortdesc": {
+    "en_US": "Remote Work with calendar",
+    "tr_TR": "Takvim ile uzaktan çalışma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_hourly_cost",
+   "shortdesc": {
+    "en_US": "Employee Hourly Wage",
+    "tr_TR": "Personel Saatlik Ücreti"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_livechat",
+   "shortdesc": {
+    "en_US": "HR - Livechat",
+    "tr_TR": "İK - Canlı Sohbet"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_maintenance",
+   "shortdesc": {
+    "en_US": "Maintenance - HR",
+    "tr_TR": "Bakım - İK"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_org_chart",
+   "shortdesc": {
+    "en_US": "HR Org Chart",
+    "tr_TR": "İK Organizasyon Planı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_presence",
+   "shortdesc": {
+    "en_US": "Employee Presence Control",
+    "tr_TR": "Çalışan Durum Kontrolü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_recruitment",
+   "shortdesc": {
+    "en_US": "Recruitment",
+    "tr_TR": "İşe Alım"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "hr_recruitment_skills",
+   "shortdesc": {
+    "en_US": "Recruitment - Skills Management",
+    "tr_TR": "İşe Alım - Yetenek Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_recruitment_sms",
+   "shortdesc": {
+    "en_US": "Recruitment - SMS",
+    "tr_TR": "İşe Alım - SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_recruitment_survey",
+   "shortdesc": {
+    "en_US": "Hr Recruitment Interview Forms",
+    "tr_TR": "İK İşe Alım Görüşme Formları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_skills",
+   "shortdesc": {
+    "en_US": "Skills Management",
+    "tr_TR": "Yetenek Yönetimi"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "hr_skills_slides",
+   "shortdesc": {
+    "en_US": "Skills e-learning",
+    "tr_TR": "E-öğrenme yetenekleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_skills_survey",
+   "shortdesc": {
+    "en_US": "Skills Certification",
+    "tr_TR": "Yetenek Sertifikası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_timesheet",
+   "shortdesc": {
+    "en_US": "Task Logs",
+    "tr_TR": "Görev Logları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_timesheet_attendance",
+   "shortdesc": {
+    "en_US": "Timesheets/attendances reporting",
+    "tr_TR": "Çalışma çizelgesi/Katılım raporları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_work_entry",
+   "shortdesc": {
+    "en_US": "Work Entries",
+    "tr_TR": "Puantaj Kayıtları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_work_entry_contract",
+   "shortdesc": {
+    "en_US": "Work Entries - Contract",
+    "tr_TR": "İş Girdileri - Sözleşme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hr_work_entry_holidays",
+   "shortdesc": {
+    "en_US": "Time Off in Payslips",
+    "tr_TR": "Ücret Bordrolarında İzin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "html_editor",
+   "shortdesc": {
+    "en_US": "HTML Editor",
+    "tr_TR": "HTML Düzenleyici"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "http_routing",
+   "shortdesc": {
+    "en_US": "Web Routing",
+    "tr_TR": "Web Rotası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "hw_drivers",
+   "shortdesc": {
+    "en_US": "Hardware Proxy",
+    "tr_TR": "Donanım Proxy"
+   },
+   "state": "uninstallable",
+   "application": false
+  },
+  {
+   "name": "hw_escpos",
+   "shortdesc": {
+    "en_US": "ESC/POS Hardware Driver",
+    "tr_TR": "ESC / POS Donanım Sürücüsü"
+   },
+   "state": "uninstallable",
+   "application": false
+  },
+  {
+   "name": "hw_posbox_homepage",
+   "shortdesc": {
+    "en_US": "IoT Box Homepage",
+    "tr_TR": "IoT Kutusu Ana Sayfası"
+   },
+   "state": "uninstallable",
+   "application": false
+  },
+  {
+   "name": "iap",
+   "shortdesc": {
+    "en_US": "In-App Purchases",
+    "tr_TR": "Uygulama İçi Satın Alma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "iap_crm",
+   "shortdesc": {
+    "en_US": "IAP / CRM",
+    "tr_TR": "IAP / CRM"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "iap_mail",
+   "shortdesc": {
+    "en_US": "IAP / Mail",
+    "tr_TR": "IAP / Mail"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "im_livechat",
+   "shortdesc": {
+    "en_US": "Live Chat",
+    "tr_TR": "Canlı Sohbet"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "industry_fsm",
+   "shortdesc": {
+    "en_US": "Field Service",
+    "tr_TR": "Saha Servisi"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "knowledge",
+   "shortdesc": {
+    "en_US": "Knowledge",
+    "tr_TR": "Bilgi Birikimi"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "l10n_account_edi_ubl_cii_tests",
+   "shortdesc": {
+    "en_US": "Testing the Import/Export invoices with UBL/CII",
+    "tr_TR": "İthalat/İhracat faturalarının UBL/CII ile test edilmesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_account_withholding_tax",
+   "shortdesc": {
+    "en_US": "Withholding Tax on Payment",
+    "tr_TR": "Ödeme Üzerinden Stopaj Vergisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_account_withholding_tax_pos",
+   "shortdesc": {
+    "en_US": "Withholding Tax on Payment - PoS",
+    "tr_TR": "Ödeme Üzerinden Stopaj Vergisi - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ae",
+   "shortdesc": {
+    "en_US": "United Arab Emirates - Accounting",
+    "tr_TR": "Birleşik Arap Emirlikleri - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_anz_ubl_pint",
+   "shortdesc": {
+    "en_US": "Australia & New Zealand - UBL PINT",
+    "tr_TR": "Avustralya & Yeni Zelanda - UBL PINT"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ar",
+   "shortdesc": {
+    "en_US": "Argentina - Accounting",
+    "tr_TR": "Arjantin - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ar_pos",
+   "shortdesc": {
+    "en_US": "Argentinean - Point of Sale with AR Doc",
+    "tr_TR": "Arjantin - AR Belgesi ile Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ar_website_sale",
+   "shortdesc": {
+    "en_US": "Argentinean eCommerce",
+    "tr_TR": "Arjantin E-Ticaret"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ar_withholding",
+   "shortdesc": {
+    "en_US": "Argentina - Payment Withholdings",
+    "tr_TR": "Arjantin - Stopajlı Ödemeler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_at",
+   "shortdesc": {
+    "en_US": "Austria - Accounting",
+    "tr_TR": "Avusturya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_au",
+   "shortdesc": {
+    "en_US": "Australia - Accounting",
+    "tr_TR": "Avustralya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_bd",
+   "shortdesc": {
+    "en_US": "Bangladesh - Accounting",
+    "tr_TR": "Bangladeş - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_be",
+   "shortdesc": {
+    "en_US": "Belgium - Accounting",
+    "tr_TR": "Belçika - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_be_pos_restaurant",
+   "shortdesc": {
+    "en_US": "Belgian POS Restaurant Localization",
+    "tr_TR": "Belçika POS Restoran Yerelleştirmesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_be_pos_sale",
+   "shortdesc": {
+    "en_US": "l10n_be_pos_sale",
+    "tr_TR": "l10n_be_pos_sale"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_bf",
+   "shortdesc": {
+    "en_US": "Burkina Faso - Accounting",
+    "tr_TR": "Burkina Faso - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_bg",
+   "shortdesc": {
+    "en_US": "Bulgaria - Accounting",
+    "tr_TR": "Bulgaristan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_bg_ledger",
+   "shortdesc": {
+    "en_US": "Bulgaria - Report ledger",
+    "tr_TR": "Bulgaristan - Rapor defteri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_bh",
+   "shortdesc": {
+    "en_US": "Bahrain - Accounting",
+    "tr_TR": "Bahreyn - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_bj",
+   "shortdesc": {
+    "en_US": "Benin - Accounting",
+    "tr_TR": "Benin - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_bo",
+   "shortdesc": {
+    "en_US": "Bolivia - Accounting",
+    "tr_TR": "Bolivya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_br",
+   "shortdesc": {
+    "en_US": "Brazilian - Accounting",
+    "tr_TR": "Brezilya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_br_sales",
+   "shortdesc": {
+    "en_US": "Brazil - Sale",
+    "tr_TR": "Brezilya - Satış"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_br_website_sale",
+   "shortdesc": {
+    "en_US": "Brazil - Website Sale",
+    "tr_TR": "Brezilya - Web Sitesi Satışı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ca",
+   "shortdesc": {
+    "en_US": "Canada - Accounting",
+    "tr_TR": "Kanada - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cd",
+   "shortdesc": {
+    "en_US": "Democratic Republic of the Congo - Accounting",
+    "tr_TR": "Demokratik Kongo Cumhuryeti - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cf",
+   "shortdesc": {
+    "en_US": "Central African Republic - Accounting",
+    "tr_TR": "Orta Afrika Cumhuriyeti - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cg",
+   "shortdesc": {
+    "en_US": "Congo - Accounting",
+    "tr_TR": "Kongo - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ch",
+   "shortdesc": {
+    "en_US": "Switzerland - Accounting",
+    "tr_TR": "İsviçre - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ch_pos",
+   "shortdesc": {
+    "en_US": "Swiss - Point of Sale",
+    "tr_TR": "İsviçre - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ci",
+   "shortdesc": {
+    "en_US": "Ivory Coast - Accounting",
+    "tr_TR": "Fildişi Sahili - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cl",
+   "shortdesc": {
+    "en_US": "Chile - Accounting",
+    "tr_TR": "Şili - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cm",
+   "shortdesc": {
+    "en_US": "Cameroon - Accounting",
+    "tr_TR": "Kamerun - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cn",
+   "shortdesc": {
+    "en_US": "China - Accounting",
+    "tr_TR": "Çin - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cn_city",
+   "shortdesc": {
+    "en_US": "China - City Data",
+    "tr_TR": "Çin - Şehir Verileri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_co",
+   "shortdesc": {
+    "en_US": "Colombia - Accounting",
+    "tr_TR": "Kolombiya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_co_pos",
+   "shortdesc": {
+    "en_US": "Colombian - Point of Sale",
+    "tr_TR": "Kolombiya - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cr",
+   "shortdesc": {
+    "en_US": "Costa Rica - Accounting",
+    "tr_TR": "Kosta Rika - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cy",
+   "shortdesc": {
+    "en_US": "Cyprus - Accounting",
+    "tr_TR": "Kıbrıs - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_cz",
+   "shortdesc": {
+    "en_US": "Czech - Accounting",
+    "tr_TR": "Çek - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_de",
+   "shortdesc": {
+    "en_US": "Germany - Accounting",
+    "tr_TR": "Almanya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_din5008",
+   "shortdesc": {
+    "en_US": "DIN 5008",
+    "tr_TR": "DIN 5008 Serisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_din5008_expense",
+   "shortdesc": {
+    "en_US": "DIN 5008 - Expenses"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_din5008_purchase",
+   "shortdesc": {
+    "en_US": "DIN 5008 - Purchase",
+    "tr_TR": "DIN 5008 - Satın Alma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_din5008_repair",
+   "shortdesc": {
+    "en_US": "DIN 5008 - Repair",
+    "tr_TR": "DIN 5008 - Onarım"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_din5008_sale",
+   "shortdesc": {
+    "en_US": "DIN 5008 - Sale",
+    "tr_TR": "DIN 5008 - Satış"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_din5008_stock",
+   "shortdesc": {
+    "en_US": "DIN 5008 - Stock",
+    "tr_TR": "DIN 5008 - Stok"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_dk",
+   "shortdesc": {
+    "en_US": "Denmark - Accounting",
+    "tr_TR": "Denmark - Accounting"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_dk_fik",
+   "shortdesc": {
+    "en_US": "Denmark - FIK Number"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_dk_nemhandel",
+   "shortdesc": {
+    "en_US": "Denmark EDI - Nemhandel",
+    "tr_TR": "Danimarka EDI - Nemhandel"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_dk_nemhandel_response",
+   "shortdesc": {
+    "en_US": "Nemhandel Business Response"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_dk_oioubl",
+   "shortdesc": {
+    "en_US": "Denmark - E-invoicing",
+    "tr_TR": "Danimarka - E-fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_do",
+   "shortdesc": {
+    "en_US": "Dominican Republic - Accounting",
+    "tr_TR": "Dominik Cumhuriyeti - muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_dz",
+   "shortdesc": {
+    "en_US": "Algeria - Accounting",
+    "tr_TR": "Algeria - Accounting"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ec",
+   "shortdesc": {
+    "en_US": "Ecuadorian Accounting",
+    "tr_TR": "Ekvador Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ec_stock",
+   "shortdesc": {
+    "en_US": "Ecuador - Stock",
+    "tr_TR": "Ekvador - Stok"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ec_website_sale",
+   "shortdesc": {
+    "en_US": "Ecuadorian Website",
+    "tr_TR": "Ekvador Web Sitesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ee",
+   "shortdesc": {
+    "en_US": "Estonia - Accounting",
+    "tr_TR": "Estonya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_eg",
+   "shortdesc": {
+    "en_US": "Egypt - Accounting",
+    "tr_TR": "Mısır - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_eg_edi_eta",
+   "shortdesc": {
+    "en_US": "Egypt E-Invoicing",
+    "tr_TR": "Mısır E-Fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es",
+   "shortdesc": {
+    "en_US": "Spain - Accounting (PGCE 2008)",
+    "tr_TR": "İspanya - Muhasebe (PGCE 2008)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es_edi_facturae",
+   "shortdesc": {
+    "en_US": "Spain - Facturae EDI",
+    "tr_TR": "İspanya - Facturae EDI"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es_edi_sii",
+   "shortdesc": {
+    "en_US": "Spain - SII EDI Suministro de Libros",
+    "tr_TR": "İspanya - SII EDI Suministro de Libros"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es_edi_tbai",
+   "shortdesc": {
+    "en_US": "Spain - TicketBAI",
+    "tr_TR": "İspanya - TicketBAI"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es_edi_tbai_pos",
+   "shortdesc": {
+    "en_US": "Spain - Point of Sale + TicketBAI",
+    "tr_TR": "İspanya - Satış Noktası + TicketBAI"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es_edi_verifactu",
+   "shortdesc": {
+    "en_US": "Spain - Veri*Factu",
+    "tr_TR": "İspanya - Veri*Factu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es_edi_verifactu_pos",
+   "shortdesc": {
+    "en_US": "Spain - Veri*Factu for Point of Sale",
+    "tr_TR": "İspanya - Satış Noktası için Veri*Factu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es_modelo130",
+   "shortdesc": {
+    "en_US": "Spain - Modelo 130 Tax report",
+    "tr_TR": "İspanya - Modelo 130 Vergi Raporu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_es_pos",
+   "shortdesc": {
+    "en_US": "Spain - Point of Sale",
+    "tr_TR": "İspanya - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_et",
+   "shortdesc": {
+    "en_US": "Ethiopia - Accounting",
+    "tr_TR": "Etiyopya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_eu_oss",
+   "shortdesc": {
+    "en_US": "EU One Stop Shop (OSS)",
+    "tr_TR": "AB Tek Durak Noktası (OSS)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fi",
+   "shortdesc": {
+    "en_US": "Finnish Localization",
+    "tr_TR": "Fince Yerelleştirme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fi_sale",
+   "shortdesc": {
+    "en_US": "Finland - Sale",
+    "tr_TR": "Finlandiya - Satış"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fr",
+   "shortdesc": {
+    "en_US": "France - Localizations",
+    "tr_TR": "Fransa - Yerelleştirmeler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fr_account",
+   "shortdesc": {
+    "en_US": "France - Accounting",
+    "tr_TR": "Fransa - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fr_facturx_chorus_pro",
+   "shortdesc": {
+    "en_US": "France - Peppol integration with Chorus Pro"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fr_hr_holidays",
+   "shortdesc": {
+    "en_US": "France - Time Off",
+    "tr_TR": "Fransa - İzin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fr_hr_work_entry_holidays",
+   "shortdesc": {
+    "en_US": "France - Work Entries Time Off",
+    "tr_TR": "Fransa - İş Girişleri İzin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fr_pdp",
+   "shortdesc": {
+    "en_US": "France - E-Invoicing (Approved Platform)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fr_pdp_pos",
+   "shortdesc": {
+    "en_US": "France - E-reporting for POS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_fr_pos_cert",
+   "shortdesc": {
+    "en_US": "France - VAT Anti-Fraud Certification for Point of Sale (CGI 286 I-3 bis)",
+    "tr_TR": "Fransa - Satış Noktası için Vergi Numarası Anti-Fraud Sertifikası (CGI 286 I-3 bis)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ga",
+   "shortdesc": {
+    "en_US": "Gabon - Accounting",
+    "tr_TR": "Gabon - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gcc_invoice",
+   "shortdesc": {
+    "en_US": "G.C.C. - Arabic/English Invoice",
+    "tr_TR": "G.C.C. - Arapça/İngilizce Fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gcc_invoice_stock_account",
+   "shortdesc": {
+    "en_US": "Gulf Cooperation Council WMS Accounting",
+    "tr_TR": "Körfez İşbirliği Konseyi WMS Muhasebesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gcc_pos",
+   "shortdesc": {
+    "en_US": "Gulf Cooperation Council - Point of Sale",
+    "tr_TR": "Körfez İşbirliği Konseyi - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gn",
+   "shortdesc": {
+    "en_US": "Guinea - Accounting",
+    "tr_TR": "Gine - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gq",
+   "shortdesc": {
+    "en_US": "Guinea Equatorial - Accounting",
+    "tr_TR": "Ekvator Ginesi - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gr",
+   "shortdesc": {
+    "en_US": "Greece - Accounting",
+    "tr_TR": "Yunanistan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gr_edi",
+   "shortdesc": {
+    "en_US": "Greece - myDATA",
+    "tr_TR": "Yunanistan - myDATA"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gr_edi_e_invoo",
+   "shortdesc": {
+    "en_US": "Greece - myDATA E-invoicing through e-invoo"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gr_edi_e_invoo_bridge",
+   "shortdesc": {
+    "en_US": "Greece - myDATA E-invoicing through e-invoo (direct API)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gt",
+   "shortdesc": {
+    "en_US": "Guatemala - Accounting",
+    "tr_TR": "Guetemala - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_gw",
+   "shortdesc": {
+    "en_US": "Guinea-Bissau - Accounting",
+    "tr_TR": "Gine-Bissau - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_hk",
+   "shortdesc": {
+    "en_US": "Hong Kong - Accounting",
+    "tr_TR": "Hong Kong - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_hn",
+   "shortdesc": {
+    "en_US": "Honduras - Accounting",
+    "tr_TR": "Honduras - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_hr",
+   "shortdesc": {
+    "en_US": "Croatia - Accounting (Euro)",
+    "tr_TR": "Hırvatistan - Muhasebe (Euro)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_hr_edi",
+   "shortdesc": {
+    "en_US": "Croatia - e-invoicing"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_hr_kuna",
+   "shortdesc": {
+    "en_US": "Croatia - Accounting (Kuna)",
+    "tr_TR": "Hırvatistan - Muhasebe (Kuna)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_hu",
+   "shortdesc": {
+    "en_US": "Hungary - Accounting",
+    "tr_TR": "Macaristan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_hu_edi",
+   "shortdesc": {
+    "en_US": "Hungary - E-invoicing",
+    "tr_TR": "Macaristan - E-fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_hu_edi_receive",
+   "shortdesc": {
+    "en_US": "Hungary - E-invoicing Receive Vendor Bills"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_id",
+   "shortdesc": {
+    "en_US": "Indonesian - Accounting",
+    "tr_TR": "Endonezya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_id_efaktur",
+   "shortdesc": {
+    "en_US": "Indonesia E-faktur",
+    "tr_TR": "Endonezya E-faktur"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_id_efaktur_coretax",
+   "shortdesc": {
+    "en_US": "Indonesia E-faktur (Coretax)",
+    "tr_TR": "Endonezya E-faktur (Coretax)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_id_pos",
+   "shortdesc": {
+    "en_US": "Indonesia - Point of Sale",
+    "tr_TR": "Endonezya - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ie",
+   "shortdesc": {
+    "en_US": "Ireland - Accounting",
+    "tr_TR": "İrlanda - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_il",
+   "shortdesc": {
+    "en_US": "Israel - Accounting",
+    "tr_TR": "Israel - Accounting"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in",
+   "shortdesc": {
+    "en_US": "Indian - Accounting",
+    "tr_TR": "Hindistan Hesapplanı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_edi",
+   "shortdesc": {
+    "en_US": "Indian - E-invoicing",
+    "tr_TR": "Hindistan - E-fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_edi_ewaybill",
+   "shortdesc": {
+    "en_US": "Indian - E-waybill",
+    "tr_TR": "Hindistan - E-irsaliye"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_ewaybill_port",
+   "shortdesc": {
+    "en_US": "Indian - Shipping Ports for E-waybill"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_ewaybill_stock",
+   "shortdesc": {
+    "en_US": "Indian - E-waybill Stock",
+    "tr_TR": "Hindistan - E-fatura Taşıma Belgesi (E-waybill)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_gstin_status",
+   "shortdesc": {
+    "en_US": "Indian - Check GST Number Status",
+    "tr_TR": "Hindistan - GST Numarası Durumunu Kontrol Et"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_hr_holidays",
+   "shortdesc": {
+    "en_US": "India - Time Off",
+    "tr_TR": "Hindistan - İzin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_pos",
+   "shortdesc": {
+    "en_US": "Indian - Point of Sale",
+    "tr_TR": "Hindistan - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_purchase",
+   "shortdesc": {
+    "en_US": "Indian - Purchase Report(GST)",
+    "tr_TR": "Hindistan - Satın Alma Raporları (GST)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_purchase_stock",
+   "shortdesc": {
+    "en_US": "India Purchase and Warehouse Management",
+    "tr_TR": "Hindistan Satın Alma ve Depo Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_sale",
+   "shortdesc": {
+    "en_US": "Indian - Sale Report(GST)",
+    "tr_TR": "Hindistan - Satış Raporları (GST)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_sale_stock",
+   "shortdesc": {
+    "en_US": "India Sales and Warehouse Management",
+    "tr_TR": "Hindistan Satış ve Depo Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_stock",
+   "shortdesc": {
+    "en_US": "Indian - Stock Report(GST)",
+    "tr_TR": "Hindistan - Stok Raporu (GST)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_withholding",
+   "shortdesc": {
+    "en_US": "Indian - TDS and TCS",
+    "tr_TR": "Hindistan - TDS ve TCS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_in_withholding_payment",
+   "shortdesc": {
+    "en_US": "Indian - TDS For Payment",
+    "tr_TR": "Hindistan - Ödeme için TDS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_iq",
+   "shortdesc": {
+    "en_US": "Iraq - Accounting",
+    "tr_TR": "Irak - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it",
+   "shortdesc": {
+    "en_US": "Italy - Accounting",
+    "tr_TR": "İtalya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it_edi",
+   "shortdesc": {
+    "en_US": "Italy - E-invoicing",
+    "tr_TR": "İtalya - E-faturalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it_edi_doi",
+   "shortdesc": {
+    "en_US": "Italy - Declaration of Intent",
+    "tr_TR": "İtalya - Niyet Beyanı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it_edi_ndd",
+   "shortdesc": {
+    "en_US": "Italy - E-invoicing - Additional module to support the debit notes (nota di debito - NDD)",
+    "tr_TR": "İtalya - E-faturalama - Borç dekontlarını (nota di debito - NDD) desteklemek için ek modül"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it_edi_ndd_account_dn",
+   "shortdesc": {
+    "en_US": "Italy - E-invoicing - Bridge module between Italy NDD and Account Debit Note"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it_edi_sale",
+   "shortdesc": {
+    "en_US": "Italy - Sale E-invoicing",
+    "tr_TR": "İtalya - Satış E-Faturalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it_edi_website_sale",
+   "shortdesc": {
+    "en_US": "Italy eCommerce eInvoicing",
+    "tr_TR": "İtalya eTicaret e-Faturalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it_edi_withholding",
+   "shortdesc": {
+    "en_US": "Italy - E-invoicing (Withholding)",
+    "tr_TR": "İtalya - E-fatura (Stopaj)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_it_stock_ddt",
+   "shortdesc": {
+    "en_US": "Italy - Stock DDT",
+    "tr_TR": "İtalya - Stok DDT"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_jo",
+   "shortdesc": {
+    "en_US": "Jordan - Accounting",
+    "tr_TR": "Ürdün - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_jo_edi",
+   "shortdesc": {
+    "en_US": "Jordan E-Invoicing",
+    "tr_TR": "Ürdün E-Faturalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_jo_edi_extended",
+   "shortdesc": {
+    "en_US": "Jordan E-Invoicing Extended Features"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_jo_edi_pos",
+   "shortdesc": {
+    "en_US": "Jordan Accounting EDI for POS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_jp",
+   "shortdesc": {
+    "en_US": "Japan - Accounting",
+    "tr_TR": "Japon - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_jp_ubl_pint",
+   "shortdesc": {
+    "en_US": "Japan - UBL PINT",
+    "tr_TR": "Japonya - UBL PINT"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ke",
+   "shortdesc": {
+    "en_US": "Kenya - Accounting",
+    "tr_TR": "Kenya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ke_edi_tremol",
+   "shortdesc": {
+    "en_US": "Kenya Tremol Device EDI Integration",
+    "tr_TR": "Kenya Tremol Cihazı EDI Entegrasyonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_kh",
+   "shortdesc": {
+    "en_US": "Cambodia - Accounting",
+    "tr_TR": "Kamboçya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_km",
+   "shortdesc": {
+    "en_US": "Comoros - Accounting",
+    "tr_TR": "Komorlar - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_kr",
+   "shortdesc": {
+    "en_US": "Republic of Korea - Accounting",
+    "tr_TR": "Kore Cumhuriyeti - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_kw",
+   "shortdesc": {
+    "en_US": "Kuwait - Accounting",
+    "tr_TR": "Kuveyt - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_kz",
+   "shortdesc": {
+    "en_US": "Kazakhstan - Accounting",
+    "tr_TR": "Kazakistan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_latam_base",
+   "shortdesc": {
+    "en_US": "LATAM Localization Base",
+    "tr_TR": "LATAM Yerelleştirme Temeli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_latam_check",
+   "shortdesc": {
+    "en_US": "Third Party and Deferred/Electronic Checks Management",
+    "tr_TR": "Alınan ve Vadeli/Elektronik Çekler Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_latam_invoice_document",
+   "shortdesc": {
+    "en_US": "LATAM Document",
+    "tr_TR": "LATAM Belgesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_lb_account",
+   "shortdesc": {
+    "en_US": "Lebanon - Accounting",
+    "tr_TR": "Lübnan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_lt",
+   "shortdesc": {
+    "en_US": "Lithuania - Accounting",
+    "tr_TR": "Lithuania - Accounting"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_lu",
+   "shortdesc": {
+    "en_US": "Luxembourg - Accounting",
+    "tr_TR": "Lüksemburg - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_lv",
+   "shortdesc": {
+    "en_US": "Latvia - Accounting",
+    "tr_TR": "Letonya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ma",
+   "shortdesc": {
+    "en_US": "Morocco - Accounting",
+    "tr_TR": "Fas - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mc",
+   "shortdesc": {
+    "en_US": "Monaco - Accounting",
+    "tr_TR": "Monako - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ml",
+   "shortdesc": {
+    "en_US": "Mali - Accounting",
+    "tr_TR": "Mali - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mn",
+   "shortdesc": {
+    "en_US": "Mongolia - Accounting",
+    "tr_TR": "Moğolistan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mr",
+   "shortdesc": {
+    "en_US": "Mauritania - Accounting"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mt",
+   "shortdesc": {
+    "en_US": "Malta - Accounting",
+    "tr_TR": "Malta - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mt_pos",
+   "shortdesc": {
+    "en_US": "Malta - Point of Sale",
+    "tr_TR": "Malta - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mu_account",
+   "shortdesc": {
+    "en_US": "Mauritius - Accounting",
+    "tr_TR": "Mauritius - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mx",
+   "shortdesc": {
+    "en_US": "Mexico - Accounting",
+    "tr_TR": "Meksika - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mx_hr",
+   "shortdesc": {
+    "en_US": "Employees - Mexico",
+    "tr_TR": "Personeller - Meksika"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_my",
+   "shortdesc": {
+    "en_US": "Malaysia - Accounting",
+    "tr_TR": "Malezya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_my_edi",
+   "shortdesc": {
+    "en_US": "Malaysia - E-invoicing",
+    "tr_TR": "Malezya - E-faturalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_my_edi_extended",
+   "shortdesc": {
+    "en_US": "Malaysia - E-invoicing Extended Features",
+    "tr_TR": "Malezya - E-faturalama Genişletilmiş Özellikleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_my_edi_pos",
+   "shortdesc": {
+    "en_US": "Malaysia - E-invoicing (POS)",
+    "tr_TR": "Malezya - E-fatura (Satış Noktası)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_my_ubl_pint",
+   "shortdesc": {
+    "en_US": "Malaysia - UBL PINT",
+    "tr_TR": "Malezya - UBL PINT"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_mz",
+   "shortdesc": {
+    "en_US": "Mozambique - Accounting",
+    "tr_TR": "Mozambik - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ne",
+   "shortdesc": {
+    "en_US": "Niger - Accounting",
+    "tr_TR": "Nijer - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ng",
+   "shortdesc": {
+    "en_US": "Nigeria - Accounting",
+    "tr_TR": "Nijerya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_nl",
+   "shortdesc": {
+    "en_US": "Netherlands - Accounting",
+    "tr_TR": "Hollanda muhasebe raporları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_no",
+   "shortdesc": {
+    "en_US": "Norway - Accounting",
+    "tr_TR": "Norveç - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_nz",
+   "shortdesc": {
+    "en_US": "New Zealand - Accounting",
+    "tr_TR": "Yeni Zelanda - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_om",
+   "shortdesc": {
+    "en_US": "Oman - Accounting",
+    "tr_TR": "Umman - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pa",
+   "shortdesc": {
+    "en_US": "Panama - Accounting",
+    "tr_TR": "Panama - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pe",
+   "shortdesc": {
+    "en_US": "Peru - Accounting",
+    "tr_TR": "Peru - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pe_pos",
+   "shortdesc": {
+    "en_US": "Peruvian - Point of Sale with Pe Doc",
+    "tr_TR": "Peru - Pe Belgesi ile Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pe_website_sale",
+   "shortdesc": {
+    "en_US": "Peruvian eCommerce",
+    "tr_TR": "Peru e-Ticaret"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ph",
+   "shortdesc": {
+    "en_US": "Philippines - Accounting",
+    "tr_TR": "Filipinler - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pk",
+   "shortdesc": {
+    "en_US": "Pakistan - Accounting",
+    "tr_TR": "Pakistan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pl",
+   "shortdesc": {
+    "en_US": "Poland - Accounting",
+    "tr_TR": "Polonya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pl_bank_verification",
+   "shortdesc": {
+    "en_US": "Poland - Accounting - Bank Account Verification"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pl_edi",
+   "shortdesc": {
+    "en_US": "Polish E-Invoicing FA(3)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pl_edi_jst",
+   "shortdesc": {
+    "en_US": "Polish E-Invoicing FA(3) LGU support"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pl_taxable_supply_date",
+   "shortdesc": {
+    "en_US": "Poland - Taxable Supply Date"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_pt",
+   "shortdesc": {
+    "en_US": "Portugal - Accounting",
+    "tr_TR": "Portekiz - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_qa",
+   "shortdesc": {
+    "en_US": "Qatar - Accounting",
+    "tr_TR": "Katar - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ro",
+   "shortdesc": {
+    "en_US": "Romania - Accounting",
+    "tr_TR": "Romanya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ro_cpv_code",
+   "shortdesc": {
+    "en_US": "Romania - CPV Code"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ro_edi",
+   "shortdesc": {
+    "en_US": "Romania - E-invoicing",
+    "tr_TR": "Romanya - e-Fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ro_edi_stock",
+   "shortdesc": {
+    "en_US": "Romania - E-Transport",
+    "tr_TR": "Romanya - e-Transport"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ro_edi_stock_batch",
+   "shortdesc": {
+    "en_US": "Romania - E-Transport Batch Pickings",
+    "tr_TR": "Romanya - E-Nakliye Toplu Sevkiyatlar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ro_efactura_synchronize",
+   "shortdesc": {
+    "en_US": "Romania - Synchronize E-Factura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_rs",
+   "shortdesc": {
+    "en_US": "Serbia - Accounting",
+    "tr_TR": "Sırbistan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_rs_edi",
+   "shortdesc": {
+    "en_US": "Serbia - eFaktura E-invoicing",
+    "tr_TR": "Sırbistan - eFaktura E-Faturalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_rw",
+   "shortdesc": {
+    "en_US": "Rwanda - Accounting",
+    "tr_TR": "Ruanda - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_sa",
+   "shortdesc": {
+    "en_US": "Saudi Arabia - Accounting",
+    "tr_TR": "Suudi Arabistan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_sa_edi",
+   "shortdesc": {
+    "en_US": "Saudi Arabia - E-invoicing",
+    "tr_TR": "Saudi Arabistan - E-fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_sa_edi_pos",
+   "shortdesc": {
+    "en_US": "Saudi Arabia - E-invoicing (Simplified)",
+    "tr_TR": "Suudi Arabistan - E-faturalama (Basitleştirilmiş)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_sa_pos",
+   "shortdesc": {
+    "en_US": "Saudi Arabia - Point of Sale",
+    "tr_TR": "Suudi Arabistan - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_se",
+   "shortdesc": {
+    "en_US": "Sweden - Accounting",
+    "tr_TR": "Sweden - Accounting Reports"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_sg",
+   "shortdesc": {
+    "en_US": "Singapore - Accounting",
+    "tr_TR": "Singapur - Muhasebesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_sg_ubl_pint",
+   "shortdesc": {
+    "en_US": "Singapore - UBL PINT",
+    "tr_TR": "Singapur - UBL PINT"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_si",
+   "shortdesc": {
+    "en_US": "Slovenian - Accounting",
+    "tr_TR": "Slovenya - Hesapplananı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_sk",
+   "shortdesc": {
+    "en_US": "Slovak - Accounting",
+    "tr_TR": "Slovakça - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_sn",
+   "shortdesc": {
+    "en_US": "Sénégal - Accounting",
+    "tr_TR": "Senegal - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_syscohada",
+   "shortdesc": {
+    "en_US": "OHADA - Accounting",
+    "tr_TR": "OHADA - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_td",
+   "shortdesc": {
+    "en_US": "Tchad - Accounting",
+    "tr_TR": "Çad - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_test_pos_qr_payment",
+   "shortdesc": {
+    "en_US": "POS QR Tests",
+    "tr_TR": "POS QR Testleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tg",
+   "shortdesc": {
+    "en_US": "Togo - Accounting",
+    "tr_TR": "Togo - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_th",
+   "shortdesc": {
+    "en_US": "Thailand - Accounting",
+    "tr_TR": "Tayland - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tn",
+   "shortdesc": {
+    "en_US": "Tunisia - Accounting",
+    "tr_TR": "Tunus - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tr",
+   "shortdesc": {
+    "en_US": "Türkiye - Accounting",
+    "tr_TR": "Türkiye - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tr_nilvera",
+   "shortdesc": {
+    "en_US": "Türkiye - Nilvera",
+    "tr_TR": "Türkiye - Nilvera"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tr_nilvera_edispatch",
+   "shortdesc": {
+    "en_US": "Türkiye - e-Irsaliye (e-Dispatch)",
+    "tr_TR": "Türkiye - e-İrsaliye (e-Gönderim)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tr_nilvera_einvoice",
+   "shortdesc": {
+    "en_US": "Türkiye - Nilvera E-Invoice",
+    "tr_TR": "Türkiye - Nilvera E-Fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tr_nilvera_einvoice_extended",
+   "shortdesc": {
+    "en_US": "Türkiye - Nilvera E-Invoice Extended"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tw",
+   "shortdesc": {
+    "en_US": "Taiwan - Accounting",
+    "tr_TR": "Tayvan - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tw_edi_ecpay",
+   "shortdesc": {
+    "en_US": "Taiwan - E-invoicing",
+    "tr_TR": "Tayvan - E-fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tw_edi_ecpay_website_sale",
+   "shortdesc": {
+    "en_US": "Taiwan - E-invoicing Ecommerce"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_tz_account",
+   "shortdesc": {
+    "en_US": "Tanzania - Accounting",
+    "tr_TR": "Tanzanya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ua",
+   "shortdesc": {
+    "en_US": "Ukraine - Accounting",
+    "tr_TR": "Ukrayna - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ug",
+   "shortdesc": {
+    "en_US": "Uganda - Accounting",
+    "tr_TR": "Uganda - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_uk",
+   "shortdesc": {
+    "en_US": "United Kingdom - Accounting",
+    "tr_TR": "Birleşik Krallık - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_us",
+   "shortdesc": {
+    "en_US": "United States - Localizations",
+    "tr_TR": "Birleşik Devletler - Yerelleştirmeler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_us_account",
+   "shortdesc": {
+    "en_US": "United States - Accounting",
+    "tr_TR": "USA - Muhasebe Hesapları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_uy",
+   "shortdesc": {
+    "en_US": "Uruguay - Accounting",
+    "tr_TR": "Uruguay - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_uy_pos",
+   "shortdesc": {
+    "en_US": "Uruguayan - Point of Sale",
+    "tr_TR": "Uruguay - Satış Noktası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_uy_website_sale",
+   "shortdesc": {
+    "en_US": "Uruguay Website"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_ve",
+   "shortdesc": {
+    "en_US": "Venezuela - Accounting",
+    "tr_TR": "Venezuela - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_vn",
+   "shortdesc": {
+    "en_US": "Vietnam - Accounting",
+    "tr_TR": "Vietnam Hesap Planı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_vn_edi_viettel",
+   "shortdesc": {
+    "en_US": "Vietnam - E-invoicing",
+    "tr_TR": "Vietnam - e-Fatura"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_vn_edi_viettel_pos",
+   "shortdesc": {
+    "en_US": "Vietnam - POS E-invoicing"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_za",
+   "shortdesc": {
+    "en_US": "South Africa - Accounting",
+    "tr_TR": "Güney Afrika - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "l10n_zm_account",
+   "shortdesc": {
+    "en_US": "Zambia - Accounting",
+    "tr_TR": "Zambiya - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "link_tracker",
+   "shortdesc": {
+    "en_US": "Link Tracker",
+    "tr_TR": "Bağlantı İzleyici"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm",
+   "shortdesc": {
+    "en_US": "LLM Integration Base"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_anthropic",
+   "shortdesc": {
+    "en_US": "Anthropic LLM Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_assistant",
+   "shortdesc": {
+    "en_US": "LLM Assistant"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_chroma",
+   "shortdesc": {
+    "en_US": "LLM Chroma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_comfy_icu",
+   "shortdesc": {
+    "en_US": "LLM ComfyICU Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_comfyui",
+   "shortdesc": {
+    "en_US": "LLM ComfyUI Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_document_page",
+   "shortdesc": {
+    "en_US": "LLM Knowledge Integration for Document Pages"
+   },
+   "state": "uninstalled",
+   "application": false
+  },
+  {
+   "name": "llm_fal_ai",
+   "shortdesc": {
+    "en_US": "LLM - Fal.ai Provider"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_generate",
+   "shortdesc": {
+    "en_US": "LLM Content Generation"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_generate_job",
+   "shortdesc": {
+    "en_US": "LLM Generate Job"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_knowledge",
+   "shortdesc": {
+    "en_US": "LLM Knowledge"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_knowledge_automation",
+   "shortdesc": {
+    "en_US": "LLM Knowledge Automation"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_knowledge_llama",
+   "shortdesc": {
+    "en_US": "LLM RAG LlamaIndex"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_knowledge_mistral",
+   "shortdesc": {
+    "en_US": "LLM RAG Mistral"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_letta",
+   "shortdesc": {
+    "en_US": "Letta LLM Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_mcp_server",
+   "shortdesc": {
+    "en_US": "LLM MCP Server"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_mistral",
+   "shortdesc": {
+    "en_US": "Mistral AI LLM Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_ollama",
+   "shortdesc": {
+    "en_US": "Ollama LLM Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_openai",
+   "shortdesc": {
+    "en_US": "OpenAI LLM Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_pgvector",
+   "shortdesc": {
+    "en_US": "LLM PgVector"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_qdrant",
+   "shortdesc": {
+    "en_US": "LLM Qdrant Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_replicate",
+   "shortdesc": {
+    "en_US": "Replicate LLM Integration"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_store",
+   "shortdesc": {
+    "en_US": "LLM Vector Store Base"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_thread",
+   "shortdesc": {
+    "en_US": "Easy AI Chat"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "llm_tool",
+   "shortdesc": {
+    "en_US": "LLM Tool"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_tool_account",
+   "shortdesc": {
+    "en_US": "LLM Tool Account"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_tool_demo",
+   "shortdesc": {
+    "en_US": "LLM Tool Demo"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_tool_knowledge",
+   "shortdesc": {
+    "en_US": "LLM Tool RAG"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_tool_mis_builder",
+   "shortdesc": {
+    "en_US": "LLM Tool MIS Builder"
+   },
+   "state": "uninstalled",
+   "application": false
+  },
+  {
+   "name": "llm_tool_ocr_mistral",
+   "shortdesc": {
+    "en_US": "Mistral OCR Tool"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_tool_website",
+   "shortdesc": {
+    "en_US": "LLM Tool Website"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "llm_training",
+   "shortdesc": {
+    "en_US": "LLM Training Management"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "loyalty",
+   "shortdesc": {
+    "en_US": "Coupons & Loyalty",
+    "tr_TR": "Coupons & Loyalty"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "lunch",
+   "shortdesc": {
+    "en_US": "Lunch",
+    "tr_TR": "Öğle Yemeği"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "mail",
+   "shortdesc": {
+    "en_US": "Discuss",
+    "tr_TR": "Mesajlaşma"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "mail_bot",
+   "shortdesc": {
+    "en_US": "OdooBot",
+    "tr_TR": "OdooBot"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mail_bot_hr",
+   "shortdesc": {
+    "en_US": "OdooBot - HR",
+    "tr_TR": "OdooBot - İK"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mail_group",
+   "shortdesc": {
+    "en_US": "Mail Group",
+    "tr_TR": "Posta Grubu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mail_plugin",
+   "shortdesc": {
+    "en_US": "Mail Plugin",
+    "tr_TR": "Posta Eklentisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "maintenance",
+   "shortdesc": {
+    "en_US": "Maintenance",
+    "tr_TR": "Bakım"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "marketing_automation",
+   "shortdesc": {
+    "en_US": "Marketing Automation",
+    "tr_TR": "Pazarlama Otomasyonu"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "marketing_card",
+   "shortdesc": {
+    "en_US": "Marketing Card",
+    "tr_TR": "Pazarlama Kartı"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "mass_mailing",
+   "shortdesc": {
+    "en_US": "Email Marketing",
+    "tr_TR": "E-posta Pazarlama"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "mass_mailing_crm",
+   "shortdesc": {
+    "en_US": "Mass mailing on lead / opportunities",
+    "tr_TR": "Aday / fırsatlara toplu postalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_crm_sms",
+   "shortdesc": {
+    "en_US": "Mass mailing sms on lead / opportunities",
+    "tr_TR": "Müşteri adayı / fırsatlar hakkında toplu posta sms"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_event",
+   "shortdesc": {
+    "en_US": "Mass mailing on attendees",
+    "tr_TR": "Katılımcılara toplu mail gönderimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_event_sms",
+   "shortdesc": {
+    "en_US": "Event Attendees SMS Marketing",
+    "tr_TR": "Etkinlik Katılımcıları SMS Pazarlama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_event_track",
+   "shortdesc": {
+    "en_US": "Mass mailing on track speakers",
+    "tr_TR": "Konuşmacı için toplu mail gönderimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_event_track_sms",
+   "shortdesc": {
+    "en_US": "Track Speakers SMS Marketing",
+    "tr_TR": "Konuşmacılar SMS Pazarlama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_sale",
+   "shortdesc": {
+    "en_US": "Mass mailing on sale orders",
+    "tr_TR": "Satış siparişlerinde toplu postalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_sale_sms",
+   "shortdesc": {
+    "en_US": "Mass mailing sms on sale orders",
+    "tr_TR": "Satış siparişlerinde toplu postalama sms"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_slides",
+   "shortdesc": {
+    "en_US": "Mass mailing on course members",
+    "tr_TR": "Kurs üyelerine toplu postalama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mass_mailing_sms",
+   "shortdesc": {
+    "en_US": "SMS Marketing",
+    "tr_TR": "SMS Pazarlaması"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "mass_mailing_themes",
+   "shortdesc": {
+    "en_US": "Mass Mailing Themes",
+    "tr_TR": "Toplu Posta Şablonları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "membership",
+   "shortdesc": {
+    "en_US": "Members",
+    "tr_TR": "Üyeler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "microsoft_account",
+   "shortdesc": {
+    "en_US": "Microsoft Users",
+    "tr_TR": "Microsoft Users"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "microsoft_calendar",
+   "shortdesc": {
+    "en_US": "Outlook Calendar",
+    "tr_TR": "Outlook Takvim"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "microsoft_outlook",
+   "shortdesc": {
+    "en_US": "Microsoft Outlook",
+    "tr_TR": "Microsoft Outlook"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp",
+   "shortdesc": {
+    "en_US": "Manufacturing",
+    "tr_TR": "Üretim"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "mrp_account",
+   "shortdesc": {
+    "en_US": "Accounting - MRP",
+    "tr_TR": "Muhasebe - MRP"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_landed_costs",
+   "shortdesc": {
+    "en_US": "Landed Costs On MO",
+    "tr_TR": "MO üzerinde Maliyet Yüklemeleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_plm",
+   "shortdesc": {
+    "en_US": "Product Lifecycle Management (PLM)",
+    "tr_TR": "Ürün Yaşam Döngüsü Yönetimi (PLM)"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "mrp_product_expiry",
+   "shortdesc": {
+    "en_US": "Manufacturing Expiry",
+    "tr_TR": "Üretim Bitiş Süresi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_repair",
+   "shortdesc": {
+    "en_US": "Mrp Repairs",
+    "tr_TR": "Mrp Onarımları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_subcontracting",
+   "shortdesc": {
+    "en_US": "MRP Subcontracting",
+    "tr_TR": "MRP Alt Yüklenicilik"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_subcontracting_account",
+   "shortdesc": {
+    "en_US": "Subcontracting Management with Stock Valuation",
+    "tr_TR": "Stok Değerlemesi ile Fason Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_subcontracting_dropshipping",
+   "shortdesc": {
+    "en_US": "Dropship and Subcontracting Management",
+    "tr_TR": "Dropship ve Fason Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_subcontracting_landed_costs",
+   "shortdesc": {
+    "en_US": "Landed Costs With Subcontracting order",
+    "tr_TR": "Fason Siparişi ile İthalat Maliyet Maliyetleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_subcontracting_purchase",
+   "shortdesc": {
+    "en_US": "Purchase and Subcontracting Management",
+    "tr_TR": "Satınalma ve Fason Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_subcontracting_repair",
+   "shortdesc": {
+    "en_US": "MRP Subcontracting Repair",
+    "tr_TR": "MRP Fason Onarım"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "mrp_workorder",
+   "shortdesc": {
+    "en_US": "MRP II",
+    "tr_TR": "MRP II"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "onboarding",
+   "shortdesc": {
+    "en_US": "Onboarding Toolbox",
+    "tr_TR": "Başlangıç Araç Kutusu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "partner_autocomplete",
+   "shortdesc": {
+    "en_US": "Partner Autocomplete",
+    "tr_TR": "İş Ortağını Otomatik Tamamlama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment",
+   "shortdesc": {
+    "en_US": "Payment Engine",
+    "tr_TR": "Ödeme Motoru"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_adyen",
+   "shortdesc": {
+    "en_US": "Payment Provider: Adyen",
+    "tr_TR": "Ödeme Sağlayıcısı: Adyen"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_aps",
+   "shortdesc": {
+    "en_US": "Payment Provider: Amazon Payment Services",
+    "tr_TR": "Ödeme Sağlayıcısı: Amazon Ödeme Hizmetleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_asiapay",
+   "shortdesc": {
+    "en_US": "Payment Provider: AsiaPay",
+    "tr_TR": "Ödeme sağlayıcısı: AsiaPay"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_authorize",
+   "shortdesc": {
+    "en_US": "Payment Provider: Authorize.Net",
+    "tr_TR": "Ödeme Sağlayıcısı: Authorize.Net"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_buckaroo",
+   "shortdesc": {
+    "en_US": "Payment Provider: Buckaroo",
+    "tr_TR": "Ödeme sağlayıcısı: Buckaroo"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_custom",
+   "shortdesc": {
+    "en_US": "Payment Provider: Custom Payment Modes",
+    "tr_TR": "Ödeme Sağlayıcısı: Özel Ödeme Modları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_demo",
+   "shortdesc": {
+    "en_US": "Payment Provider: Demo",
+    "tr_TR": "Ödeme Sağlayıcısı: Demo"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_flutterwave",
+   "shortdesc": {
+    "en_US": "Payment Provider: Flutterwave",
+    "tr_TR": "Ödeme Sağlayıcısı: Flutterwave"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_mercado_pago",
+   "shortdesc": {
+    "en_US": "Payment Provider: Mercado Pago",
+    "tr_TR": "Ödeme Sağlayıcısı: Mercado Pago"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_mollie",
+   "shortdesc": {
+    "en_US": "Payment Provider: Mollie",
+    "tr_TR": "Ödeme Sağlayıcısı: Mollie"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_nuvei",
+   "shortdesc": {
+    "en_US": "Payment Provider: Nuvei",
+    "tr_TR": "Ödeme Sağlayıcı: Nuvei"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_paypal",
+   "shortdesc": {
+    "en_US": "Payment Provider: Paypal",
+    "tr_TR": "Ödeme Sağlayıcısı: PayPal"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_razorpay",
+   "shortdesc": {
+    "en_US": "Payment Provider: Razorpay",
+    "tr_TR": "Ödeme sağlayıcısı: Razorpay"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_razorpay_oauth",
+   "shortdesc": {
+    "en_US": "Razorpay OAuth Integration",
+    "tr_TR": "Razorpay OAuth Entegrasyonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_sepa_direct_debit",
+   "shortdesc": {
+    "en_US": "Sepa Direct Debit Payment Provider",
+    "tr_TR": "Ödeme Sağlayıcısı: Sepa Otomatik Ödeme"
+   },
+   "state": "uninstallable",
+   "application": false
+  },
+  {
+   "name": "payment_stripe",
+   "shortdesc": {
+    "en_US": "Payment Provider: Stripe",
+    "tr_TR": "Ödeme Sağlayıcısı: Stripe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_worldline",
+   "shortdesc": {
+    "en_US": "Payment Provider: Worldline",
+    "tr_TR": "Ödeme Sağlayıcı: Worldline"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "payment_xendit",
+   "shortdesc": {
+    "en_US": "Payment Provider: Xendit",
+    "tr_TR": "Ödeme Sağlayıcı: Xendit"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "phone_validation",
+   "shortdesc": {
+    "en_US": "Phone Numbers Validation",
+    "tr_TR": "Telefon Numarası Doğrulama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "planning",
+   "shortdesc": {
+    "en_US": "Planning",
+    "tr_TR": "Planlama"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "point_of_sale",
+   "shortdesc": {
+    "en_US": "Point of Sale",
+    "tr_TR": "Satış Noktası"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "portal",
+   "shortdesc": {
+    "en_US": "Customer Portal",
+    "tr_TR": "Müşteri Portalı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "portal_rating",
+   "shortdesc": {
+    "en_US": "Portal Rating",
+    "tr_TR": "Portal Rating"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_account_tax_python",
+   "shortdesc": {
+    "en_US": "Allow custom taxes in POS",
+    "tr_TR": "POS'ta özel vergi tanımlamaya izin verin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_adyen",
+   "shortdesc": {
+    "en_US": "POS Adyen",
+    "tr_TR": "POS Adyen"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_discount",
+   "shortdesc": {
+    "en_US": "Point of Sale Discounts",
+    "tr_TR": "Satış Noktası İndirimleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_edi_ubl",
+   "shortdesc": {
+    "en_US": "Point of Sale UBL"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_epson_printer",
+   "shortdesc": {
+    "en_US": "POS Epson Printer",
+    "tr_TR": "POS Epson Yazıcı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_event",
+   "shortdesc": {
+    "en_US": "POS - Event",
+    "tr_TR": "POS - Etkinlik"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_event_sale",
+   "shortdesc": {
+    "en_US": "PoS - Event Sale",
+    "tr_TR": "PoS - Etkinlik Satışı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_hr",
+   "shortdesc": {
+    "en_US": "POS - HR",
+    "tr_TR": "POS - İK"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_hr_restaurant",
+   "shortdesc": {
+    "en_US": "POS HR Restaurant",
+    "tr_TR": "POS İK Restoran"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_loyalty",
+   "shortdesc": {
+    "en_US": "Point of Sale - Coupons & Loyalty",
+    "tr_TR": "Satış Noktası - Kuponlar & Sadakat"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_mercado_pago",
+   "shortdesc": {
+    "en_US": "POS Mercado Pago",
+    "tr_TR": "POS Mercado Pago"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_mrp",
+   "shortdesc": {
+    "en_US": "pos_mrp",
+    "tr_TR": "pos_mrp"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_online_payment",
+   "shortdesc": {
+    "en_US": "Point of Sale online payment",
+    "tr_TR": "Satış Noktası çevrim içi ödeme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_online_payment_self_order",
+   "shortdesc": {
+    "en_US": "POS Self-Order / Online Payment",
+    "tr_TR": "POS Self-Order / Çevrim İçi Ödeme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_paytm",
+   "shortdesc": {
+    "en_US": "POS PayTM",
+    "tr_TR": "POS PayTM"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_pine_labs",
+   "shortdesc": {
+    "en_US": "POS Pine Labs",
+    "tr_TR": "POS Pine Labs"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_razorpay",
+   "shortdesc": {
+    "en_US": "POS Razorpay",
+    "tr_TR": "POS Razorpay"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_restaurant",
+   "shortdesc": {
+    "en_US": "Restaurant",
+    "tr_TR": "Restoran"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "pos_restaurant_adyen",
+   "shortdesc": {
+    "en_US": "POS Restaurant Adyen",
+    "tr_TR": "POS Restaurant Adyen"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_restaurant_loyalty",
+   "shortdesc": {
+    "en_US": "POS - Restaurant Loyalty",
+    "tr_TR": "POS - Restoran Sadakat Sistemi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_restaurant_stripe",
+   "shortdesc": {
+    "en_US": "POS Restaurant Stripe",
+    "tr_TR": "POS Restoran Stripe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_sale",
+   "shortdesc": {
+    "en_US": "POS - Sales",
+    "tr_TR": "POS - Satış"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_sale_loyalty",
+   "shortdesc": {
+    "en_US": "POS - Sales Loyalty",
+    "tr_TR": "POS - Satış Sadakat Sistemi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_sale_margin",
+   "shortdesc": {
+    "en_US": "POS - Sale Margin",
+    "tr_TR": "POS - Satış Marjı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_self_order",
+   "shortdesc": {
+    "en_US": "POS Self Order",
+    "tr_TR": "POS Self Order"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_self_order_adyen",
+   "shortdesc": {
+    "en_US": "POS Self Order Adyen",
+    "tr_TR": "POS Self Order Adyen"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_self_order_epson_printer",
+   "shortdesc": {
+    "en_US": "POS Self Order Epson Printer",
+    "tr_TR": "POS Self-Order Epson Yazıcı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_self_order_razorpay",
+   "shortdesc": {
+    "en_US": "POS Self Order Razorpay",
+    "tr_TR": "POS Self Order Razorpay ile"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_self_order_sale",
+   "shortdesc": {
+    "en_US": "POS Self Order Sale",
+    "tr_TR": "POS Self Order Satış"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_self_order_stripe",
+   "shortdesc": {
+    "en_US": "POS Self Order Stripe",
+    "tr_TR": "POS Self Order Stripe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_six",
+   "shortdesc": {
+    "en_US": "POS Six",
+    "tr_TR": "POS Six"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_sms",
+   "shortdesc": {
+    "en_US": "POS - SMS",
+    "tr_TR": "POS - SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_stripe",
+   "shortdesc": {
+    "en_US": "POS Stripe",
+    "tr_TR": "POS Stripe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "pos_viva_wallet",
+   "shortdesc": {
+    "en_US": "POS Viva Wallet",
+    "tr_TR": "POS Viva Wallet"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "privacy_lookup",
+   "shortdesc": {
+    "en_US": "Privacy",
+    "tr_TR": "Özel"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "product",
+   "shortdesc": {
+    "en_US": "Products & Pricelists",
+    "tr_TR": "Ürünler ve Fiyat Listeleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "product_email_template",
+   "shortdesc": {
+    "en_US": "Product Email Template",
+    "tr_TR": "Ürün E-posta Şablonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "product_expiry",
+   "shortdesc": {
+    "en_US": "Products Expiration Date",
+    "tr_TR": "Ürün Son Kullanım Tarihleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "product_images",
+   "shortdesc": {
+    "en_US": "Product Images",
+    "tr_TR": "Ürün Görselleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "product_margin",
+   "shortdesc": {
+    "en_US": "Margins by Products",
+    "tr_TR": "Ürün Marjları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "product_matrix",
+   "shortdesc": {
+    "en_US": "Product Matrix",
+    "tr_TR": "Ürün Matrisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project",
+   "shortdesc": {
+    "en_US": "Project",
+    "tr_TR": "Proje"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "project_account",
+   "shortdesc": {
+    "en_US": "Project - Account",
+    "tr_TR": "Proje - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_hr_expense",
+   "shortdesc": {
+    "en_US": "Project Expenses",
+    "tr_TR": "Proje Giderleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_hr_skills",
+   "shortdesc": {
+    "en_US": "Project - Skills",
+    "tr_TR": "Proje - Beceriler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_mail_plugin",
+   "shortdesc": {
+    "en_US": "Project Mail Plugin",
+    "tr_TR": "Project Mail Eklentisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_mrp",
+   "shortdesc": {
+    "en_US": "MRP Project",
+    "tr_TR": "MRP Projesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_mrp_account",
+   "shortdesc": {
+    "en_US": "MRP Account Project",
+    "tr_TR": "MRP Hesap Projesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_mrp_sale",
+   "shortdesc": {
+    "en_US": "MRP Project Sale",
+    "tr_TR": "MRP Proje Satışı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_mrp_stock_landed_costs",
+   "shortdesc": {
+    "en_US": "Project MRP Landed Costs",
+    "tr_TR": "Proje MRP İthalat Maliyetleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_purchase",
+   "shortdesc": {
+    "en_US": "Project Purchase",
+    "tr_TR": "Proje Satın Alma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_purchase_stock",
+   "shortdesc": {
+    "en_US": "Project - Purchase - Stock",
+    "tr_TR": "Proje Yönetimi - Satın Alma - Stok Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_sale_expense",
+   "shortdesc": {
+    "en_US": "Project - Sale - Expense",
+    "tr_TR": "Proje - Satış - Masraf"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_sms",
+   "shortdesc": {
+    "en_US": "Project - SMS",
+    "tr_TR": "Proje - SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_stock",
+   "shortdesc": {
+    "en_US": "Project Stock",
+    "tr_TR": "Proje Stok"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_stock_account",
+   "shortdesc": {
+    "en_US": "Project Stock Account",
+    "tr_TR": "Proje Stok Muhasebesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_stock_landed_costs",
+   "shortdesc": {
+    "en_US": "Project Stock Landed Costs",
+    "tr_TR": "Proje Stok İthalat Maliyetleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_timesheet_holidays",
+   "shortdesc": {
+    "en_US": "Timesheet when on Time Off",
+    "tr_TR": "Çalışma Kapalı olduğunda çalışma çizelgesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "project_todo",
+   "shortdesc": {
+    "en_US": "To-Do",
+    "tr_TR": "Yapılacak"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "purchase",
+   "shortdesc": {
+    "en_US": "Purchase",
+    "tr_TR": "Satınalma"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "purchase_edi_ubl_bis3",
+   "shortdesc": {
+    "en_US": "Import/Export electronic orders with UBL",
+    "tr_TR": "Elektronik siparişleri UBL ile içe/dışa aktarma "
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "purchase_mrp",
+   "shortdesc": {
+    "en_US": "Purchase and MRP Management",
+    "tr_TR": "Satınalma ve MRP Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "purchase_product_matrix",
+   "shortdesc": {
+    "en_US": "Purchase Matrix",
+    "tr_TR": "Satın Alma Matrisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "purchase_repair",
+   "shortdesc": {
+    "en_US": "Purchase Repair",
+    "tr_TR": "Satın Alma Onarımı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "purchase_requisition",
+   "shortdesc": {
+    "en_US": "Purchase Agreements",
+    "tr_TR": "Satınalma Sözleşmeleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "purchase_requisition_sale",
+   "shortdesc": {
+    "en_US": "Purchase Requisition Sale",
+    "tr_TR": "Satın Alma Talebi Satışı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "purchase_requisition_stock",
+   "shortdesc": {
+    "en_US": "Purchase Requisition Stock",
+    "tr_TR": "Satınalma Talebi Stoku"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "purchase_stock",
+   "shortdesc": {
+    "en_US": "Purchase Stock",
+    "tr_TR": "Satınalma Stok"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "quality_control",
+   "shortdesc": {
+    "en_US": "Quality",
+    "tr_TR": "Kalite"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "rating",
+   "shortdesc": {
+    "en_US": "Customer Rating",
+    "tr_TR": "Müşteri Memnuniyeti"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "repair",
+   "shortdesc": {
+    "en_US": "Repairs",
+    "tr_TR": "Onarımlar"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "resource",
+   "shortdesc": {
+    "en_US": "Resource",
+    "tr_TR": "Kaynak"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "resource_mail",
+   "shortdesc": {
+    "en_US": "Resource Mail",
+    "tr_TR": "Kaynak E-postası"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale",
+   "shortdesc": {
+    "en_US": "Sales",
+    "tr_TR": "Satış"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_amazon",
+   "shortdesc": {
+    "en_US": "Amazon Connector",
+    "tr_TR": "Amazon Bağlayıcı"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "sale_async_emails",
+   "shortdesc": {
+    "en_US": "Sales - Async Emails",
+    "tr_TR": "Satışlar - Zaman Uyumsuz E-postalar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_crm",
+   "shortdesc": {
+    "en_US": "Opportunity to Quotation",
+    "tr_TR": "Teklif için Fırsat"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_edi_ubl",
+   "shortdesc": {
+    "en_US": "Import electronic orders with UBL",
+    "tr_TR": "UBL ile elektronik siparişleri içe aktar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_expense",
+   "shortdesc": {
+    "en_US": "Sales Expense",
+    "tr_TR": "Satış Gideri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_expense_margin",
+   "shortdesc": {
+    "en_US": "Sales Expense Margin",
+    "tr_TR": "Satış Gideri Marjı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_gelato",
+   "shortdesc": {
+    "en_US": "Gelato",
+    "tr_TR": "Gelato"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_gelato_stock",
+   "shortdesc": {
+    "en_US": "Gelato/Stock bridge",
+    "tr_TR": "Gelato/Stok entegrasyonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_loyalty",
+   "shortdesc": {
+    "en_US": "Sale Loyalty",
+    "tr_TR": "Satış Sadakati"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_loyalty_delivery",
+   "shortdesc": {
+    "en_US": "Sale Loyalty - Delivery",
+    "tr_TR": "Satış Sadakati - Teslimat"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_management",
+   "shortdesc": {
+    "en_US": "Sales",
+    "tr_TR": "Satış"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "sale_margin",
+   "shortdesc": {
+    "en_US": "Margins in Sales Orders",
+    "tr_TR": "Satış Siparişleri Marjların"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_mrp",
+   "shortdesc": {
+    "en_US": "Sales and MRP Management",
+    "tr_TR": "Satış ve MRP Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_mrp_margin",
+   "shortdesc": {
+    "en_US": "Sale Mrp Margin",
+    "tr_TR": "Satış Mrp Marjı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_pdf_quote_builder",
+   "shortdesc": {
+    "en_US": "Sales PDF Quotation Builder",
+    "tr_TR": "Satış PDF Fiyat Teklifi Oluşturucu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_product_matrix",
+   "shortdesc": {
+    "en_US": "Sale Matrix",
+    "tr_TR": "Satış Matrisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_project",
+   "shortdesc": {
+    "en_US": "Sales - Project",
+    "tr_TR": "Sales - Project"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_project_stock",
+   "shortdesc": {
+    "en_US": "Sale Project - Sale Stock",
+    "tr_TR": "Satış Proje - Satış Stok"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_project_stock_account",
+   "shortdesc": {
+    "en_US": "Sale Project Stock Account",
+    "tr_TR": "Satış Proje Stok Hesabı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_purchase",
+   "shortdesc": {
+    "en_US": "Sale Purchase",
+    "tr_TR": "Satış  Satınalma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_purchase_project",
+   "shortdesc": {
+    "en_US": "Sale Purchase Project",
+    "tr_TR": "Satış Satın Alma Projesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_purchase_stock",
+   "shortdesc": {
+    "en_US": "MTO Sale <-> Purchase",
+    "tr_TR": "MTO Satış<-> Satın Alma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_service",
+   "shortdesc": {
+    "en_US": "Sales - Service",
+    "tr_TR": "Satış - Hizmet"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_sms",
+   "shortdesc": {
+    "en_US": "Sale - SMS",
+    "tr_TR": "Satış - SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_stock",
+   "shortdesc": {
+    "en_US": "Sales and Warehouse Management",
+    "tr_TR": "Satış ve Depo Yönetimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_stock_margin",
+   "shortdesc": {
+    "en_US": "Sale Stock Margin",
+    "tr_TR": "Satış Stok Marjı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_subscription",
+   "shortdesc": {
+    "en_US": "Subscriptions",
+    "tr_TR": "Abonelikler"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "sale_timesheet",
+   "shortdesc": {
+    "en_US": "Sales Timesheet",
+    "tr_TR": "Satış Çalışma Çizelgesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sale_timesheet_margin",
+   "shortdesc": {
+    "en_US": "Service Margins in Sales Orders",
+    "tr_TR": "Satış Sipariş Hizmet Marjları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sales_team",
+   "shortdesc": {
+    "en_US": "Sales Teams",
+    "tr_TR": "Satış Ekipleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sign",
+   "shortdesc": {
+    "en_US": "Sign",
+    "tr_TR": "İmzala"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "sms",
+   "shortdesc": {
+    "en_US": "SMS gateway",
+    "tr_TR": "SMS Ağ Geçidi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "sms_twilio",
+   "shortdesc": {
+    "en_US": "Twilio SMS",
+    "tr_TR": "Twilio SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "snailmail",
+   "shortdesc": {
+    "en_US": "Snail Mail",
+    "tr_TR": "Snail Mail"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "snailmail_account",
+   "shortdesc": {
+    "en_US": "Snail Mail - Account",
+    "tr_TR": "Posta ile Gönderim - Muhasebe"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "social",
+   "shortdesc": {
+    "en_US": "Social Marketing",
+    "tr_TR": "Sosyal Medya"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "social_media",
+   "shortdesc": {
+    "en_US": "Social Media",
+    "tr_TR": "Sosyal Medya"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet",
+   "shortdesc": {
+    "en_US": "Spreadsheet",
+    "tr_TR": "E-tablo"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_account",
+   "shortdesc": {
+    "en_US": "Spreadsheet Accounting Formulas",
+    "tr_TR": "E-tablo Muhasebe Formülleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard",
+    "tr_TR": "E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_account",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for accounting",
+    "tr_TR": "E-tablo Muhasebe kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_event_sale",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for events",
+    "tr_TR": "Etkinlikler için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_hr_expense",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for expenses",
+    "tr_TR": "Masraflar için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_hr_timesheet",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for time sheets",
+    "tr_TR": "Çalışma çizelgeleri için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_im_livechat",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for live chat",
+    "tr_TR": "Canlı sohbet için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_pos_hr",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for point of sale",
+    "tr_TR": "Satış noktası için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_pos_restaurant",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for restaurants",
+    "tr_TR": "Restoranlar için e-tablo panosu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_sale",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for sales",
+    "tr_TR": "Satışlar için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_sale_timesheet",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for time sheets",
+    "tr_TR": "Çalışma çizelgeleri için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_stock_account",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for stock",
+    "tr_TR": "Hisse senedi için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_website_sale",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for eCommerce",
+    "tr_TR": "eTicaret için Hesap Tablosu Gösterge Paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "spreadsheet_dashboard_website_sale_slides",
+   "shortdesc": {
+    "en_US": "Spreadsheet dashboard for eLearning",
+    "tr_TR": "E-Öğrenim için E-tablo kontrol paneli"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "stock",
+   "shortdesc": {
+    "en_US": "Inventory",
+    "tr_TR": "Stok"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "stock_account",
+   "shortdesc": {
+    "en_US": "WMS Accounting",
+    "tr_TR": "Stok Muhasebesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "stock_barcode",
+   "shortdesc": {
+    "en_US": "Barcode",
+    "tr_TR": "Barkod"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "stock_delivery",
+   "shortdesc": {
+    "en_US": "Delivery - Stock",
+    "tr_TR": "Teslimat - Stok"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "stock_dropshipping",
+   "shortdesc": {
+    "en_US": "Drop Shipping",
+    "tr_TR": "Transit Satış (Dropshipping)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "stock_fleet",
+   "shortdesc": {
+    "en_US": "Stock Transport",
+    "tr_TR": "Stok Transferi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "stock_landed_costs",
+   "shortdesc": {
+    "en_US": "WMS Landed Costs",
+    "tr_TR": "Maliyet Yüklemeleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "stock_picking_batch",
+   "shortdesc": {
+    "en_US": "Warehouse Management: Batch Transfer",
+    "tr_TR": "Depo Yönetimi: Toplu Transfer"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "stock_sms",
+   "shortdesc": {
+    "en_US": "Stock - SMS",
+    "tr_TR": "Stok - SMS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "survey",
+   "shortdesc": {
+    "en_US": "Surveys",
+    "tr_TR": "Anketler"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "test_access_rights",
+   "shortdesc": {
+    "en_US": "test of access rights and rules",
+    "tr_TR": "erişim izinleri ve kuralları testi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_action_bindings",
+   "shortdesc": {
+    "en_US": "Test Action Bindings",
+    "tr_TR": "Eylem Bağlamaları Test Et"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_apikeys",
+   "shortdesc": {
+    "en_US": "Tests flow of API keys",
+    "tr_TR": "API anahtarlarının akışını test eder"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_assetsbundle",
+   "shortdesc": {
+    "en_US": "test-assetsbundle",
+    "tr_TR": "test-assetsbundle"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_auth_custom",
+   "shortdesc": {
+    "en_US": "Tests that custom auth works & is not impaired by CORS",
+    "tr_TR": "Tests that custom auth works & is not impaired by CORS"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_base_automation",
+   "shortdesc": {
+    "en_US": "Test - Base Automation",
+    "tr_TR": "Test - Base Automation"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_convert",
+   "shortdesc": {
+    "en_US": "test_convert",
+    "tr_TR": "test_convert"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_converter",
+   "shortdesc": {
+    "en_US": "test-field-converter",
+    "tr_TR": "test-alan-dönüştürücü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_crm_full",
+   "shortdesc": {
+    "en_US": "Test Full Crm Flow",
+    "tr_TR": "Tam Crm Akışını Test Edin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_data_module",
+   "shortdesc": {
+    "en_US": "test module to test data only modules",
+    "tr_TR": "sadece modüllerin verilerini test etmek için test modülü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_data_module_install",
+   "shortdesc": {
+    "en_US": "test installation of data module",
+    "tr_TR": "veri modülünün test kurulumu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_discuss_full",
+   "shortdesc": {
+    "en_US": "Test Discuss (full)",
+    "tr_TR": "Test Tartışması (tam)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_event_full",
+   "shortdesc": {
+    "en_US": "Test Full Event Flow",
+    "tr_TR": "Tüm Etkinlik Akışını Test Edin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_exceptions",
+   "shortdesc": {
+    "en_US": "test-exceptions",
+    "tr_TR": "test-istisnalar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_hr_contract_calendar",
+   "shortdesc": {
+    "en_US": "Bridge module calendar, contract",
+    "tr_TR": "Köprü modülü, takvim, sözleşme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_html_field_history",
+   "shortdesc": {
+    "en_US": "Test - html_field_history",
+    "tr_TR": "Test - html_field_history"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_http",
+   "shortdesc": {
+    "en_US": "Test HTTP",
+    "tr_TR": "HTTP'yi test edin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_import_export",
+   "shortdesc": {
+    "en_US": "Test - Import & Export",
+    "tr_TR": "Test - İçe/Dışa Aktarma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_inherit",
+   "shortdesc": {
+    "en_US": "test-inherit",
+    "tr_TR": "test devral"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_inherit_depends",
+   "shortdesc": {
+    "en_US": "test-inherit-depends",
+    "tr_TR": "test-kalıtım-bağlıdır"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_inherits",
+   "shortdesc": {
+    "en_US": "test-inherits",
+    "tr_TR": "test devral"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_inherits_depends",
+   "shortdesc": {
+    "en_US": "test-inherits-depends",
+    "tr_TR": "test-inherits-depends"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_limits",
+   "shortdesc": {
+    "en_US": "test-limits",
+    "tr_TR": "test-sınırlar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_lint",
+   "shortdesc": {
+    "en_US": "test-lint",
+    "tr_TR": "test-lint"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_mail",
+   "shortdesc": {
+    "en_US": "Mail Tests",
+    "tr_TR": "Posta Testleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_mail_full",
+   "shortdesc": {
+    "en_US": "Mail Tests (Full)",
+    "tr_TR": "Posta Testleri (Tam)"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_mail_sms",
+   "shortdesc": {
+    "en_US": "SMS Tests",
+    "tr_TR": "SMS Testleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_main_flows",
+   "shortdesc": {
+    "en_US": "Test Main Flow",
+    "tr_TR": "Ana Akışı Test Et"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_mass_mailing",
+   "shortdesc": {
+    "en_US": "Mass Mail Tests",
+    "tr_TR": "Toplu Posta Testleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_mimetypes",
+   "shortdesc": {
+    "en_US": "test mimetypes-guessing",
+    "tr_TR": "test mimetypes-guessing"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_new_api",
+   "shortdesc": {
+    "en_US": "Test API",
+    "tr_TR": "Test API"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_performance",
+   "shortdesc": {
+    "en_US": "Test Performance",
+    "tr_TR": "Performansı Test Et"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_read_group",
+   "shortdesc": {
+    "en_US": "test read_group",
+    "tr_TR": "test read_group"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_resource",
+   "shortdesc": {
+    "en_US": "Test - Resource",
+    "tr_TR": "Test - Kaynak"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_rpc",
+   "shortdesc": {
+    "en_US": "Test RPC",
+    "tr_TR": "RPC Sınama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_sale_product_configurators",
+   "shortdesc": {
+    "en_US": "Sale Product Configurators Tests",
+    "tr_TR": "Satış Ürün Konfigüratör Testleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_sale_purchase_edi_ubl",
+   "shortdesc": {
+    "en_US": "Test - Sale & Purchase Order EDI",
+    "tr_TR": "Test - Satış ve Satın Alma Siparişi EDI"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_search_panel",
+   "shortdesc": {
+    "en_US": "test_search_panel",
+    "tr_TR": "test_search_panel"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_spreadsheet",
+   "shortdesc": {
+    "en_US": "Spreadsheet Test",
+    "tr_TR": "E-tablo Test"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_testing_utilities",
+   "shortdesc": {
+    "en_US": "Test testing utilities",
+    "tr_TR": "Test testi yardımcı programları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_translation_import",
+   "shortdesc": {
+    "en_US": "test-translation-import",
+    "tr_TR": "test-translation-import"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_uninstall",
+   "shortdesc": {
+    "en_US": "test-uninstall",
+    "tr_TR": "test-kaldırma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_website",
+   "shortdesc": {
+    "en_US": "Website Test",
+    "tr_TR": "Web Sitesi Testi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_website_modules",
+   "shortdesc": {
+    "en_US": "Website Modules Test",
+    "tr_TR": "Web Sitesi Modülleri Testi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "test_website_slides_full",
+   "shortdesc": {
+    "en_US": "Test Full eLearning Flow",
+    "tr_TR": "Tüm e-Öğrenim Akışını Test Edin"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "theme_default",
+   "shortdesc": {
+    "en_US": "Default Theme",
+    "tr_TR": "Öntanımlı Tema"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "timesheet_grid",
+   "shortdesc": {
+    "en_US": "Timesheets",
+    "tr_TR": "Çalışma Çizelgeleri"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "transifex",
+   "shortdesc": {
+    "en_US": "Transifex integration",
+    "tr_TR": "Transifex Entegrasyonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "uom",
+   "shortdesc": {
+    "en_US": "Units of measure",
+    "tr_TR": "Ölçü birimleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "utm",
+   "shortdesc": {
+    "en_US": "UTM Trackers",
+    "tr_TR": "UTM İzleyici"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "voip",
+   "shortdesc": {
+    "en_US": "VoIP",
+    "tr_TR": "VoIP"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "web",
+   "shortdesc": {
+    "en_US": "Web",
+    "tr_TR": "Web"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "web_editor",
+   "shortdesc": {
+    "en_US": "Web Editor",
+    "tr_TR": "Web Editörü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "web_hierarchy",
+   "shortdesc": {
+    "en_US": "Web Hierarchy",
+    "tr_TR": "Web Hiyerarşisi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "web_json_editor",
+   "shortdesc": {
+    "en_US": "Web JSON Editor"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "web_mobile",
+   "shortdesc": {
+    "en_US": "Android & iPhone",
+    "tr_TR": "Mobil"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "web_studio",
+   "shortdesc": {
+    "en_US": "Studio",
+    "tr_TR": "Studio"
+   },
+   "state": "uninstallable",
+   "application": true
+  },
+  {
+   "name": "web_tour",
+   "shortdesc": {
+    "en_US": "Tours",
+    "tr_TR": "Turlar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "web_unsplash",
+   "shortdesc": {
+    "en_US": "Unsplash Image Library",
+    "tr_TR": "Unsplash Görsel Kütüphanesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website",
+   "shortdesc": {
+    "en_US": "Website",
+    "tr_TR": "Websitesi"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "website_blog",
+   "shortdesc": {
+    "en_US": "Blog",
+    "tr_TR": "Blog"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_cf_turnstile",
+   "shortdesc": {
+    "en_US": "Cloudflare Turnstile",
+    "tr_TR": "Cloudflare Turnike"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_crm",
+   "shortdesc": {
+    "en_US": "Contact Form",
+    "tr_TR": "İletişim Formu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_crm_iap_reveal",
+   "shortdesc": {
+    "en_US": "Lead Generation From Website Visits",
+    "tr_TR": "Web Sitesi Ziyaretlerinden Olası Satış Yaratma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_crm_livechat",
+   "shortdesc": {
+    "en_US": "Lead Livechat Sessions",
+    "tr_TR": "Aday Livechat Oturumları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_crm_partner_assign",
+   "shortdesc": {
+    "en_US": "Resellers",
+    "tr_TR": "Bayiler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_crm_sms",
+   "shortdesc": {
+    "en_US": "Send SMS to Visitor with leads",
+    "tr_TR": "Ziyaretçilere olası satışlarla SMS gönderme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_customer",
+   "shortdesc": {
+    "en_US": "Customer References",
+    "tr_TR": "Müşteri Referansları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event",
+   "shortdesc": {
+    "en_US": "Events",
+    "tr_TR": "Etkinlikler"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "website_event_booth",
+   "shortdesc": {
+    "en_US": "Online Event Booths",
+    "tr_TR": "Online Etkinlik Kabinleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_booth_exhibitor",
+   "shortdesc": {
+    "en_US": "Booths/Exhibitors Bridge",
+    "tr_TR": "Standlar/Katılımcı Köprüsü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_booth_sale",
+   "shortdesc": {
+    "en_US": "Online Event Booth Sale",
+    "tr_TR": "Online Etkinlik Standı Satışı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_booth_sale_exhibitor",
+   "shortdesc": {
+    "en_US": "Booths Sale/Exhibitors Bridge",
+    "tr_TR": "Stand Satış/Katılımcı Köprüsü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_crm",
+   "shortdesc": {
+    "en_US": "Website Events CRM",
+    "tr_TR": "Web Sitesi Etkinlikleri CRM"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_exhibitor",
+   "shortdesc": {
+    "en_US": "Event Exhibitors",
+    "tr_TR": "Etkinlik Katılımcıları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_jitsi",
+   "shortdesc": {
+    "en_US": "Event / Jitsi",
+    "tr_TR": "Etkinlik / Jitsi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_meet",
+   "shortdesc": {
+    "en_US": "Event Meeting / Rooms",
+    "tr_TR": "Etkinlik Görüşmesi / Odalar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_meet_quiz",
+   "shortdesc": {
+    "en_US": "Quiz and Meet on community",
+    "tr_TR": "Test ve Toplulukta görüşme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_sale",
+   "shortdesc": {
+    "en_US": "Online Event Ticketing",
+    "tr_TR": "Online Etkinlik Bileti"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_track",
+   "shortdesc": {
+    "en_US": "Advanced Events",
+    "tr_TR": "Gelişmiş Etkinlikler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_track_live",
+   "shortdesc": {
+    "en_US": "Live Event Tracks",
+    "tr_TR": "Canlı Etkinlik İzleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_track_live_quiz",
+   "shortdesc": {
+    "en_US": "Quiz on Live Event Tracks",
+    "tr_TR": "Canlı Etkinlik Bölüm Testi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_event_track_quiz",
+   "shortdesc": {
+    "en_US": "Quizzes on Tracks",
+    "tr_TR": "Bölümlerde Testler"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_forum",
+   "shortdesc": {
+    "en_US": "Forum",
+    "tr_TR": "Forum"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_google_map",
+   "shortdesc": {
+    "en_US": "Google Maps",
+    "tr_TR": "Google Haritalar"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_hr_recruitment",
+   "shortdesc": {
+    "en_US": "Online Jobs",
+    "tr_TR": "Çevrimiçi İşler"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "website_jitsi",
+   "shortdesc": {
+    "en_US": "Website Jitsi",
+    "tr_TR": "Website Jitsi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_links",
+   "shortdesc": {
+    "en_US": "Link Tracker",
+    "tr_TR": "Bağlantı İzleyici"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_livechat",
+   "shortdesc": {
+    "en_US": "Website Live Chat",
+    "tr_TR": "Web Sitesi Canlı Sohbet"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_mail",
+   "shortdesc": {
+    "en_US": "Website Mail",
+    "tr_TR": "Web Sitesi E-Posta"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_mail_group",
+   "shortdesc": {
+    "en_US": "Website Mail Group",
+    "tr_TR": "Web Sitesi E-Posta Grubu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_mass_mailing",
+   "shortdesc": {
+    "en_US": "Newsletter Subscribe Button",
+    "tr_TR": "Bülten Abone Ol Butonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_mass_mailing_sms",
+   "shortdesc": {
+    "en_US": "Newsletter Subscribe SMS Template",
+    "tr_TR": "Bülten Abone SMS Şablonu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_membership",
+   "shortdesc": {
+    "en_US": "Online Members Directory",
+    "tr_TR": "Online Üye Rehberi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_partner",
+   "shortdesc": {
+    "en_US": "Website Partner",
+    "tr_TR": "Web Sitesi İş Ortağı"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_payment",
+   "shortdesc": {
+    "en_US": "Website Payment",
+    "tr_TR": "Web Sitesi Ödeme"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_payment_authorize",
+   "shortdesc": {
+    "en_US": "Website - Payment Authorize",
+    "tr_TR": "Web Sitesi - Ödeme Authorize"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_profile",
+   "shortdesc": {
+    "en_US": "Website profile",
+    "tr_TR": "Web sitesi profili"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_project",
+   "shortdesc": {
+    "en_US": "Online Task Submission",
+    "tr_TR": "Online Görev Gönderimi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale",
+   "shortdesc": {
+    "en_US": "eCommerce",
+    "tr_TR": "e-Ticaret"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "website_sale_autocomplete",
+   "shortdesc": {
+    "en_US": "Google places autocompletion",
+    "tr_TR": "Google yerler otomatik tamamlama"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_collect",
+   "shortdesc": {
+    "en_US": "Click & Collect",
+    "tr_TR": "Mağazadan Teslim Alma"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_comparison",
+   "shortdesc": {
+    "en_US": "Product Comparison",
+    "tr_TR": "Ürün Karşılaştırması"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_comparison_wishlist",
+   "shortdesc": {
+    "en_US": "Product Availability Notifications",
+    "tr_TR": "Ürün Kullanılabilirliği Bildirimleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_gelato",
+   "shortdesc": {
+    "en_US": "eCommerce/Gelato bridge",
+    "tr_TR": "eTicaret/Gelato köprüsü"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_loyalty",
+   "shortdesc": {
+    "en_US": "Coupons, Promotions, Gift Card and Loyalty for eCommerce",
+    "tr_TR": "Kuponlar, Promosyonlar, Hediye Kartı ve e-Ticaret için Sadakat"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_mass_mailing",
+   "shortdesc": {
+    "en_US": "Checkout Newsletter",
+    "tr_TR": "Ödeme Bülteni"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_mondialrelay",
+   "shortdesc": {
+    "en_US": "eCommerce Mondialrelay Delivery",
+    "tr_TR": "eTicaret Mondialrelay Teslimat"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_mrp",
+   "shortdesc": {
+    "en_US": "Kit Availability",
+    "tr_TR": "Kit Uygunluğu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_slides",
+   "shortdesc": {
+    "en_US": "Sell Courses",
+    "tr_TR": "Kurs Sat"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_stock",
+   "shortdesc": {
+    "en_US": "Product Availability",
+    "tr_TR": "Kullanılabilir Ürün"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_stock_wishlist",
+   "shortdesc": {
+    "en_US": "Product Availability Notifications",
+    "tr_TR": "Ürün Kullanılabilirliği Bildirimleri"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sale_wishlist",
+   "shortdesc": {
+    "en_US": "Shopper's Wishlist",
+    "tr_TR": "Shopper'ın İstek Listesi"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_slides",
+   "shortdesc": {
+    "en_US": "eLearning",
+    "tr_TR": "e-Eğitim"
+   },
+   "state": "installed",
+   "application": true
+  },
+  {
+   "name": "website_slides_forum",
+   "shortdesc": {
+    "en_US": "Forum on Courses",
+    "tr_TR": "Kurs Forumu"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_slides_survey",
+   "shortdesc": {
+    "en_US": "Course Certifications",
+    "tr_TR": "Kurs Sertifikaları"
+   },
+   "state": "installed",
+   "application": false
+  },
+  {
+   "name": "website_sms",
+   "shortdesc": {
+    "en_US": "Send SMS to Visitor",
+    "tr_TR": "Ziyaretçiye SMS Gönder"
+   },
+   "state": "installed",
+   "application": false
+  }
+ ]
+}
