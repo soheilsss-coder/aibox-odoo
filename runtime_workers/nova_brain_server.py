@@ -236,15 +236,27 @@ def _document_answer(message):
     the sentences that actually match the question (or ranks them by term
     frequency for summarize-style asks), and says so honestly.
     """
-    marker = "Extracted analysis:"
-    if marker not in message:
-        return None
-    start = message.find(marker) + len(marker)
-    qidx = message.rfind("User request:")
-    doc = message[start:qidx if qidx != -1 else len(message)].strip()
-    question = (message[qidx + len("User request:"):].strip() if qidx != -1 else "") or "Summarize the important points"
-    fm = re.search(r"attached file\s+(.+?)\.", message)
-    fname = fm.group(1).strip() if fm else "the file"
+    message = message or ""
+    # The UI sends the extracted text in one of two phrasings (English or
+    # Persian - ChatPage builds the Persian one); accept both.
+    for marker, qmark, fname_re in (
+        ("Extracted analysis:", "User request:", r"attached file\s+(.+?)\."),
+        ("تحلیل استخراج‌شده:", "درخواست کاربر:", r"فایل پیوست\s+(.+?)\s+را"),
+    ):
+        if marker not in message:
+            continue
+        start = message.find(marker) + len(marker)
+        qidx = message.rfind(qmark)
+        doc = message[start:qidx if qidx != -1 else len(message)].strip()
+        question = (message[qidx + len(qmark):].strip() if qidx != -1 else "") or "Summarize the important points"
+        fm = re.search(fname_re, message)
+        fname = fm.group(1).strip() if fm else "the file"
+        return _doc_extractive(doc, question, fname)
+    return None
+
+
+def _doc_extractive(doc, question, fname):
+    """Quote the sentences that actually answer the question (verbatim)."""
     sents = _sentences(doc)
     if not sents:
         return ("I opened %s but no readable text could be extracted from it "
