@@ -283,8 +283,11 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         password = vals.get("password") or ""
         if not name or not login:
             return {"error": "name and login are required"}
-        if len(password) < 4:
-            return {"error": "password too short (min 4)"}
+        if len(password) < 8:
+            # Odoo's auth_password_policy (installed on the appliance) enforces
+            # 8+ characters on every res.users write - validate up front so the
+            # vendor sees one clear message instead of a server stack trace.
+            return {"error": "password too short (min 8 characters)"}
         Users = self.env["res.users"].sudo()
         if Users.search([("login", "=", login)], limit=1):
             return {"error": "login already exists"}

@@ -4,7 +4,7 @@
    button, and verifies what is visibly rendered. 13 sections,
    46 checks. Run:  node ui_test_real.mjs   (needs: npm i jsdom@24
    in /tmp, appliance on 18069 + preview proxy on 5173).
-   Env: ADMIN_PW (admin password; defaults to "admin").
+   Env: ADMIN_PW (admin password; defaults to "NovaAdmin2026").
    NOTE: the test changes the admin password (section 11) —
    restore it afterwards via odoo-bin shell.
    ============================================================= */
@@ -66,7 +66,7 @@ await waitFor(()=>/invalid admin credentials/.test($id("lerr").textContent), "er
 check("error message shown to user", true, $id("lerr").textContent);
 
 console.log("=== 3) REAL LOGIN admin/admin ===");
-type($id("lp"), process.env.ADMIN_PW || "admin");
+type($id("lp"), process.env.ADMIN_PW || "NovaAdmin2026");
 click($id("lb"));
 await waitFor(()=>!$id("shell").hidden, "console appears");
 check("console appears after login", true);
@@ -196,7 +196,7 @@ check("checklist items visible", w.document.body.textContent.includes("Pre-deliv
 type($id("pw_cur"), "WRONG"); type($id("pw_new"), "Admin123456"); click($id("pw_change"));
 await waitFor(()=>/wrong/.test($id("pw_msg").textContent), "wrong current rejected");
 check("admin pw change: wrong current refused", $id("pw_msg").textContent.includes("wrong"));
-type($id("pw_cur"), process.env.ADMIN_PW || "admin"); click($id("pw_change"));
+type($id("pw_cur"), process.env.ADMIN_PW || "NovaAdmin2026"); click($id("pw_change"));
 await waitFor(()=>/Password changed/.test($id("pw_msg").textContent), "pw changed");
 check("admin pw change works (user must note it down)", true);
 const chk = w.document.querySelector(".arc-chk");

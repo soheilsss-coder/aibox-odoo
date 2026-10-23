@@ -61,7 +61,7 @@ async function adminPart(){
   }
   await sleep(500);
   const $id = (i)=>w.document.getElementById(i);
-  type($id("lu"), "admin"); type($id("lp"), process.env.ADMIN_PW || "admin");
+  type($id("lu"), "admin"); type($id("lp"), process.env.ADMIN_PW || "NovaAdmin2026");
   click($id("lb"));
   await waitFor(()=>!$id("shell").hidden, "console appears");
 
