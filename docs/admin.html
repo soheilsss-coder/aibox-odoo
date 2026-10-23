@@ -82,7 +82,7 @@ body{font-family:var(--font-sans)}
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="orb" style="width:30px;height:30px"></span>
-      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v7</div></div>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v8</div></div>
     </div>
     <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
     <div style="flex:1"></div>
@@ -623,7 +623,7 @@ async function secHandover(view) {
   $id("bk_full").onclick = async () => {
     const msg = $id("bk_msg"); msg.textContent = "Building backup…";
     try {
-      const r = await realFetch(API + "/api/admin/panel/backup/full", {credentials:"include"});
+      const r = await fetch(API + "/api/admin/panel/backup/full", {credentials:"include"});
       if (!r.ok) { const d = await r.json().catch(()=>({})); throw new Error(d.error || "HTTP "+r.status); }
       const blob = await r.blob();
       const a = document.createElement("a");
