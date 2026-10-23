@@ -289,7 +289,15 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         if Users.search([("login", "=", login)], limit=1):
             return {"error": "login already exists"}
         try:
-            user = Users.create({"name": name, "login": login, "password": password})
+            # email is REQUIRED for chat: odoo-llm posts the assistant's reply
+            # as a mail.message, and Odoo refuses to post without a sender
+            # address ("Unable to send message, please configure the sender's
+            # email address"). Panel logins are email-shaped, so reuse the
+            # login; give non-email logins a deliverable-looking address so
+            # the appliance works fully offline.
+            email = login if "@" in login else "%s@appliance.local" % login
+            user = Users.create({"name": name, "login": login, "password": password,
+                                 "email": email})
         except Exception as exc:  # noqa: BLE001
             return {"error": str(exc)[:200]}
         dept = vals.get("department_id")
