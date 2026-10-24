@@ -82,7 +82,7 @@ body{font-family:var(--font-sans)}
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="orb" style="width:30px;height:30px"></span>
-      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v8</div></div>
+      <div><div class="brand-name">Nova Admin</div><div class="brand-sub">vendor console · v9</div></div>
     </div>
     <nav id="nav" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></nav>
     <div style="flex:1"></div>
@@ -162,8 +162,9 @@ async function doLogin() {
   try {
     const base = $id("lbase").value.trim().replace(/\/+$/,"");
     if (base) { try { sessionStorage.setItem("aibox.apiBase", base); } catch(e){} window.location.reload(); return; }
-    await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
+    const r = await api("/api/admin/panel/login", {method:"POST", body: JSON.stringify({
       username: $id("lu").value.trim(), password: $id("lp").value })});
+    if (r.role === "developer") { window.location.href = "./devconsole.html"; return; }
     showConsole();
   } catch(e) { $id("lerr").textContent = e.message; }
   b.disabled = false; b.textContent = "Sign in";
@@ -656,7 +657,11 @@ async function secLogs(view) {
 
 /* ================= boot ================= */
 (async function boot(){
-  try { await api("/api/admin/panel/session"); showConsole(); }
+  try {
+    const r = await api("/api/admin/panel/session");
+    if (r.role === "developer") { window.location.href = "./devconsole.html"; return; }
+    showConsole();
+  }
   catch(e){ /* 401 already switched to the login card; network errors too */ showAuth(); }
 })();
 </script>

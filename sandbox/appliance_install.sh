@@ -83,25 +83,28 @@ if [[ $WITH_DEMO -eq 1 ]]; then
   bash "$REPO_DIR/sandbox/aibox_local.sh" demo || true
 fi
 
-echo "==> [5/7] administrator password"
+echo "==> [5/7] administrator + developer accounts"
 if [[ -z $ADMIN_PASSWORD ]]; then
   ADMIN_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 14)"
 fi
-AIBOX_WS="$WS_DIR" "$VENV_PY" "$REPO_DIR/../aibox/src/odoo/odoo-bin" shell \
-  -c "$WS_DIR/conf/odoo.conf" -d "${AIBOX_DB:-aibox}" --no-http <<PYEOF >/dev/null 2>&1 || true
-env["res.users"].sudo().browse(2).write({"password": "$ADMIN_PASSWORD"})
-env["res.users"].sudo().browse(2).write({"groups_id": [(4, env.ref("base.group_system").id)]})
-env.cr.commit()
-print("admin password set")
-PYEOF
-# the shell path differs per layout - fall back to the repo-local helper path
-if ! grep -q . /dev/null; then :; fi
+# Developer admin: the VENDOR's own technical account - lands in the
+# developer console (devconsole.html) instead of the customer system console.
+DEV_PASSWORD="${AIBOX_DEV_PASSWORD:-$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 14)}"
 AIBOX_WS="$WS_DIR" "$VENV_PY" "$REPO_DIR/src/odoo/odoo-bin" shell \
   -c "$WS_DIR/conf/odoo.conf" -d "${AIBOX_DB:-aibox}" --no-http <<PYEOF >/dev/null 2>&1 || true
-env["res.users"].sudo().browse(2).write({"password": "$ADMIN_PASSWORD"})
-env["res.users"].sudo().browse(2).write({"groups_id": [(4, env.ref("base.group_system").id)]})
+U = env["res.users"].sudo()
+admin = U.browse(2)
+admin.write({"password": "$ADMIN_PASSWORD"})
+admin.write({"groups_id": [(4, env.ref("base.group_system").id)]})
+dev = U.search([("login", "=", "developer")], limit=1)
+if not dev:
+    dev = U.create({"name": "Developer", "login": "developer",
+                    "password": "$DEV_PASSWORD", "email": "developer@appliance.local"})
+dev.write({"password": "$DEV_PASSWORD",
+           "groups_id": [(4, env.ref("base.group_system").id),
+                         (4, env.ref("ai_gateway.group_developer_admin").id)]})
 env.cr.commit()
-print("admin password set (fallback path)")
+print("TWO_ADMINS_READY")
 PYEOF
 
 echo "==> [6/7] systemd unit"
@@ -142,9 +145,10 @@ cat <<SUMMARY
 
 ============================================================================
  AIBox appliance installed.
-   admin username : admin
-   admin password : $ADMIN_PASSWORD
-   vendor console : http://THIS-BOX-IP:$PORT/aibox-odoo/admin.html
+   system admin   : admin / $ADMIN_PASSWORD          -> console: /aibox-odoo/admin.html
+   developer admin: developer / $DEV_PASSWORD        -> console: /aibox-odoo/devconsole.html
+   (both sign in at the SAME login screen; the developer account lands in
+    the full engineering console automatically)
    workspace app  : http://THIS-BOX-IP:$PORT/aibox-odoo/
    service        : systemctl {status|restart|stop} aibox-appliance
    updates later  : sudo bash /opt/aibox/sandbox/appliance_update.sh

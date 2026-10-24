@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nova · Developer Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1020'/%3E%3Cpath d='M9 22V10l7 8V10' stroke='%2322d3ee' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='23' cy='21' r='2' fill='%236d5efc'/%3E%3C/svg%3E"/>
+<style>
+:root{
+  --bg:#0a0f1f; --bg2:#0d1428; --card:rgba(255,255,255,.045); --card2:rgba(255,255,255,.03);
+  --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.05);
+  --txt:#e8ecf8; --mut:#93a0bd; --faint:#5f6c88;
+  --acc:#6d5efc; --acc2:#22d3ee; --ok:#34d399; --warn:#fbbf24; --err:#f87171;
+  --grad:linear-gradient(100deg,#6d5efc 0%,#22d3ee 100%);
+  --r:14px; --fs:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font:var(--fs)/1.55 "Inter",system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--txt);
+  background:radial-gradient(1200px 700px at 85% -10%,rgba(109,94,252,.16),transparent 60%),
+             radial-gradient(1000px 600px at -10% 110%,rgba(34,211,238,.10),transparent 55%),
+             var(--bg); min-height:100vh}
+a{color:var(--acc2);text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;color:var(--txt);
+  background:rgba(255,255,255,.07);padding:8px 14px;transition:.15s}
+button:hover{background:rgba(255,255,255,.12)}
+button:disabled{opacity:.45;cursor:default}
+input,select,textarea{font:inherit;color:var(--txt);background:rgba(255,255,255,.05);
+  border:1px solid var(--line);border-radius:10px;padding:9px 12px;outline:none;transition:.15s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(109,94,252,.18)}
+input::placeholder,textarea::placeholder{color:var(--faint)}
+::selection{background:rgba(109,94,252,.4)}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:8px}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.small{font-size:12.5px}.muted{color:var(--mut)}.faint{color:var(--faint)}
+.ok-txt{color:var(--ok)}.err-txt{color:var(--err)}
+code{font-family:ui-monospace,monospace;background:rgba(255,255,255,.07);padding:1px 6px;border-radius:6px;font-size:12.5px}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+aside{background:linear-gradient(180deg,rgba(13,20,40,.92),rgba(10,15,31,.94));
+  border-right:1px solid var(--line2);padding:18px 14px;display:flex;flex-direction:column;gap:4px;
+  position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;gap:11px;align-items:center;padding:6px 8px 16px;border-bottom:1px solid var(--line2);margin-bottom:10px}
+.brand .mark{width:38px;height:38px;border-radius:11px;background:var(--grad);display:grid;place-items:center;
+  font-weight:800;font-size:17px;color:#fff;box-shadow:0 6px 18px rgba(109,94,252,.4)}
+.brand b{font-size:14.5px;letter-spacing:.2px;display:block}
+.brand span{font-size:11px;color:var(--faint)}
+.nav-label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);padding:10px 10px 4px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;color:var(--mut);
+  cursor:pointer;font-size:13.5px;border:1px solid transparent}
+.nav-item svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-item:hover{color:var(--txt);background:rgba(255,255,255,.05)}
+.nav-item.active{color:#fff;background:linear-gradient(90deg,rgba(109,94,252,.22),rgba(34,211,238,.10));
+  border-color:rgba(109,94,252,.35)}
+.side-foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--line2);display:flex;flex-direction:column;gap:8px}
+.role-badge{display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--acc2)}
+.role-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--acc2);box-shadow:0 0 8px var(--acc2)}
+
+main{padding:26px 30px 60px;min-width:0}
+.topbar{display:flex;align-items:center;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+.topbar h1{font-size:20px;font-weight:650}
+.topbar .sub{font-size:12.5px;color:var(--mut)}
+.topbar .grow{flex:1}
+.chip{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--mut);
+  background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 13px}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--warn)}
+.chip .dot.up{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.ph-actions{display:flex;gap:8px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;
+  backdrop-filter:blur(6px)}
+.card+.card{margin-top:16px}
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.card-head h3{font-size:14.5px;font-weight:600}
+.card-head .hint{font-size:12px;color:var(--faint);margin-left:auto}
+.grid{display:grid;gap:14px}
+.tiles{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.tile{background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:14px 16px}
+.tile .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.tile .v{font-size:22px;font-weight:700;margin-top:3px;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.tile .s{font-size:11.5px;color:var(--mut)}
+.h-stack{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn-primary{background:var(--grad);color:#fff;font-weight:600;box-shadow:0 4px 16px rgba(109,94,252,.35)}
+.btn-primary:hover{filter:brightness(1.1)}
+.btn-danger{background:rgba(248,113,113,.14);color:#fca5a5;border:1px solid rgba(248,113,113,.3)}
+.btn-sm{padding:5px 11px;font-size:12.5px;border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:left;
+  padding:8px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(10,15,31,.9)}
+td{padding:8px 10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.03)}
+.table-wrap{max-height:520px;overflow:auto;border:1px solid var(--line2);border-radius:12px}
+.bgd{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:11.5px;font-weight:600}
+.bgd-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.bgd-ok{background:rgba(52,211,153,.13);color:var(--ok)}
+.bgd-warn{background:rgba(251,191,36,.13);color:var(--warn)}
+.bgd-err{background:rgba(248,113,113,.13);color:var(--err)}
+.bgd-off{background:rgba(147,160,189,.12);color:var(--mut)}
+.fade-in{animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.out{background:rgba(0,0,0,.35);border:1px solid var(--line2);border-radius:12px;padding:14px;
+  font-family:ui-monospace,monospace;font-size:12.3px;white-space:pre-wrap;word-break:break-word;
+  max-height:440px;overflow:auto;color:#c7d2f0}
+.term{background:#05070f;border:1px solid var(--line2);border-radius:12px;padding:14px;
+  font-family:ui-monospace,monospace;font-size:12px;line-height:1.6;max-height:480px;overflow:auto;
+  color:#9fd6b1;white-space:pre-wrap;word-break:break-all}
+.switch{position:relative;width:38px;height:21px;flex:none;display:inline-block}
+.switch input{opacity:0;width:0;height:0}
+.switch .sl{position:absolute;inset:0;background:rgba(255,255,255,.14);border-radius:999px;transition:.2s;cursor:pointer}
+.switch .sl:before{content:"";position:absolute;width:15px;height:15px;border-radius:50%;background:#fff;
+  top:3px;left:3px;transition:.2s}
+.switch input:checked+.sl{background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.switch input:checked+.sl:before{transform:translateX(17px)}
+#toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:50}
+.toast{background:rgba(13,20,40,.97);border:1px solid var(--line);border-left:3px solid var(--acc);
+  border-radius:10px;padding:11px 16px;font-size:13px;max-width:380px;animation:fi .2s ease;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.toast.err{border-left-color:var(--err)}
+.toast.ok{border-left-color:var(--ok)}
+.auth-wrap{max-width:380px;margin:12vh auto}
+.pill{display:inline-flex;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;
+  background:rgba(109,94,252,.15);color:#b9b1ff}
+@media(max-width:960px){.shell{grid-template-columns:1fr}aside{position:fixed;z-index:40;width:250px;
+  transform:translateX(-100%);transition:.25s}aside.open{transform:none}.burger{display:inline-flex!important}main{padding:18px}}
+.burger{display:none}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside id="sidebar">
+    <div class="brand"><div class="mark">N</div>
+      <div><b>Nova Developer</b><span>developer console · v1</span></div></div>
+    <div class="nav-label">Console</div>
+    <div id="nav"></div>
+    <div class="side-foot">
+      <span class="role-badge"><span class="dot"></span>Developer Admin</span>
+      <span class="small faint" id="whoAmI"></span>
+      <button class="btn-sm" id="btnLogout" style="text-align:left">↪ Sign out</button>
+    </div>
+  </aside>
+  <main>
+    <div class="topbar">
+      <button class="burger btn-sm" id="btnBurger">☰</button>
+      <div><h1 id="phTitle">Overview</h1><div class="sub" id="phDesc"></div></div>
+      <div class="grow"></div>
+      <span class="chip" id="sideStatus"><span class="dot"></span>checking…</span>
+      <div class="ph-actions" id="phActions"></div>
+    </div>
+    <div id="view"><div class="card fade-in"><span class="muted">Loading…</span></div></div>
+  </main>
+</div>
+<div id="toasts"></div>
+
+<script>
+/* ======================================================================
+   Nova DEVELOPER CONSOLE — the appliance vendor's own engineering surface.
+   Same login as the rest of the box; a session WITH the developer role
+   lands here (docs/admin.html routes it), everyone else bounces back.
+   ====================================================================== */
+const API = new URL(".", location.href).href.replace(/[\\/]+$/, "");
+function apiUrl(p){ return API + p; }
+async function api(path, opts={}){
+  const o = Object.assign({}, opts);
+  o.headers = Object.assign({}, opts.headers, {"Content-Type":"application/json"});
+  o.credentials = "include";
+  let r;
+  try { r = await fetch(apiUrl(path), o); }
+  catch(e){ throw new Error("network error - is the appliance address correct?"); }
+  const d = await r.json().catch(()=>({}));
+  if (r.status === 401){ window.location.href = "./admin"; throw new Error("session expired"); }
+  if (!r.ok || d.error) throw new Error(d.error || ("request failed ("+r.status+")"));
+  return d;
+}
+const $id = (i)=>document.getElementById(i);
+const esc = (s)=>String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(msg, kind=""){ const t=document.createElement("div"); t.className="toast "+kind;
+  t.textContent=msg; $id("toasts").appendChild(t); setTimeout(()=>t.remove(), 4200); }
+const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+
+const ICONS = {
+  overview:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+  engine:'<svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>',
+  branding:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/><path d="M3 12h18"/></svg>',
+  modules:'<svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 12l9-5M12 12v10M12 12L3 7"/></svg>',
+  registry:'<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg>',
+  crons:'<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>',
+  logs:'<svg viewBox="0 0 24 24"><path d="M4 17l6-5-6-5M12 19h8"/></svg>',
+  users:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 15.2c2.8.2 4.9 1.8 5.5 4.8"/></svg>',
+  usage:'<svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="M8 16v-5M12 16V8M16 16v-3M20 16v-7"/></svg>',
+  audit:'<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg>',
+  handover:'<svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>',
+};
+const SECTIONS = [
+  ["overview","Overview","Health, counts and the state of the whole box at a glance."],
+  ["engine","AI Engine","Connect the appliance to an LLM: base URL, key, model - live test."],
+  ["branding","Branding","White-label the platform for the target organisation."],
+  ["modules","Modules","Install, upgrade or remove ANY Odoo module of the full catalogue."],
+  ["registry","Data & Models","The live object registry: every model with its real record count."],
+  ["crons","Automation","Scheduled jobs: pause, resume or trigger them right now."],
+  ["logs","Server Logs","Tail the appliance's own odoo.log - the real engineering ground truth."],
+  ["users","Users & Roles","Accounts, passwords and who carries the Developer Admin role."],
+  ["usage","Token Usage","Real consumption per user/department and the monthly cap."],
+  ["audit","Audit Log","Every admin action recorded by the panel."],
+  ["handover","Handover","Pre-delivery checklist, backups, certificate and test-data wipe."],
+];
+let SEC = "overview";
+
+function renderNav(){
+  const nav = $id("nav"); nav.innerHTML = "";
+  const lbl = document.createElement("div");
+  lbl.className = "nav-label"; lbl.textContent = "Engineering";
+  nav.appendChild(lbl);
+  SECTIONS.forEach(([k,label])=>{
+    const a = document.createElement("a");
+    a.className = "nav-item" + (k===SEC?" active":"");
+    a.innerHTML = ICONS[k] + "<span>" + esc(label) + "</span>";
+    a.onclick = (ev)=>{ ev.preventDefault(); SEC=k; renderNav(); renderSection();
+      $id("sidebar").classList.remove("open"); window.scrollTo({top:0}); };
+    nav.appendChild(a);
+  });
+}
+function setHead(title, desc){
+  $id("phTitle").textContent = title; $id("phDesc").textContent = desc||"";
+}
+function renderSection(){
+  const view = $id("view");
+  view.innerHTML = '<div class="card"><span class="muted">Loading…</span></div>';
+  const fn = {overview:secOverview, engine:secEngine, branding:secBranding, modules:secModules,
+              registry:secRegistry, crons:secCrons, logs:secLogs, users:secUsers,
+              usage:secUsage, audit:secAudit, handover:secHandover}[SEC];
+  setHead(SECTIONS.find(s=>s[0]===SEC)[1], SECTIONS.find(s=>s[0]===SEC)[2]);
+  fn(view).catch(e=>{ view.innerHTML =
+    '<div class="card fade-in"><span class="err-txt">'+esc(e.message)+
+    '</span> <button class="btn-sm" onclick="renderSection()" style="margin-left:8px">Retry</button></div>'; });
+}
+async function refreshSideStatus(){
+  const el = $id("sideStatus");
+  try { const h = await api("/api/admin/panel/health");
+    const up = h.database==="up" && h.ai_engine==="up";
+    el.innerHTML = '<span class="dot'+(up?" up":"")+'"></span>db '+esc(h.database)+' · engine '+esc(h.ai_engine);
+  } catch(e){}
+}
+
+/* ---------------- overview ---------------- */
+async function secOverview(view){
+  const [ov, h] = await Promise.all([api("/api/dev/overview"), api("/api/admin/panel/health")]);
+  const T = (k,v,s)=>'<div class="tile"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+
+    '</div><div class="s">'+esc(s||"")+'</div></div>';
+  view.innerHTML = '<div class="fade-in">'+
+    '<div class="card"><div class="card-head"><h3>Appliance</h3><span class="hint mono">'+
+      esc(ov.company)+' · Odoo '+esc(ov.odoo_series)+'</span></div>'+
+    '<div class="grid tiles">'+
+      T("modules installed", ov.modules_installed, "apps on this box")+
+      T("installable left", ov.modules_installable, "still uninstalled")+
+      T("models", ov.models, "registry classes")+
+      T("menus", ov.menus, "navigation entries")+
+      T("internal users", ov.users_active, "active, non-portal")+
+      (ov.threads!=null?T("chat threads", ov.threads, "Nova conversations"):"")+
+      T("tokens this month", ov.month_tokens.toLocaleString(), "estimated (chars/4)")+
+      T("database size", ov.db_size_mb+" MB", "on-device postgres")+
+    '</div></div>'+
+    '<div class="card"><div class="card-head"><h3>Services</h3></div><div class="grid tiles">'+
+      T("database", h.database, "postgres")+
+      T("ai engine", h.ai_engine, "chat completion backend")+
+      T("redis", h.redis || "n/a", "rate limiting / queue")+
+    '</div><p class="small faint" style="margin-top:10px">Log file: <code>'+
+      esc(ov.logfile || "(stdout)")+'</code> — open the Server Logs section to tail it.</p></div></div>';
+}
+
+/* ---------------- AI engine ---------------- */
+const PRESETS = [
+  ["", "Custom (type your own)", "", ""],
+  ["local", "Local server on this appliance (Nova brain)", "http://127.0.0.1:8001/v1", "nova-local-brain"],
+  ["openrouter", "OpenRouter", "https://openrouter.ai/api/v1", ""],
+  ["groq", "Groq", "https://api.groq.com/openai/v1", ""],
+  ["deepseek", "DeepSeek", "https://api.deepseek.com/v1", ""],
+  ["ollama", "Ollama on this device", "http://127.0.0.1:11434/v1", ""],
+];
+async function secEngine(view){
+  const cfg = await api("/api/admin/panel/engine");
+  view.innerHTML = '<div class="fade-in card"><div class="card-head"><h3>LLM engine</h3>'+
+    '<span class="hint">any OpenAI-compatible endpoint - the brain tests it FROM the appliance</span></div>'+
+    '<div class="h-stack" style="margin-bottom:12px"><select id="e_preset" style="max-width:360px">'+
+      PRESETS.map((p,i)=>'<option value="'+i+'">'+esc(p[1])+'</option>').join("")+'</select></div>'+
+    '<div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">'+
+      '<div><label class="small muted">Base URL</label><input id="e_base" class="mono" value="'+esc(cfg.api_base||"")+'"/></div>'+
+      '<div><label class="small muted">Model</label><input id="e_model" class="mono" value="'+esc(cfg.chat_model||"")+'"/></div>'+
+      '<div><label class="small muted">API key (optional for local)</label><input id="e_key" type="password" class="mono" value="'+esc(cfg.api_key_tail?("…"+cfg.api_key_tail):"")+'" placeholder="paste key - saving again keeps the old one if left masked"/></div>'+
+    '</div>'+
+    '<div class="h-stack" style="margin-top:14px"><button class="btn-sm" id="e_test">Test connection</button>'+
+    '<button class="btn-primary" id="e_save">Save &amp; apply</button><span class="small muted" id="e_msg"></span></div>'+
+    '<div class="out" id="e_out" style="display:none;margin-top:12px"></div></div>';
+  $id("e_preset").onchange = ()=>{ const p = PRESETS[$id("e_preset").value];
+    if (p[2]) { $id("e_base").value = p[2]; $id("e_model").value = p[3]; } };
+  $id("e_test").onclick = async ()=>{ const m = $id("e_msg"); m.textContent = "Testing…";
+    try { const r = await api("/api/admin/panel/engine/test", {method:"POST", body: JSON.stringify({
+        api_base:$id("e_base").value.trim(), api_key:$id("e_key").value.trim()===("…"+(cfg.api_key_tail||""))?"":$id("e_key").value.trim(),
+        chat_model:$id("e_model").value.trim()})});
+      $id("e_out").style.display="block"; $id("e_out").textContent = JSON.stringify(r, null, 2);
+      m.innerHTML = r.ok ? '<span class="ok-txt">Engine replied: “'+esc((r.chat_reply||"PONG").slice(0,90))+'”</span>'
+                         : '<span class="err-txt">'+esc(r.error||"no reply")+'</span>';
+    } catch(e){ m.innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+  $id("e_save").onclick = async ()=>{ const m = $id("e_msg"); m.textContent = "Saving…";
+    try { const r = await api("/api/admin/panel/engine", {method:"POST", body: JSON.stringify({
+        api_base:$id("e_base").value.trim(), api_key:$id("e_key").value.trim()===("…"+(cfg.api_key_tail||""))?"":$id("e_key").value.trim(),
+        chat_model:$id("e_model").value.trim()})});
+      m.innerHTML = '<span class="ok-txt">Saved &amp; applied — chat now uses '+esc(r.chat_model||"this engine")+'</span>';
+      toast("Engine applied", "ok"); refreshSideStatus();
+    } catch(e){ m.innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+}
+
+/* ---------------- branding ---------------- */
+async function secBranding(view){
+  const b = await api("/api/admin/panel/branding");
+  const colors = [["primary_color","Primary"],["secondary_color","Secondary"],["accent_color","Accent"],["danger_color","Danger"],["warning_color","Warning"]];
+  const def = (k,d)=>esc(b[k]||d);
+  const F = (id,label,val)=>'<div><label class="small muted">'+esc(label)+'</label><input id="'+id+'" value="'+esc(val||"")+'"/></div>';
+  view.innerHTML = '<div class="fade-in card"><div class="card-head"><h3>White-label for the target organisation</h3>'+
+    (b.logo_uploaded?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>logo uploaded</span>':'<span class="bgd bgd-warn"><span class="bgd-dot"></span>no logo</span>')+'</div>'+
+    '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">'+
+      F("b_name","Brand name *",b.brand_name)+ F("b_tag","Tagline",b.tagline)+
+      F("b_prod","Product title",b.product_title)+ F("b_semail","Support email",b.support_email)+
+      F("b_surl","Support URL",b.support_url)+ F("b_foot","Footer text",b.footer_text)+
+      F("b_lmsg","Customer login welcome line",b.login_message)+
+    '</div>'+
+    '<div class="card-head" style="margin-top:16px"><h3>Colors</h3></div>'+
+    '<div class="h-stack">'+ colors.map(([k,label])=>'<div class="h-stack small" style="gap:6px"><span class="muted">'+label+
+      '</span><input type="color" id="b_'+k+'" value="'+def(k,"#5a5ad6")+'" style="width:46px;padding:3px"/>'+
+      '<input class="mono" style="width:110px;padding:5px 8px;font-size:12px" id="b_'+k+'_txt" value="'+def(k,"#5a5ad6")+'"/></div>').join("")+'</div>'+
+    '<div class="h-stack" style="margin-top:16px;align-items:flex-end">'+
+      '<div><label class="small muted">Logo (PNG/SVG, ≤2MB)</label><input id="b_logo" type="file" accept="image/png,image/jpeg,image/svg+xml" style="max-width:240px"/></div>'+
+      '<div><label class="small muted">Favicon (.png/.ico)</label><input id="b_favicon" type="file" accept="image/png,image/x-icon,image/svg+xml" style="max-width:240px"/></div>'+
+      '<button class="btn-primary" id="b_save">Save branding</button><span class="small muted" id="b_msg"></span></div></div>';
+  colors.forEach(([k])=>{ const c=$id("b_"+k), t=$id("b_"+k+"_txt");
+    c.oninput = ()=>t.value=c.value; t.oninput = ()=>{ if(/^#[0-9a-fA-F]{6}$/.test(t.value)) c.value=t.value; }; });
+  $id("b_save").onclick = async ()=>{ const m=$id("b_msg"); m.textContent="Saving…";
+    try { const payload = { brand_name:$id("b_name").value.trim(), tagline:$id("b_tag").value.trim(),
+        product_title:$id("b_prod").value.trim(), support_email:$id("b_semail").value.trim(),
+        support_url:$id("b_surl").value.trim(), footer_text:$id("b_foot").value.trim(),
+        login_message:$id("b_lmsg").value.trim() };
+      colors.forEach(([k])=>{ payload[k]=$id("b_"+k+"_txt").value.trim(); });
+      const f = $id("b_logo").files[0];
+      if (f){ if (f.size>2*1024*1024) throw new Error("logo must be under 2 MB");
+        payload.logo_b64 = await new Promise((res,rej)=>{ const rd=new FileReader();
+          rd.onload=()=>res(String(rd.result)); rd.onerror=()=>rej(new Error("read failed")); rd.readAsDataURL(f); });
+        payload.logo_filename=f.name; payload.logo_mimetype=f.type||"image/png"; }
+      const fv = $id("b_favicon").files[0];
+      if (fv){ if (fv.size>512*1024) throw new Error("favicon must be under 512 KB");
+        payload.favicon_b64 = await new Promise((res,rej)=>{ const rd=new FileReader();
+          rd.onload=()=>res(String(rd.result)); rd.onerror=()=>rej(new Error("read failed")); rd.readAsDataURL(fv); });
+        payload.favicon_filename=fv.name; payload.favicon_mimetype=fv.type||"image/png"; }
+      await api("/api/admin/panel/branding", {method:"POST", body: JSON.stringify(payload)});
+      m.innerHTML = '<span class="ok-txt">Branding saved — the customer login shows it instantly.</span>';
+      toast("Branding saved","ok");
+    } catch(e){ m.innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+}
+
+/* ---------------- modules ---------------- */
+async function secModules(view){
+  const [mods, presets] = await Promise.all([
+    api("/api/admin/panel/modules"), api("/api/admin/panel/modules/presets")]);
+  const rows = mods.modules;
+  view.innerHTML = '<div class="fade-in card"><div class="card-head"><h3>Module catalogue</h3>'+
+    '<span class="hint">'+rows.length+' known · '+rows.filter(m=>m.state==="installed").length+' installed</span></div>'+
+    '<div class="h-stack" style="margin-bottom:12px">'+
+      '<input id="m_q" placeholder="Search 700+ modules — name or description…" style="max-width:420px"/>'+
+      '<select id="m_preset" style="max-width:260px"><option value="">Preset bundle…</option>'+
+        presets.presets.map(p=>'<option value="'+esc(p.key)+'">'+esc(p.name)+'</option>').join("")+'</select>'+
+      '<button class="btn-sm" id="m_apply">Apply bundle</button><span class="small muted" id="m_msg"></span></div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Module</th><th>Description</th><th>State</th><th style="width:210px">Action</th></tr></thead>'+
+    '<tbody id="m_rows"></tbody></table></div></div>';
+  const paint = (list)=>{
+    $id("m_rows").innerHTML = list.map(m=>{
+      const st = m.state==="installed" ? '<span class="bgd bgd-ok"><span class="bgd-dot"></span>installed</span>'
+        : m.state==="uninstallable" ? '<span class="bgd bgd-off">technical</span>'
+        : '<span class="bgd bgd-warn"><span class="bgd-dot"></span>not installed</span>';
+      let act = "";
+      if (m.state==="uninstalled") act = '<button class="btn-sm btn-primary" data-i="'+esc(m.name)+'">Install</button>';
+      else if (m.state==="installed") act = '<button class="btn-sm" data-u="'+esc(m.name)+'">Upgrade</button>';
+      $id("m_rows").insertAdjacentHTML("beforeend", "<tr><td class='mono small'>"+esc(m.name)+
+        "</td><td class='small muted'>"+esc(m.short_desc)+"</td><td>"+st+"</td><td>"+act+"</td></tr>");
+    }).join("");
+  };
+  paint(rows);
+  $id("m_q").oninput = ()=>{ const q = $id("m_q").value.toLowerCase(); $id("m_rows").innerHTML="";
+    paint(rows.filter(m=>!q || m.name.toLowerCase().includes(q) || (m.short_desc||"").toLowerCase().includes(q))); };
+  $id("m_rows").onclick = async (ev)=>{ const b = ev.target.closest("button"); if(!b) return;
+    b.disabled = true; const msg = $id("m_msg"); msg.textContent = b.dataset.i ? "Installing "+b.dataset.i+" …" : "Upgrading "+b.dataset.u+" …";
+    try { const r = await api("/api/admin/panel/modules/act", {method:"POST", body: JSON.stringify({
+        names:[b.dataset.i||b.dataset.u], action: b.dataset.i?"install":"upgrade"})});
+      msg.innerHTML = '<span class="ok-txt">done: '+esc((r.done||[]).join(", "))+(r.errors&&r.errors.length?(' · '+esc(JSON.stringify(r.errors))):"")+'</span>';
+      if (r.errors && r.errors.length) toast("Module error — see message","err"); else toast("Module "+(b.dataset.i?"installed":"upgraded"),"ok");
+      setTimeout(()=>renderSection(), 900);
+    } catch(e){ msg.innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; b.disabled = false; } };
+  $id("m_apply").onclick = async ()=>{ const k = $id("m_preset").value; if(!k) return;
+    const msg = $id("m_msg"); msg.textContent = "Applying bundle…";
+    try { const r = await api("/api/admin/panel/modules/preset", {method:"POST", body: JSON.stringify({key:k})});
+      msg.innerHTML = '<span class="ok-txt">done: '+esc((r.done||[]).join(", "))+'</span>'; toast("Bundle applied","ok");
+      setTimeout(()=>renderSection(), 900);
+    } catch(e){ msg.innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+}
+
+/* ---------------- registry ---------------- */
+async function secRegistry(view){
+  view.innerHTML = '<div class="fade-in card"><div class="card-head"><h3>Object registry</h3>'+
+    '<span class="hint">every model with its live record count</span></div>'+
+    '<div class="h-stack" style="margin-bottom:12px">'+
+    '<input id="r_q" class="mono" placeholder="model or name — e.g. res.partner, sale.order, llm…" style="max-width:420px"/>'+
+    '<button class="btn-sm" id="r_go">Search</button><span class="small muted" id="r_msg"></span></div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Model</th><th>Description</th><th>Records</th></tr></thead>'+
+    '<tbody id="r_rows"><tr><td colspan="3" class="muted small">Search to load — blank search lists the first 120.</td></tr></tbody></table></div></div>';
+  const load = async ()=>{
+    $id("r_msg").textContent = "Counting records…";
+    try { const r = await api("/api/dev/registry?query="+encodeURIComponent($id("r_q").value.trim())+"&limit=120");
+      $id("r_rows").innerHTML = r.models.map(m=>'<tr><td class="mono small">'+esc(m.model)+
+        '</td><td class="small muted">'+esc(m.name)+(m.transient?' <span class="pill">transient</span>':"")+
+        '</td><td>'+(m.records<0?'<span class="err-txt">broken</span>':esc(m.records.toLocaleString()))+'</td></tr>').join("") ||
+        '<tr><td colspan="3" class="muted small">no match</td></tr>';
+      $id("r_msg").textContent = r.models.length + " models";
+    } catch(e){ $id("r_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+  $id("r_go").onclick = load;
+  $id("r_q").onkeydown = (e)=>{ if(e.key==="Enter") load(); };
+}
+
+/* ---------------- crons ---------------- */
+async function secCrons(view){
+  const r = await api("/api/dev/crons");
+  view.innerHTML = '<div class="fade-in card"><div class="card-head"><h3>Scheduled jobs</h3>'+
+    '<span class="hint">'+r.crons.length+' jobs · toggle or trigger instantly</span></div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Job</th><th>Model</th><th>Every</th><th>Next run</th><th>Active</th><th></th></tr></thead>'+
+    '<tbody>'+r.crons.map(c=>'<tr><td class="small">'+esc(c.name)+'</td><td class="mono small muted">'+esc(c.model)+
+      '</td><td class="small">'+esc(c.interval)+'</td><td class="small faint">'+esc(c.nextcall.slice(0,16))+
+      '</td><td><label class="switch"><input type="checkbox" data-id="'+c.id+'" '+(c.active?"checked":"")+
+      '/><span class="sl"></span></label></td>'+
+      '<td><button class="btn-sm" data-run="'+c.id+'">Run now</button></td></tr>').join("")+
+    '</tbody></table></div><p class="small faint" style="margin-top:10px" id="c_msg"></p></div>';
+  view.querySelector("tbody").addEventListener("change", async (ev)=>{
+    const inp = ev.target.closest("input[data-id]"); if(!inp) return;
+    try { const res = await api("/api/dev/crons/act", {method:"POST", body: JSON.stringify({id:+inp.dataset.id, action:"toggle"})});
+      toast("Job "+(res.active?"enabled":"paused"), res.active?"ok":""); }
+    catch(e){ inp.checked = !inp.checked; toast(e.message,"err"); } });
+  view.querySelector("tbody").addEventListener("click", async (ev)=>{
+    const b = ev.target.closest("button[data-run]"); if(!b) return;
+    b.disabled = true;
+    try { await api("/api/dev/crons/act", {method:"POST", body: JSON.stringify({id:+b.dataset.run, action:"runnow"})});
+      $id("c_msg").innerHTML = '<span class="ok-txt">Triggered — the scheduler picks it up within its cycle.</span>'; toast("Job triggered","ok");
+    } catch(e){ toast(e.message,"err"); }
+    setTimeout(()=>{ b.disabled=false; }, 1500); });
+}
+
+/* ---------------- logs ---------------- */
+let _logTimer = null;
+async function secLogs(view){
+  view.innerHTML = '<div class="fade-in card"><div class="card-head"><h3>Server log</h3>'+
+    '<span class="hint mono" id="l_path"></span></div>'+
+    '<div class="h-stack" style="margin-bottom:10px">'+
+    '<button class="btn-sm" id="l_ref">Refresh</button>'+
+    '<label class="h-stack small muted" style="gap:6px"><span class="switch"><input type="checkbox" id="l_auto" checked/><span class="sl"></span></span> auto every 5s</label>'+
+    '<select id="l_n" style="max-width:110px"><option>200</option><option>400</option><option>500</option></select></div>'+
+    '<div class="term" id="l_out">loading…</div></div>';
+  const load = async ()=>{
+    try { const r = await api("/api/dev/logs?lines="+$id("l_n").value);
+      if (r.error){ $id("l_out").textContent = r.error + " " + (r.path||""); return; }
+      $id("l_path").textContent = r.path;
+      const stick = $id("l_out").scrollTop + $id("l_out").clientHeight >= $id("l_out").scrollHeight - 40;
+      $id("l_out").textContent = r.lines.join("\n");
+      if (stick) $id("l_out").scrollTop = $id("l_out").scrollHeight;
+    } catch(e){ $id("l_out").textContent = e.message; } };
+  $id("l_ref").onclick = load;
+  $id("l_auto").onchange = ()=>{ if(_logTimer){ clearInterval(_logTimer); _logTimer=null; }
+    if ($id("l_auto").checked) _logTimer = setInterval(load, 5000); };
+  _logTimer = setInterval(load, 5000);
+  await load();
+}
+
+/* ---------------- users & roles ---------------- */
+async function secUsers(view){
+  const {users} = await api("/api/admin/panel/users");
+  view.innerHTML = '<div class="fade-in card"><div class="card-head"><h3>Create account</h3>'+
+    '<span class="hint">customer staff — or a second developer</span></div>'+
+    '<div class="h-stack" style="align-items:flex-end">'+
+      '<div style="flex:1;min-width:160px"><label class="small muted">Name</label><input id="nu_name"/></div>'+
+      '<div style="flex:1;min-width:200px"><label class="small muted">Login (email)</label><input id="nu_login"/></div>'+
+      '<div style="flex:1;min-width:160px"><label class="small muted">Password (min 8)</label><input id="nu_pw"/></div>'+
+      '<label class="h-stack small muted" style="gap:7px;padding-bottom:9px"><input type="checkbox" id="nu_dev" style="width:auto"/> Developer role</label>'+
+      '<button class="btn-primary" id="nu_go">Create</button></div>'+
+    '<p class="small muted" id="nu_msg" style="margin-top:8px"></p></div>'+
+    '<div class="card"><div class="card-head"><h3>Accounts</h3><span class="hint">'+users.length+' internal</span></div>'+
+    '<div class="table-wrap"><table><thead><tr><th>User</th><th>Login</th><th>Roles</th><th>Status</th><th style="width:290px">Set password</th></tr></thead>'+
+    '<tbody>'+users.map(u=>'<tr><td class="small">'+esc(u.name)+'</td><td class="mono small muted">'+esc(u.login)+'</td>'+
+      '<td class="small">'+(u.admin?'<span class="pill">system admin</span> ':"")+
+      (u.developer?'<span class="pill" style="background:rgba(34,211,238,.15);color:#7dd3fc">developer</span> ':"")+
+      '</td><td>'+(u.active?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>active</span>'
+        :'<span class="bgd bgd-err"><span class="bgd-dot"></span>blocked</span>')+'</td>'+
+      '<td><div class="h-stack" style="flex-wrap:nowrap"><input id="pw_'+u.id+'" style="max-width:150px" placeholder="new password"/>'+
+      '<button class="btn-sm" data-login="'+esc(u.login)+'" data-in="pw_'+u.id+'">Save</button>'+
+      '<button class="btn-sm" data-role="'+esc(u.login)+'" data-dev="'+(u.developer?"0":"1")+'">'+
+      (u.developer?"Revoke dev":"Make dev")+'</button></div></td></tr>').join("")+
+    '</tbody></table></div><p class="small muted" id="u_msg" style="margin-top:8px"></p></div>';
+  $id("nu_go").onclick = async ()=>{
+    try { const r = await api("/api/admin/panel/users", {method:"POST", body: JSON.stringify({
+      name:$id("nu_name").value.trim(), login:$id("nu_login").value.trim().toLowerCase(),
+      password:$id("nu_pw").value, developer:$id("nu_dev").checked})});
+      $id("nu_msg").innerHTML = '<span class="ok-txt">User “'+esc(r.login)+'” created</span>';
+      toast("User created","ok"); setTimeout(renderSection, 1100);
+    } catch(e){ $id("nu_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+  view.querySelector("tbody").addEventListener("click", async (ev)=>{
+    const b = ev.target.closest("button"); if(!b) return;
+    if (b.dataset.login){
+      const pw = document.getElementById(b.dataset.in).value;
+      try { await api("/api/admin/panel/users/password", {method:"POST", body: JSON.stringify({login:b.dataset.login, password:pw})});
+        $id("u_msg").innerHTML = '<span class="ok-txt">Password updated for '+esc(b.dataset.login)+'</span>'; toast("Password updated","ok");
+      } catch(e){ $id("u_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; }
+    } else if (b.dataset.role !== undefined){
+      try { const r = await api("/api/dev/users/role", {method:"POST", body: JSON.stringify({login:b.dataset.role, developer:b.dataset.dev==="1"})});
+        toast("Role updated: "+r.login,"ok"); setTimeout(renderSection, 700);
+      } catch(e){ toast(e.message,"err"); }
+    } });
+}
+
+/* ---------------- usage ---------------- */
+async function secUsage(view){
+  const u = await api("/api/admin/panel/usage");
+  const T = (k,v,s)=>'<div class="tile"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+
+    '</div><div class="s">'+esc(s||"")+'</div></div>';
+  const cap = u.cap_monthly ? u.cap_monthly.toLocaleString() : "unlimited";
+  const pct = u.cap_monthly ? Math.min(100, Math.round(u.month_tokens / u.cap_monthly * 100)) : 0;
+  view.innerHTML = '<div class="fade-in">'+
+    '<div class="card"><div class="card-head"><h3>This month</h3><span class="hint">estimated tokens = chars/4, real per-turn accounting</span></div>'+
+    '<div class="grid tiles">'+ T("tokens", u.month_tokens.toLocaleString(), "this month")+
+      T("cap", cap, u.cap_monthly? (pct+"% used") : "no limit")+
+      T("turns", u.total_turns.toLocaleString(), "chat turns recorded")+
+      T("users tracked", (u.users||[]).length, "with any consumption")+'</div>'+
+    (u.cap_monthly?'<div style="margin-top:14px;height:8px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden">'+
+      '<div style="height:100%;width:'+pct+'%;background:var(--grad)"></div></div>':"")+
+    '<div class="h-stack" style="margin-top:14px"><input id="cap_in" placeholder="monthly token cap (0 = unlimited)" style="max-width:280px"/>'+
+    '<button class="btn-sm" id="cap_set">Set cap</button><button class="btn-sm" id="cap_reset">Reset to unlimited</button>'+
+    '<span class="small muted" id="cap_msg"></span></div></div>'+
+    '<div class="card"><div class="card-head"><h3>Per user</h3></div><div class="table-wrap"><table>'+
+    '<thead><tr><th>User</th><th>Department</th><th>Turns</th><th>Tokens</th></tr></thead><tbody>'+
+    (u.users||[]).map(x=>'<tr><td class="small">'+esc(x.name||x.login)+'</td><td class="small muted">'+esc(x.department||"—")+
+      '</td><td class="small">'+esc((x.turns||0).toLocaleString())+'</td><td class="small">'+esc((x.tokens||0).toLocaleString())+
+      '</td></tr>').join("")+'</tbody></table></div></div></div>';
+  $id("cap_set").onclick = async ()=>{ try {
+      await api("/api/admin/panel/usage/cap", {method:"POST", body: JSON.stringify({monthly: +$id("cap_in").value || 0})});
+      $id("cap_msg").innerHTML = '<span class="ok-txt">Cap set</span>'; toast("Cap set","ok"); setTimeout(renderSection, 800);
+    } catch(e){ $id("cap_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+  $id("cap_reset").onclick = async ()=>{ try {
+      await api("/api/admin/panel/usage/cap", {method:"POST", body: JSON.stringify({monthly: 0})});
+      $id("cap_msg").innerHTML = '<span class="ok-txt">Unlimited</span>'; toast("Cap removed","ok"); setTimeout(renderSection, 800);
+    } catch(e){ $id("cap_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+}
+
+/* ---------------- audit ---------------- */
+async function secAudit(view){
+  const {logs} = await api("/api/admin/panel/logs");
+  view.innerHTML = '<div class="fade-in card"><div class="card-head"><h3>Audit log (last '+logs.length+')</h3>'+
+    '<span class="hint">hash-chained delivery record</span></div>'+
+    (logs.length? '<div class="table-wrap"><table><thead><tr><th>When</th><th>Action</th><th>Detail</th><th>Result</th></tr></thead><tbody>'+
+    logs.map(l=>'<tr><td class="small faint">'+esc(String(l.at||"").slice(0,19))+'</td><td class="mono small">'+esc(l.action)+
+      '</td><td class="small muted">'+esc(typeof l.detail==="string"?l.detail:JSON.stringify(l.detail||"")).slice(0,140)+
+      '</td><td>'+(l.success!==false?'<span class="bgd bgd-ok"><span class="bgd-dot"></span>ok</span>'
+        :'<span class="bgd bgd-err"><span class="bgd-dot"></span>failed</span>')+'</td></tr>').join("")+
+    '</tbody></table></div>' : '<p class="muted small">Fresh box — no entries yet. Every console action from here on is recorded.</p>')+'</div>';
+}
+
+/* ---------------- handover ---------------- */
+async function secHandover(view){
+  const h = await api("/api/admin/panel/handover");
+  const {users} = await api("/api/admin/panel/users");
+  const others = users.filter(u=>u.active && !u.admin && !u.developer);
+  const ITEM = (ok,txt)=>'<div class="h-stack" style="gap:9px;padding:4px 0"><span class="bgd '+(ok?"bgd-ok":"bgd-warn")+
+    '"><span class="bgd-dot"></span>'+(ok?"ok":"todo")+'</span><span class="small">'+esc(txt)+'</span></div>';
+  view.innerHTML = '<div class="fade-in">'+
+  '<div class="card"><div class="card-head"><h3>1 · Delivery checklist</h3>'+(h.ready?
+    '<span class="bgd bgd-ok"><span class="bgd-dot"></span>READY</span>':
+    '<span class="bgd bgd-warn"><span class="bgd-dot"></span>NOT READY</span>')+'</div>'+
+    '<p class="small muted" style="margin-bottom:8px">Everything green means the appliance can ship.</p>'+
+    (h.items||[]).map(i=>ITEM(i.ok, i.label)).join("")+'</div>'+
+  '<div class="card"><div class="card-head"><h3>2 · Admin password</h3></div>'+
+    '<div class="h-stack"><input id="pw_cur" type="password" placeholder="current password" style="max-width:220px"/>'+
+    '<input id="pw_new" type="password" placeholder="new password (min 8)" style="max-width:220px"/>'+
+    '<button class="btn-sm" id="pw_change">Change password</button><span class="muted small" id="pw_msg"></span></div></div>'+
+  '<div class="card"><div class="card-head"><h3>3 · Wipe testing data</h3></div>'+
+    '<p class="muted small">Deletes all conversations and uploaded files, blocks the users you tick, revokes sessions &amp; keys. The audit log is kept.</p>'+
+    (others.length?'<details style="margin:10px 0"><summary class="small" style="cursor:pointer;color:var(--acc2)">Tick test users to block ('+others.length+')</summary>'+
+      others.map(x=>'<label class="h-stack small" style="gap:8px;padding:5px 0"><input type="checkbox" class="arc-chk" value="'+esc(x.login)+'" style="width:auto"/> '+esc(x.name)+' <span class="faint mono">'+esc(x.login)+'</span></label>').join("")+'</details>':"")+
+    '<div class="h-stack"><button class="btn-danger" id="wipe_go">Clean test data</button><span class="muted small" id="wipe_msg"></span></div></div>'+
+  '<div class="card"><div class="card-head"><h3>4 · Backups</h3></div>'+
+    '<div class="h-stack"><a class="btn-sm" href="'+API+'/api/admin/panel/backup/config" download>Config backup (JSON)</a>'+
+    '<button class="btn-sm" id="bk_full">Full backup (zip)</button><span class="muted small" id="bk_msg"></span></div></div>'+
+  '<div class="card"><div class="card-head"><h3>5 · Handover certificate</h3></div>'+
+    '<div class="h-stack"><button class="btn-primary" id="cert_go">Generate certificate</button><span class="muted small" id="cert_msg"></span></div>'+
+    '<div id="cert_out"></div></div></div>';
+  $id("pw_change").onclick = async ()=>{ try {
+      await api("/api/admin/panel/admin/password", {method:"POST", body: JSON.stringify({current:$id("pw_cur").value, new:$id("pw_new").value})});
+      $id("pw_msg").innerHTML = '<span class="ok-txt">Password changed — use it from now on.</span>'; toast("Password changed","ok");
+    } catch(e){ $id("pw_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+  $id("wipe_go").onclick = async ()=>{
+    if (!confirm("This permanently deletes ALL conversations and files on this appliance. Continue?")) return;
+    $id("wipe_msg").textContent = "Cleaning…";
+    try { const logins = Array.from(view.querySelectorAll(".arc-chk:checked")).map(c=>c.value);
+      const r = await api("/api/admin/panel/cleanup", {method:"POST", body: JSON.stringify({archive_logins: logins})});
+      $id("wipe_msg").innerHTML = '<span class="ok-txt">Deleted: '+r.threads+' chats · '+r.messages+' messages · '+r.attachments+
+        ' files · blocked '+r.users_archived.length+' users · revoked '+r.sessions_revoked+' sessions / '+r.api_keys_revoked+' keys</span>';
+      toast("Test data wiped","ok");
+    } catch(e){ $id("wipe_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+  $id("bk_full").onclick = async ()=>{ $id("bk_msg").textContent = "Building backup…";
+    try { const r = await fetch(API+"/api/admin/panel/backup/full", {credentials:"include"});
+      if (!r.ok){ const d = await r.json().catch(()=>({})); throw new Error(d.error||("HTTP "+r.status)); }
+      const blob = await r.blob();
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = "aibox-backup.zip"; a.click();
+      $id("bk_msg").innerHTML = '<span class="ok-txt">backup downloaded ('+Math.round(blob.size/1024)+' KB)</span>';
+    } catch(e){ $id("bk_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+  $id("cert_go").onclick = async ()=>{ try {
+      const r = await api("/api/admin/panel/handover/certificate", {method:"POST"});
+      $id("cert_msg").innerHTML = '<span class="bgd '+(r.ready?"bgd-ok":"bgd-warn")+'"><span class="bgd-dot"></span>'+
+        (r.ready?"READY":"NOT READY")+'</span>';
+      $id("cert_out").innerHTML = '<div class="out" style="margin-top:10px">'+esc(JSON.stringify(r, null, 2))+'</div>'+
+        '<p class="faint small" style="margin-top:8px">Recorded in the appliance audit log at '+esc(r.generated_at)+'.</p>';
+    } catch(e){ $id("cert_msg").innerHTML = '<span class="err-txt">'+esc(e.message)+'</span>'; } };
+}
+
+/* ---------------- boot ---------------- */
+$id("btnLogout").onclick = async ()=>{ try{ await api("/api/admin/panel/logout", {method:"POST"});}catch(e){}
+  window.location.href = "./admin"; };
+$id("btnBurger").onclick = ()=>$id("sidebar").classList.toggle("open");
+(async function boot(){
+  try {
+    const r = await api("/api/admin/panel/session");
+    if (r.role !== "developer"){ window.location.href = "./admin"; return; }
+    $id("whoAmI").textContent = r.user && (r.user.name + " · " + r.user.login);
+    renderNav(); renderSection(); refreshSideStatus(); setInterval(refreshSideStatus, 30000);
+  } catch(e){ /* api() already bounced a 401 to ./admin */ }
+})();
+</script>
+</body>
+</html>
