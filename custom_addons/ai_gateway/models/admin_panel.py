@@ -1,4 +1,5 @@
 import secrets
+import time
 
 from odoo import api, fields, models
 
@@ -140,7 +141,8 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
 
     def engine_test(self, api_base=None, api_key=None, chat_model=None):
         """Live probe: one tiny chat completion (and embeddings if given)."""
-        import json as _json
+        import json
+        import time as _time
 
         import requests as _requests
 
@@ -205,7 +207,7 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                     if m.state == "to remove":
                         # a previous attempt got interrupted - finish it now
                         self._finish_pending_apply()
-                        m.invalidate_recordsets()
+                        self.env.invalidate_all()
                         if m.state == "uninstalled":
                             done.append(m.name)
                             continue
@@ -220,7 +222,7 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                         continue
                     if m.state in ("to install", "to upgrade"):
                         self._finish_pending_apply()
-                        m.invalidate_recordsets()
+                        self.env.invalidate_all()
                         if m.state == "installed":
                             done.append(m.name)
                             continue
@@ -230,17 +232,34 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                     m.button_immediate_uninstall() if action == "uninstall" \
                         else getattr(m, "button_immediate_" + action)()
                     done.append(m.name)
-                except Exception:  # noqa: BLE001
-                    # immediate functions commit mid-flight; report the truth
+                except Exception as exc:  # noqa: BLE001
+                    # immediate functions commit mid-flight; report the truth:
+                    # success state depends on the ACTION (uninstalled only
+                    # counts for uninstall - a failed install rolls back to
+                    # 'uninstalled' and must surface as an error).
                     self.env.cr.rollback()
-                    m.invalidate_recordsets()
+                    self.env.invalidate_all()
                     if m.state in ("to remove", "to install", "to upgrade"):
                         self._finish_pending_apply()
-                        m.invalidate_recordsets()
-                    if m.state in ("installed", "uninstalled"):
+                        self.env.invalidate_all()
+                    ok_state = "uninstalled" if action == "uninstall" else "installed"
+                    if m.state == ok_state:
                         done.append(m.name)
+                    elif "scheduled action" in str(exc):
+                        # cron lock: ir_cron FOR UPDATE NOWAIT lost the race -
+                        # wait out the running job and retry once
+                        time.sleep(4)
+                        try:
+                            m.invalidate_recordset()
+                            m.button_immediate_uninstall() if action == "uninstall" \
+                                else getattr(m, "button_immediate_" + action)()
+                            done.append(m.name)
+                        except Exception as exc2:  # noqa: BLE001
+                            self.env.cr.rollback()
+                            self.env.invalidate_all()
+                            errors.append({"name": m.name, "error": str(exc2)[:200]})
                     else:
-                        raise
+                        errors.append({"name": m.name, "error": str(exc)[:200]})
             except Exception as exc:  # noqa: BLE001
                 errors.append({"name": m.name, "error": str(exc)[:200]})
         return {"done": done, "errors": errors}

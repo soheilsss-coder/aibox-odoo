@@ -87,3 +87,18 @@ sudo bash /opt/aibox/sandbox/appliance_update.sh
 - پنل فروشنده فقط با رمز ادمین باز می‌شود؛ کاربران مشتری هیچ راهی به آن ندارند.
 - پورت‌ها: وب `18069` (همه‌چیز از همان)، مغز Nova `8001`، امبدینگ `8002`، ردیس `16379` — همه فقط روی خود دستگاه.
 - اگر دستگاه پشت مودم مشتری است، مشتری با `http://IP-داخلی:18069` استفاده می‌کند؛ برای دسترسی خودِ شما از بیرون، تونل/پورت‌فورواردینگ را **موقت** باز کنید و بعد از تحویل ببندید.
+
+## فعال‌سازی همهٔ ماژول‌های اختیاری (OCA)
+قبل از نصب گروهی، یک‌بار اجرا کنید تا وابستگی‌های OCA (مثل document_page و mis_builder و account_invoice_import) آماده شود:
+
+```bash
+AIBOX_WS=/var/lib/aibox python3 /opt/aibox/sandbox/setup_optional_deps.sh
+```
+
+سپس اپلاینس را ری‌استارت و نصب گروهی را اجرا کنید. تنها استثنا `auth_ldap` است که به پکیج‌های سیستم نیاز دارد:
+
+```bash
+sudo apt-get install -y libldap2-dev libsasl2-dev python3-dev gcc
+/var/lib/aibox/venv/bin/python -m pip install python-ldap
+```
+
