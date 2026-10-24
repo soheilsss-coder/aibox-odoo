@@ -195,8 +195,12 @@ async function spaPart(){
   // B3: AI CHAT - a REAL leave request through the brain's tool call
   navTo("AI Chat");
   await waitFor(()=>doc.querySelector('textarea[aria-label="Message Nova"]'), "chat composer", 15000);
+  // unique date per run: re-running the test must not collide with the
+  // leave created by the previous run (Odoo refuses overlapping leave)
+  const off = 30 + (Math.floor(Date.now()/86400000) % 150);
+  const d = new Date(Date.now() + off*86400000).toISOString().slice(0,10);
   try {
-    const ans = await sendAndWait("Please register 2 days of leave for me starting 2026-12-01",
+    const ans = await sendAndWait("Please register 2 days of leave for me starting "+d,
       /executed that in Odoo|submitted/i, "Nova executes the leave for real", 90000);
     check("Nova CREATES a real leave request (real Odoo tool call)", true,
       ans.split("\n").filter(l=>/submitted|date|status/i.test(l)).slice(0,2).join(" | ").slice(0,110));

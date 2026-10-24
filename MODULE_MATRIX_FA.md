@@ -81,3 +81,20 @@ Qdrant/Replicate/letta/fal و…) و دوباره تلاش شد. بوتِ دست
 
 ۴ ماژول استثنا همان جدول بالایی‌اند (auth_ldap + ۳ وابستهٔ OCA). پس از ممیزی، هر دو
 تستِ واقعی-کاربر روی همین دستگاه دوباره اجرا شد: **پنل ۴۶/۴۶ و داستان مشتری ۸/۸ — پاس.**
+
+## به‌روزرسانی نهایی — کاتالوگ کامل (۷۱۲ ماژول)
+با اسکریپت `sandbox/setup_optional_deps.sh` (کلون‌های OCA: knowledge، mis-builder، reporting-engine، server-ux، community-data-files، edi + بسته‌های پایتون) هر ۴ استثنای قبلی هم نصب شدند:
+
+| قبلاً مانده | حالا | ریشه |
+|---|---|---|
+| llm_document_page | ✅ نصب | document_page + document_knowledge از OCA/knowledge + markdownify |
+| llm_tool_mis_builder | ✅ نصب | mis_builder + date_range + report_xlsx + openupgradelib |
+| account_invoice_import_llm | ✅ نصب | زنجیرهٔ OCA/edi (account_invoice_import ← base_business_document_import ← uom_unece/account_tax_unece/base_unece) + mistralai |
+| auth_ldap | ❌ تنها استثنا | python-ldap به پکیج سیستم (libldap2-dev/libsasl2-dev) نیاز دارد — روی دستگاه مقصد با apt حل می‌شود |
+
+**وضعیت نهایی: ۷۱۲ نصب‌شده / ۲۴ فنی (uninstallable) / ۱ استثنا (auth_ldap).**
+
+ممیزی سازگاری روی دیتابیس کامل: ۱۵۰۵ مدل (۰ خراب) · ۱۴۵۶ نمای ترکیبی (۰ خراب) · ۶۲۴ قانون امنیتی سالم · ۱۰۰ کرون سالم · ۰ xml_id یتیم · ۰ پیام/پیوست یتیم · تنها ناهنجاری، فیلد تستیِ عمدیِ ماژول `test_read_group` خودِ اودوست. ۲۰۵ مدل بدون ACL مستقیم، همگی mixin/abstract استاندارد (مانند mail.thread) هستند که روی مدل‌های واقعی اعمال می‌شوند.
+
+هر ۴ تستِ کاربر واقعی روی همین دیتابیس دوباره سبز شدند: **پنل ۴۶/۴۶ · کنسول توسعه‌دهنده ۲۰/۲۰ · داستان مشتری ۸/۸ · شبیه‌سازی شرکت ۱۵/۱۵.**
+

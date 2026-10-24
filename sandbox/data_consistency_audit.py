@@ -119,10 +119,13 @@ for at in env["ir.attachment"].sudo().search_read([("res_model", "!=", False)], 
         break
 P("CHK10B orphan attachments (probe 4000):", len(orph2), orph2[:4])
 
-with_acl = {r["model_id"][1] if isinstance(r["model_id"], tuple) else r["model_id"]
-            for r in env["ir.model.access"].sudo().search_read([], ["model_id"])}
+# compare by ir.model ID - display_name of ir.model is NOT the technical name
+with_acl_ids = {r["model_id"][0] if isinstance(r["model_id"], tuple) else r["model_id"]
+                for r in env["ir.model.access"].sudo().search_read([], ["model_id"])}
+with_rule_ids = {r["model_id"][0] if isinstance(r["model_id"], tuple) else r["model_id"]
+                 for r in env["ir.rule"].sudo().search_read([], ["model_id"])}
 no_acl = [r["model"] for r in env["ir.model"].sudo().search_read(
-    [("transient", "=", False)], ["model"]) if r["model"] not in with_acl]
+    [("transient", "=", False), ("id", "not in", list(with_acl_ids | with_rule_ids))], ["model"])]
 P("CHK11 models without any ACL:", len(no_acl), no_acl[:6])
 
 owning = set()
