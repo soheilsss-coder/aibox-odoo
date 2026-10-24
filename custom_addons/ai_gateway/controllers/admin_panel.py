@@ -5,6 +5,7 @@ cookie (aibox_admin_session), issued by /api/admin/panel/login after a
 username/password check against a base.group_system user. Employee
 workspace API keys / session cookies are deliberately NOT accepted.
 """
+import json
 import logging
 import os
 
@@ -41,7 +42,7 @@ def _admin_cors_headers():
 
 def _json(data, status=200):
     return request.make_response(
-        __import__("json").dumps(data, ensure_ascii=False, default=str),
+        json.dumps(data, ensure_ascii=False, default=str),
         headers=[("Content-Type", "application/json; charset=utf-8")] + _admin_cors_headers(),
         status=status,
     )
@@ -86,6 +87,24 @@ def _require_admin():
     return user, None
 
 
+def _require_dev():
+    """Developer-admin guard: admin session PLUS the developer group."""
+    user, err = _require_admin()
+    if err:
+        return None, err
+    if not user.has_group("ai_gateway.group_developer_admin"):
+        return None, _json({"error": "developer admin role required"}, status=403)
+    return user, None
+
+
+def _admin_role(user):
+    """'developer' or 'system' - decides which console the login lands in."""
+    try:
+        return "developer" if user.has_group("ai_gateway.group_developer_admin") else "system"
+    except Exception:  # noqa: BLE001
+        return "system"
+
+
 class AdminPanelController(http.Controller):
 
     @http.route("/api/admin/panel/login", type="http", auth="none", csrf=False,
@@ -94,7 +113,7 @@ class AdminPanelController(http.Controller):
         if request.httprequest.method == "OPTIONS":
             return _preflight()
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         username = (body.get("username") or "").strip()
@@ -149,6 +168,7 @@ class AdminPanelController(http.Controller):
         # comes up fully logged-in - no second password prompt.
         gateway_key, gateway_expires = _issue_gateway_session(user)
         resp = _json({"ok": True, "user": {"name": user.name, "login": user.login},
+                      "role": _admin_role(user),
                       "gateway_api_key": gateway_key,
                       "gateway_expires_at": gateway_expires})
         resp.set_cookie(_COOKIE, token, max_age=8 * 3600, httponly=True,
@@ -186,6 +206,7 @@ class AdminPanelController(http.Controller):
         # a page reload mints a fresh 8h session so the app stays logged in.
         gateway_key, gateway_expires = _issue_gateway_session(user)
         resp = _json({"ok": True, "user": {"name": user.name, "login": user.login},
+                      "role": _admin_role(user),
                       "gateway_api_key": gateway_key,
                       "gateway_expires_at": gateway_expires})
         if gateway_key:
@@ -214,7 +235,7 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         cfg = _panel_env().engine_set(
@@ -235,7 +256,7 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             body = {}
         return _json(_panel_env().engine_test(
@@ -262,7 +283,7 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         names = body.get("names") or []
@@ -285,7 +306,7 @@ class AdminPanelController(http.Controller):
             return _json({"users": _panel_env().users_list(),
                           "departments": _panel_env().departments_list()})
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         return _json(_panel_env().users_create(body))
@@ -299,7 +320,7 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         return _json(_panel_env().user_set_password(
@@ -328,7 +349,7 @@ class AdminPanelController(http.Controller):
         if request.httprequest.method == "GET":
             return _json(_panel_env().branding_get())
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         return _json(_panel_env().branding_save(body))
@@ -364,7 +385,7 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         return _json(_panel_env().preset_apply(body.get("key") or ""))
@@ -390,7 +411,7 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         return _json(_panel_env().token_cap_set(body.get("cap", 0)))
@@ -429,7 +450,7 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         return _json(_panel_env().cleanup_test_data(body.get("archive_logins") or []))
@@ -443,7 +464,7 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         try:
-            body = __import__("json").loads(request.httprequest.data or b"{}")
+            body = json.loads(request.httprequest.data or b"{}")
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         return _json(_panel_env().admin_change_password(
@@ -502,3 +523,78 @@ class AdminPanelController(http.Controller):
         if err:
             return err
         return _json({"logs": _panel_env().logs_tail()})
+
+    # --------------------------------------------------- developer console
+    # Every route below requires the Appliance Developer Admin role
+    # (system-admin session is NOT enough - the developer console is the
+    # vendor's own engineering surface, never the customer's).
+
+    @http.route("/api/dev/overview", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def dev_overview(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_dev()
+        if err:
+            return err
+        return _json(_panel_env().dev_overview())
+
+    @http.route("/api/dev/registry", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def dev_registry(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_dev()
+        if err:
+            return err
+        return _json({"models": _panel_env().dev_registry(
+            query=request.params.get("query"), limit=request.params.get("limit"))})
+
+    @http.route("/api/dev/crons", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def dev_crons(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_dev()
+        if err:
+            return err
+        return _json({"crons": _panel_env().dev_crons_list()})
+
+    @http.route("/api/dev/crons/act", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def dev_crons_act(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_dev()
+        if err:
+            return err
+        try:
+            body = json.loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            return _json({"error": "invalid body"}, status=400)
+        return _json(_panel_env().dev_cron_act(body.get("id"), body.get("action")))
+
+    @http.route("/api/dev/logs", type="http", auth="none", csrf=False,
+                methods=["GET", "OPTIONS"])
+    def dev_logs(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_dev()
+        if err:
+            return err
+        return _json(_panel_env().dev_logs(lines=request.params.get("lines")))
+
+    @http.route("/api/dev/users/role", type="http", auth="none", csrf=False,
+                methods=["POST", "OPTIONS"])
+    def dev_users_role(self, **kwargs):
+        if request.httprequest.method == "OPTIONS":
+            return _preflight()
+        user, err = _require_dev()
+        if err:
+            return err
+        try:
+            body = json.loads(request.httprequest.data or b"{}")
+        except Exception:  # noqa: BLE001
+            return _json({"error": "invalid body"}, status=400)
+        return _json(_panel_env().user_set_role(
+            (body.get("login") or "").strip(), bool(body.get("developer"))))

@@ -206,9 +206,32 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         # the vendor needs to see every account they manage.
         users = self.env["res.users"].sudo().with_context(active_test=False).search(
             [("share", "=", False)], order="login")
+        dev_group = self.env.ref("ai_gateway.group_developer_admin", raise_if_not_found=False)
         return [{"id": u.id, "login": u.login, "name": u.name,
                  "admin": u.has_group("base.group_system"),
+                 "developer": bool(dev_group) and u.has_group("ai_gateway.group_developer_admin"),
                  "active": u.active} for u in users]
+
+    def user_set_role(self, login, developer):
+        """Grant or revoke the Appliance Developer Admin role.
+
+        Only a logged-in developer can call this (controller enforces it).
+        Self-demotion is refused: the last thing the vendor needs is to
+        lock themselves out of the developer console by a misclick.
+        """
+        user = self.env["res.users"].sudo().search([("login", "=", login)], limit=1)
+        if not user:
+            return {"error": "user not found"}
+        if user.id == self.env.uid:
+            return {"error": "you cannot change your own developer role"}
+        group = self.env.ref("ai_gateway.group_developer_admin", raise_if_not_found=False)
+        if not group:
+            return {"error": "developer role group is not installed"}
+        if developer:
+            user.write({"groups_id": [(4, group.id)]})
+        else:
+            user.write({"groups_id": [(3, group.id)]})
+        return {"ok": True, "login": user.login, "developer": bool(developer)}
 
     def user_set_password(self, login, password):
         user = self.env["res.users"].sudo().search([("login", "=", login)], limit=1)
@@ -321,6 +344,11 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         group = role or self.env.ref("base.group_user", raise_if_not_found=False)
         if group:
             user.write({"groups_id": [(4, group.id)]})
+        # Optional developer-admin role (grants the developer console).
+        if vals.get("developer"):
+            dev_group = self.env.ref("ai_gateway.group_developer_admin", raise_if_not_found=False)
+            if dev_group:
+                user.write({"groups_id": [(4, dev_group.id)]})
         return {"ok": True, "id": user.id, "login": user.login}
 
     # ---------------------------------------------------- module presets
@@ -657,3 +685,90 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
             "departments": sorted(dept_map.values(), key=lambda d: -d["tokens"]),
             "daily": daily,
         }
+
+    # ----------------------------------------------------- developer console
+    # The appliance vendor's own tools (ai_gateway.group_developer_admin
+    # required - enforced in the controller). These expose internal registry
+    # data ON PURPOSE: this console belongs to the person who ships the box,
+    # never to the customer organisation.
+
+    def dev_overview(self):
+        """Single call powering the developer console landing tiles."""
+        import odoo
+        cr = self.env.cr
+        def scalar(sql):
+            cr.execute(sql)
+            return cr.fetchone()[0]
+        has_threads = bool(self.env["ir.model"].sudo().search_count(
+            [("model", "=", "llm.thread")]))
+        overview = {
+            "odoo_version": odoo.release.description.split(" ")[1] if odoo.release.description else odoo.release.version,
+            "odoo_series": odoo.release.series,
+            "company": self.env.company.name,
+            "modules_installed": scalar(
+                "SELECT count(*) FROM ir_module_module WHERE state='installed'"),
+            "modules_installable": scalar(
+                "SELECT count(*) FROM ir_module_module WHERE state='uninstalled'"),
+            "models": scalar("SELECT count(*) FROM ir_model"),
+            "menus": scalar("SELECT count(*) FROM ir_ui_menu"),
+            "users_active": scalar(
+                "SELECT count(*) FROM res_users WHERE active=true AND share=false"),
+            "db_size_mb": round(int(scalar(
+                "SELECT pg_database_size(current_database())")) / (1024 * 1024), 1),
+            "logfile": odoo.tools.config.options.get("logfile") or "",
+        }
+        if has_threads:
+            overview["threads"] = scalar("SELECT count(*) FROM llm_thread")
+        overview["month_tokens"] = int(scalar(
+            "SELECT coalesce(sum(token_count),0) FROM ai_gateway_audit_log "
+            "WHERE source='chat' AND create_date >= date_trunc('month', now())") or 0)
+        return overview
+
+    def dev_registry(self, query=None, limit=120):
+        """Registry explorer: every model with a live record count."""
+        Model = self.env["ir.model"].sudo()
+        q = (query or "").strip()
+        dom = ["|", ("model", "ilike", q), ("name", "ilike", q)] if q else []
+        recs = Model.search(dom, order="model", limit=max(1, min(int(limit or 120), 200)))
+        out = []
+        for m in recs:
+            try:
+                count = self.env[m.model].sudo().search_count([])
+            except Exception:  # noqa: BLE001 - broken/legacy model: report 0
+                count = -1
+            out.append({"model": m.model, "name": m.name, "records": count,
+                        "transient": m.transient})
+        return out
+
+    def dev_crons_list(self):
+        return [{"id": c.id, "name": c.name or c.cron_name, "model": c.model_id.model,
+                 "code": c.code, "active": c.active,
+                 "interval": "%s %s" % (c.interval_number, c.interval_type),
+                 "nextcall": str(c.nextcall or "")} for c in self.env["ir.cron"].sudo().search([], order="name")]
+
+    def dev_cron_act(self, cron_id, action):
+        cron = self.env["ir.cron"].sudo().browse(int(cron_id)).exists()
+        if not cron:
+            return {"error": "cron not found"}
+        if action == "toggle":
+            cron.active = not cron.active
+            return {"ok": True, "id": cron.id, "active": cron.active}
+        if action == "runnow":
+            from odoo import fields as odoo_fields
+            cron._trigger(odoo_fields.Datetime.now())
+            return {"ok": True, "id": cron.id, "triggered": True}
+        return {"error": "unknown action"}
+
+    def dev_logs(self, lines=200):
+        """Tail the appliance's own odoo log file (dev console only)."""
+        import os
+        from collections import deque
+        import odoo
+        path = odoo.tools.config.options.get("logfile") or ""
+        if not path or not os.path.isfile(path):
+            return {"error": "log file not available on this host", "path": path,
+                    "lines": []}
+        lines = max(10, min(int(lines or 200), 500))
+        with open(path, errors="replace") as fh:
+            tail = list(deque(fh, maxlen=lines))
+        return {"path": path, "lines": [l.rstrip("\n") for l in tail]}
