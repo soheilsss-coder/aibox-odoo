@@ -383,7 +383,16 @@ def _decide(payload: dict) -> dict:
     last_user = ""
     for m in messages:
         if m.get("role") == "user":
-            last_user = m.get("content") or ""
+            c = m.get("content")
+            if isinstance(c, list):
+                # OpenAI multimodal shape: [{"type":"text",...},{"type":"image_url",...}]
+                txts = [part.get("text", "") for part in c if isinstance(part, dict) and part.get("type") == "text"]
+                has_img = any(isinstance(part, dict) and part.get("type") == "image_url" for part in c)
+                last_user = " ".join(t for t in txts if t)
+                if has_img and not last_user:
+                    last_user = "[an image was attached]"
+            else:
+                last_user = c or ""
 
     # Summarise ONLY when the conversation ends with a tool result (i.e. this
     # is the tool-execution follow-up call). Older tool messages deep in the

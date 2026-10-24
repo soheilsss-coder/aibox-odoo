@@ -269,6 +269,8 @@ class AiExperienceApi(http.Controller):
             payload = json.loads(request.httprequest.data or b"{}")
             filename = _safe_name(payload.get("filename", "file"), "file")
             raw = base64.b64decode(payload.get("data_base64", ""), validate=True)
+            if len(raw) > 20 * 1024 * 1024:
+                return _json_response({"error": "file too large (max 20 MB)"}, status=413)
             question = payload.get("question", "خلاصه و نکات مهم این فایل را توضیح بده")
             lower = filename.lower()
             text = ""
@@ -284,9 +286,39 @@ class AiExperienceApi(http.Controller):
             elif lower.endswith(".docx"):
                 try:
                     from docx import Document
-                    doc = Document(io.BytesIO(raw)); text = "\n".join(p.text for p in doc.paragraphs)
+                    doc = Document(io.BytesIO(raw))
+                    text = "\n".join(p.text for p in doc.paragraphs)
+                    if doc.tables:
+                        for t in doc.tables:
+                            for row in t.rows:
+                                text += "\n" + " | ".join(c.text for c in row.cells)
                 except ImportError:
                     return _json_response({"error": "DOCX reader is not installed"}, status=501)
+            elif lower.endswith(".pptx"):
+                try:
+                    from pptx import Presentation
+                    prs = Presentation(io.BytesIO(raw))
+                    text = ""
+                    for i, slide in enumerate(prs.slides, 1):
+                        text += "\n[Slide %d]\n" % i + "\n".join(
+                            shape.text for shape in slide.shapes if shape.has_text_frame and shape.text.strip())
+                except ImportError:
+                    return _json_response({"error": "PPTX reader is not installed"}, status=501)
+            elif lower.endswith((".ods", ".odt")):
+                try:
+                    from odf.opendocument import load as odf_load
+                    from odf import text as odf_text, table as odf_table, teletype
+                    doc = odf_load(io.BytesIO(raw))
+                    parts = [teletype.extractText(p) for p in doc.getElementsByType(odf_text.P)]
+                    for tbl in doc.getElementsByType(odf_table.Table):
+                        rows = []
+                        for r in tbl.getElementsByType(odf_table.TableRow):
+                            cells = [teletype.extractText(c) for c in r.getElementsByType(odf_table.TableCell)]
+                            rows.append(" | ".join(cells))
+                        parts.append("\n".join(rows))
+                    text = "\n".join(parts)
+                except ImportError:
+                    return _json_response({"error": "ODF reader is not installed"}, status=501)
             elif lower.endswith((".xlsx", ".xls")):
                 try:
                     import openpyxl
@@ -298,12 +330,34 @@ class AiExperienceApi(http.Controller):
                     text = "\n".join(chunks)
                 except ImportError:
                     return _json_response({"error": "XLSX reader is not installed"}, status=501)
-            elif lower.endswith((".png", ".jpg", ".jpeg", ".webp")):
-                import requests
-                base = env["ir.config_parameter"].sudo().get_param("company_ai_demo.vision_api_base", "http://127.0.0.1:8001/v1")
-                mime = "image/png" if lower.endswith(".png") else "image/jpeg"
-                resp = requests.post(f"{base}/chat/completions", json={"model":env["ai.model.router"].route(purpose="vision").model_id,"messages":[{"role":"user","content":[{"type":"text","text":question},{"type":"image_url","image_url":{"url":f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],"max_tokens":1500}, timeout=90)
-                resp.raise_for_status(); answer=resp.json()["choices"][0]["message"]["content"]
+            elif lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")):
+                # ALWAYS-available, instant vision-lite: exact image facts
+                # (format/dimensions/mode) via Pillow. When a REAL vision
+                # LLM is configured (api_base != the local brain) the file
+                # is additionally described by that model; with only the
+                # local brain connected we answer with the true facts and
+                # honestly say free-text vision needs a real LLM key.
+                from PIL import Image as PILImage
+                img = PILImage.open(io.BytesIO(raw))
+                w, h = img.size
+                info = "image: %s %dx%d px (%s mode, %.1f KB)" % (
+                    img.format or "?", w, h, img.mode, len(raw) / 1024.0)
+                vbase = env["ir.config_parameter"].sudo().get_param(
+                    "company_ai_demo.vision_api_base", "http://127.0.0.1:8001/v1")
+                if "127.0.0.1:8001" in vbase:
+                    return _json_response({"filename": filename, "kind": "image-info",
+                                           "analysis": info})
+                import requests as _rq
+                mime = {"png": "image/png", "gif": "image/gif", "bmp": "image/bmp",
+                        "webp": "image/webp"}.get(lower.rsplit(".", 1)[-1], "image/jpeg")
+                resp = _rq.post(f"{vbase}/chat/completions", json={
+                    "model": env["ai.model.router"].route(purpose="vision").model_id,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": question},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],
+                    "max_tokens": 1500}, timeout=90)
+                resp.raise_for_status()
+                answer = resp.json()["choices"][0]["message"]["content"]
                 return _json_response({"filename": filename, "kind": "vision", "analysis": answer})
             else:
                 return _json_response({"error": "unsupported file type"}, status=415)

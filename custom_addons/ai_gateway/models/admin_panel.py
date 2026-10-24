@@ -255,9 +255,14 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                                 else getattr(m, "button_immediate_" + action)()
                             done.append(m.name)
                         except Exception as exc2:  # noqa: BLE001
+                            # a lost cron race can still leave the operation
+                            # COMMITTED - report the real final state
                             self.env.cr.rollback()
                             self.env.invalidate_all()
-                            errors.append({"name": m.name, "error": str(exc2)[:200]})
+                            if m.state == ok_state:
+                                done.append(m.name)
+                            else:
+                                errors.append({"name": m.name, "error": str(exc2)[:200]})
                     else:
                         errors.append({"name": m.name, "error": str(exc)[:200]})
             except Exception as exc:  # noqa: BLE001

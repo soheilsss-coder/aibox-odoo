@@ -199,7 +199,19 @@ check("admin pw change: wrong current refused", $id("pw_msg").textContent.includ
 type($id("pw_cur"), process.env.ADMIN_PW || "NovaAdmin2026"); click($id("pw_change"));
 await waitFor(()=>/Password changed/.test($id("pw_msg").textContent), "pw changed");
 check("admin pw change works (user must note it down)", true);
-const chk = w.document.querySelector(".arc-chk");
+// archive a THROWAWAY user the test creates itself - never the first
+// user in the list (that used to archive a real company's manager!)
+await navTo("Users");
+await waitFor(()=>$id("nu_name"), "users form");
+type($id("nu_name"), "Wipe Target");
+type($id("nu_login"), "wipe.me+"+Date.now()+"@acme.test");
+type($id("nu_pw"), "Wipe123456");
+click($id("nu_go"));
+await waitFor(()=>/created|exists|failed/.test($id("nu_msg").textContent), "wipe target created");
+await sleep(1200);
+await navTo("Handover");
+await waitFor(()=>w.document.querySelectorAll("#view .arc-chk").length>0, "archive checkboxes");
+const chk = [...w.document.querySelectorAll(".arc-chk")].find(c=>c.value.includes("wipe.me+"));
 if (chk) chk.checked = true;
 click($id("wipe_go"));
 await waitFor(()=>/Deleted:/.test($id("wipe_msg").textContent), "wipe done", 60000);
