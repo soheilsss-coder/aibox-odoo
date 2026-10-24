@@ -30,8 +30,14 @@ class AiGatewayAuditLog(models.Model):
 
     user_id = fields.Many2one("res.users", required=True, index=True, ondelete="cascade")
     source = fields.Selection(
-        [("tool", "AI Tool Call"), ("rpc", "Gateway RPC"), ("chat", "Gateway Chat")],
+        [("tool", "AI Tool Call"), ("rpc", "Gateway RPC"), ("chat", "Gateway Chat"),
+         ("execution_gate", "Execution Gate"), ("authorization", "Authorization"),
+         ("workflow", "Workflow"), ("event_bus", "Event Bus"),
+         ("customer_control_plane", "Customer Control Plane")],
         required=True, index=True,
+        help="Every writer must have its value listed here - an unlisted "
+             "source raises ValueError and its audit entry is LOST "
+             "(this exact bug silently dropped execution-gate audit trail).",
     )
     action = fields.Char(required=True, index=True, help="Tool name, or 'model.operation' for rpc")
     payload = fields.Text(help="JSON-encoded parameters, truncated to 2000 chars")

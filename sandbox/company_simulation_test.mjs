@@ -197,7 +197,7 @@ async function spaPart(){
   await waitFor(()=>doc.querySelector('textarea[aria-label="Message Nova"]'), "chat composer", 15000);
   // unique date per run: re-running the test must not collide with the
   // leave created by the previous run (Odoo refuses overlapping leave)
-  const off = 30 + (Math.floor(Date.now()/86400000) % 150);
+  const off = 30 + Math.floor(Math.random()*330);
   const d = new Date(Date.now() + off*86400000).toISOString().slice(0,10);
   try {
     const ans = await sendAndWait("Please register 2 days of leave for me starting "+d,
