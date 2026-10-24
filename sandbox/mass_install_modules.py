@@ -26,7 +26,7 @@ TIME_BUDGET = int(os.environ.get("AIBOX_TIME_BUDGET", "7000"))
 
 
 def odoo_shell(script):
-    r = subprocess.run([VENV, ODOO, "-c", CONF, "-d", DB, "--stop-after-init"],
+    r = subprocess.run([VENV, ODOO, "shell", "-c", CONF, "-d", DB, "--stop-after-init"],
                        input=script, text=True, capture_output=True, timeout=600)
     return r.stdout
 
