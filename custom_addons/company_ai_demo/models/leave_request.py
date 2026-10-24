@@ -82,11 +82,15 @@ class LLMToolLeaveRequest(models.Model):
                     return self.env["ai.gateway.idempotency"].get_cached(self.env.user.id, idempotency_key)
                 return {"error": "idempotency_in_progress", "message": "همین عملیات در درخواست دیگری در حال اجراست."}
         try:
+            # Odoo 18: request_date_* are the canonical user-facing Date
+            # fields; date_from/date_to are derived from them through the
+            # employee's working calendar (tz-aware). Writing raw datetimes
+            # made Odoo re-snap them unpredictably (days=0 bug).
             leave = self.env["hr.leave"].create({
                 "employee_id": employee.id,
                 "holiday_status_id": leave_type.id,
-                "date_from": f"{date_from} 08:00:00",
-                "date_to": f"{date_to} 18:00:00",
+                "request_date_from": date_from,
+                "request_date_to": date_to,
                 "name": reason or "درخواست مرخصی",
             })
         except Exception as exc:  # noqa: BLE001

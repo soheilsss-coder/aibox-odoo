@@ -61,37 +61,64 @@ def _split_name(name: str) -> list[str]:
     return [t for t in re.split(r"[_\-\s]|(?<=[a-z])(?=[A-Z])", name or "") if t]
 
 
-def _tool_tokens(name: str, description: str) -> set[str]:
-    tokens = set()
-    for part in _split_name(name):
-        tokens.add(part.lower())
+def _tool_tokens(name: str, description: str) -> tuple[set[str], set[str]]:
+    """(name_tokens, description_tokens).
+
+    Name tokens carry the tool's intent ("create", "leave", "request");
+    description tokens are prose and must not outweigh the name. Stopwords
+    are stripped from description words so filler like "for"/"the" never
+    scores.
+    """
+    name_tokens = {part.lower() for part in _split_name(name)}
+    desc_tokens = set()
     for word in re.findall(r"[a-zA-Z]{3,}", description or ""):
-        tokens.add(word.lower())
+        w = word.lower()
+        if w not in _STOP and w not in name_tokens:
+            desc_tokens.add(w)
     for group in _SYNONYMS.values():
         for phrase in group:
-            if phrase in (name or "").lower() or phrase in (description or "").lower():
-                tokens.add(phrase.split()[0])
-    return tokens
+            if phrase in (name or "").lower():
+                name_tokens.add(phrase.split()[0])
+            elif phrase in (description or "").lower():
+                desc_tokens.add(phrase.split()[0])
+    return name_tokens, desc_tokens
 
 
 def _pick_tool(message: str, tools: list[tuple]) -> tuple | None:
-    """Score every offered tool against the user's message; return the best."""
+    """Score every offered tool against the user's message; return the best.
+
+    Scoring: a NAME-token hit is worth 4 (that is what the tool IS);
+    description words together may add at most 2 (prose should never
+    outweigh the name - otherwise "search_documents_semantic" wins a
+    leave request just because its description mentions "leave" and
+    "days"). When the message is clearly a DO request (create-synonyms)
+    tools whose name starts with a read verb (list/get/search) get a
+    small penalty, and vice versa.
+    """
     text = " " + re.sub(r"[^a-z0-9\s]", " ", message.lower()) + " "
+    wants_create = any((" %s " % w) in text for group in _SYNONYMS.values()
+                       for w in ("create", "new", "add", "request", "book",
+                                 "make", "register", "submit", "open"))
     best, best_score = None, 0
     for name, description, _schema in tools:
-        tokens = _tool_tokens(name, description)
+        name_toks, desc_toks = _tool_tokens(name, description)
         score = 0
-        for token in tokens:
+        for token in name_toks:
             if token and (" %s " % token) in text:
-                score += 2
+                score += 4
+        desc_hits = sum(1 for t in desc_toks if t and (" %s " % t) in text)
+        score += min(2, desc_hits)
         for group in _SYNONYMS.values():
             hit_group = any((" %s " % w) in text or w in text for w in group)
-            hit_tool = any(t in tokens for t in group)
+            hit_tool = any(t in name_toks for t in group)
             if hit_group and hit_tool:
                 score += 1
+        lname = name.lower()
+        if wants_create and lname.startswith(("list_", "get_", "search_", "read_")):
+            score -= 2
         if score > best_score:
             best, best_score = (name, description, _schema), score
-    return best if best_score >= 2 else None
+    return best if best_score >= 4 else None
 
 
 _WEEKDAYS = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
