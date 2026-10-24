@@ -64,9 +64,14 @@ link_mod community-data-files/base_unece base_unece
 link_mod edi/account_invoice_import account_invoice_import
 link_mod edi/base_business_document_import base_business_document_import
 
-# python extras declared by those modules (+ their llm wrappers)
+# python extras declared across the catalog (llm providers, HR, peppol):
+# missing packages make the whole DB fail to initialize (CRITICAL), so
+# install EVERY python external_dependencies found in any manifest.
 if [ -x "$AIBOX_WS/venv/bin/python" ]; then
-  "$AIBOX_WS/venv/bin/python" -m pip install -q markdownify openupgradelib mistralai \
+  PY="$AIBOX_WS/venv/bin/python"
+  "$PY" -m pip install -q markdownify openupgradelib mistralai \
+    anthropic chromadb-client fal_client jsonref letta-client llama_index \
+    nltk ollama phonenumbers qdrant-client replicate "pydantic>=2.0.0" \
     && echo "python extras ok" || echo "WARN: python extras failed"
 else
   echo "WARN: venv python not found at $AIBOX_WS/venv"
