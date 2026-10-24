@@ -84,6 +84,38 @@ def _tool_tokens(name: str, description: str) -> tuple[set[str], set[str]]:
     return name_tokens, desc_tokens
 
 
+_FA_KEYWORDS = [
+    (("مرخصی",), "leave"),
+    (("درخواست",), "request"),
+    (("انتظار",), "pending"),
+    (("تأیید", "تایید"), "approve"),
+    (("حضور", "حضوروغیاب"), "attendance"),
+    (("وظیفه", "کارها", "کار"), "task"),
+    (("ساخت", "ثبت", "ایجاد", "بساز", "کن"), "create"),
+    (("لیست", "نشان", "نمایش", "بده", "بگو"), "list"),
+    (("سند", "اسناد", "مستند"), "document"),
+    (("گزارش",), "report"),
+    (("جلسه", "تقویم"), "meeting"),
+    (("خلاصه", "خلاصهٔ"), "summary"),
+    (("من", "خودم", "من:", "برای من"), "my"),
+]
+
+
+def _fa_bridge(message: str) -> str:
+    """Translate Persian intent words onto the English tool tokens so the
+    same scoring works for Persian requests (the existing token regex is
+    a-z0-9 only - Persian letters were being stripped and the intent
+    silently lost)."""
+    if not _is_fa(message):
+        return ""
+    words = set(re.split(r"[\s\u200c]+", message or ""))
+    out = []
+    for keys, token in _FA_KEYWORDS:
+        if any(k in words or k in (message or "") for k in keys):
+            out.append(token)
+    return " " + " ".join(out) + " " if out else ""
+
+
 def _pick_tool(message: str, tools: list[tuple]) -> tuple | None:
     """Score every offered tool against the user's message; return the best.
 
@@ -95,7 +127,7 @@ def _pick_tool(message: str, tools: list[tuple]) -> tuple | None:
     tools whose name starts with a read verb (list/get/search) get a
     small penalty, and vice versa.
     """
-    text = " " + re.sub(r"[^a-z0-9\s]", " ", message.lower()) + " "
+    text = " " + re.sub(r"[^a-z0-9\s]", " ", message.lower()) + " " + _fa_bridge(message)
     wants_create = any((" %s " % w) in text for group in _SYNONYMS.values()
                        for w in ("create", "new", "add", "request", "book",
                                  "make", "register", "submit", "open"))
@@ -134,11 +166,11 @@ def _parse_date(message: str, today: date | None = None) -> date | None:
             return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
         except ValueError:
             return None
-    if "tomorrow" in text:
+    if "tomorrow" in text or "فردا" in message:
         return today + timedelta(days=1)
-    if "today" in text:
+    if "today" in text or "امروز" in message:
         return today
-    if "next week" in text:
+    if "next week" in text or "هفته بعد" in message or "هفتهٔ بعد" in message:
         return today + timedelta(days=8 - today.weekday())
     for word, idx in _WEEKDAYS.items():
         if word in text:
@@ -308,6 +340,36 @@ def _doc_extractive(doc, question, fname):
                ("\nNotable figures: %s" % ", ".join(numbers)) if numbers else ""))
 
 
+def _parse_persona(messages: list) -> dict:
+    """Read the appliance-injected [identity-context] system block.
+
+    The gateway prepends who is chatting (name, company, department,
+    job title, access level) so the assistant can answer personally and
+    stay inside that user's permission story. Returns {} if absent.
+    """
+    persona = {}
+    for m in messages or []:
+        if m.get("role") != "system":
+            continue
+        content = m.get("content") or ""
+        if "[identity-context]" not in content:
+            continue
+        for line in content.splitlines():
+            for key in ("user:", "company:", "department:", "job_title:", "access_level:"):
+                if line.startswith(key):
+                    persona[key[:-1]] = line[len(key):].strip()
+    return persona
+
+
+def _first_name(persona: dict) -> str:
+    full = (persona.get("user") or "").split(" (")[0].strip()
+    return full.split()[0] if full else ""
+
+
+def _is_fa(text: str) -> bool:
+    return bool(re.search(r"[\u0600-\u06FF]", text or ""))
+
+
 def _decide(payload: dict) -> dict:
     """Return an OpenAI message dict: either a tool_call or plain content."""
     messages = payload.get("messages") or []
@@ -316,6 +378,7 @@ def _decide(payload: dict) -> dict:
         fn = t.get("function") or t
         if fn.get("name"):
             tools.append((fn["name"], fn.get("description") or "", fn.get("parameters") or {}))
+    persona = _parse_persona(messages)
 
     last_user = ""
     for m in messages:
@@ -327,17 +390,27 @@ def _decide(payload: dict) -> dict:
     # history must not hijack a fresh user request.
     if messages and messages[-1].get("role") == "tool":
         print("[nova-brain] tool result: %.500r" % (messages[-1].get("content"),), flush=True)
-        return {"role": "assistant", "content": _summarise_result(messages[-1].get("content") or "")}
+        return {"role": "assistant", "content": _summarise_result(messages[-1].get("content") or "", _parse_persona(messages))}
 
     doc_answer = _document_answer(last_user)
     if doc_answer:
         return {"role": "assistant", "content": doc_answer}
 
+    # a QUESTION about capabilities is never a tool call: "what can you
+    # do?" / "چه کارهایی می‌تونی انجام بدی؟" must not create a task
+    q = last_user.strip()
+    is_question = q.endswith(("?", "\u061f")) or any(w in q.lower() for w in (
+        "what can", "چیکار", "چه کار", "چی کار", "می\u200cتون", "می\u200cتوان", "میتون"))
+    if is_question and any(w in q.lower() for w in (
+        "what can", "چیکار", "چه کار", "چی کار", "می\u200cتون", "می\u200cتوان", "میتون")):
+        return {"role": "assistant", "content": _plain_answer(last_user, tools, persona)}
+
     pick = _pick_tool(last_user, tools)
     if pick:
         name, _desc, schema = pick
         arguments = _build_arguments(last_user, schema)
-        print("[nova-brain] tool_call %s(%s) for %r" % (name, arguments, last_user[:80]), flush=True)
+        print("[nova-brain] tool_call %s(%s) for %r [%s]" % (
+            name, arguments, last_user[:80], persona.get("user", "?")), flush=True)
         return {
             "role": "assistant",
             "content": None,
@@ -347,10 +420,10 @@ def _decide(payload: dict) -> dict:
                 "function": {"name": name, "arguments": arguments},
             }],
         }
-    return {"role": "assistant", "content": _plain_answer(last_user, tools)}
+    return {"role": "assistant", "content": _plain_answer(last_user, tools, persona)}
 
 
-def _summarise_result(raw: str) -> str:
+def _summarise_result(raw: str, persona: dict | None = None) -> str:
     snippet = (raw or "").strip()
     try:
         data = json.loads(snippet)
@@ -381,34 +454,91 @@ def _summarise_result(raw: str) -> str:
     try:
         data = json.loads((raw or "").strip())
         if isinstance(data, dict):
-            detail = "\n".join("- %s: %s" % (k, v) for k, v in data.items()
-                               if isinstance(v, (str, int, float, bool)))
+            scalars = "\n".join("- %s: %s" % (k, v) for k, v in data.items()
+                                if isinstance(v, (str, int, float, bool)))
+            detail = scalars or detail
+            # list results (pending leaves, tasks, documents): render the
+            # first few RECORDS so the user actually sees the who/what
+            for key, val in data.items():
+                if isinstance(val, list) and val and isinstance(val[0], dict):
+                    rows = []
+                    for item in val[:4]:
+                        if key == "pending":
+                            rows.append("- %s: %s → %s [%s]" % (
+                                item.get("employee", item.get("name", "?")),
+                                str(item.get("date_from", ""))[:10],
+                                str(item.get("date_to", ""))[:10],
+                                item.get("state", "")))
+                        else:
+                            rows.append("- " + ", ".join(
+                                "%s=%s" % (k2, v2) for k2, v2 in list(item.items())[:3]
+                                if isinstance(v2, (str, int, float, bool))))
+                    if rows:
+                        detail += "\n%s:\n%s" % (key, "\n".join(rows))
     except (ValueError, TypeError):
         pass
+    if persona and not has_problem:
+        name = _first_name(persona)
+        if name:
+            detail = "%s\n\n(%s)" % (detail, name)
     return ("Done - I executed that in Odoo for real:\n%s\n\n"
             "Anything else - another record, a report, or a follow-up?") % detail
 
 
-def _plain_answer(message: str, tools: list[tuple]) -> str:
+def _plain_answer(message: str, tools: list[tuple], persona: dict | None = None) -> str:
+    """Personal, access-aware small talk / fallback.
+
+    ``tools`` already contains ONLY what the calling user is allowed to
+    use (the gateway filters per user) - so the examples below are the
+    user's own capabilities, never someone else's powers.
+    """
+    persona = persona or {}
+    name = _first_name(persona)
+    dept = persona.get("department", "")
+    level = persona.get("access_level", "employee")
     text = (message or "").strip().lower()
-    catalogue = "\n".join("- %s" % name for name, _d, _s in tools[:10]) if tools else ""
-    if any(g in text for g in ("hi", "hello", "hey", "salam", "good morning", "good afternoon")):
-        return ("Hi! I'm Nova, running on the appliance's built-in local brain. "
-                "I can actually operate your Odoo - just ask in plain words, e.g.:\n"
-                "\"Request 2 days of leave starting next Monday\" or \"Create a task called Draft Q4 plan\".")
-    if "what can you do" in text or "help" in text or "capability" in text:
-        return ("I'm Nova's local brain. I execute real Odoo tools for you:\n%s\n\n"
+    catalogue = "\n".join("- %s" % name for name, _d, _s in tools[:8]) if tools else ""
+    fa = _is_fa(message)
+
+    who_en = ("%s - " % name) if name else ""
+    who_fa = ("%s عزیز" % name) if name else ""
+    dept_en = (" (%s)" % dept) if dept else ""
+    dept_fa = (" در «%s»" % dept) if dept else ""
+
+    if any(g in text for g in ("hi", "hello", "hey", "salam", "سلام", "درود", "good morning", "good afternoon")):
+        if fa:
+            return ("سلام %s! من نووا هستم%s؛ دستیار هوشمند سازمان شما. "
+                    "کارهای واقعی اودو را برایتان انجام می‌دهم - مثلاً:\n"
+                    "«۲ روز مرخصی برای هفتهٔ بعد ثبت کن» یا «یک کار به نام بررسی بودجه بساز». "
+                    "داده‌ها هم فقط در حد دسترسی خودتان است." % (who_fa, dept_fa))
+        return ("Hi %sI'm Nova%s, your company AI assistant. I really operate "
+                "your Odoo - just ask in plain words, e.g.:\n"
+                "\"Request 2 days of leave starting next Monday\" or \"Create a task called Draft Q4 plan\". "
+                "You only ever get the data your own access allows." % (who_en, dept_en))
+    if "what can you do" in text or "help" in text or "capability" in text or "چیکار" in text or "چه کار" in text:
+        if fa:
+            return ("ابزارهای واقعی که با دسترسی شما فعال است:\n%s\n\n"
+                    "مثلاً: «مرخصی هفتهٔ بعد»، «ساخت کار»، «گزارش حضورم». "
+                    "برای گفتگوی آزادِ کامل، ادمین می‌تواند کلید یک LLM واقعی را وصل کند."
+                    % (catalogue or "- عملیات روی داده‌های مجاز شما"))
+        return ("Tools available at YOUR access level (%s):\n%s\n\n"
                 "Try: \"request time off for next week\", \"create a task called ...\", "
-                "\"show attendance report\". Admins can plug any OpenAI-compatible LLM "
-                "(OpenRouter, Groq, local llama.cpp, ...) in Admin -> AI Models for full "
-                "natural-language power." % (catalogue or "- operate your Odoo data"))
-    return ("I'm Nova's built-in local brain (no external LLM key is configured on this "
-            "appliance yet). I can still DO things in Odoo - try:\n"
+                "\"show my attendance\". Admins can plug any OpenAI-compatible LLM "
+                "in Admin -> AI Models for full natural-language power."
+                % (level, catalogue or "- operate your Odoo data"))
+    if fa:
+        return ("%s، من نووا هستم%s و کارهای واقعی اودو را انجام می‌دهم - مثلاً:\n"
+                "«ثبت مرخصی از دوشنبه» · «ساخت کار به نام …» · «خلاصهٔ حضور من»\n\n"
+                "همه‌چیز در محدودهٔ دسترسی خودتان؛ چیزی فراتر از آن را نمی‌بینید و نمی‌گویم."
+                % (who_fa, dept_fa))
+    return ("%sI'm Nova%s, the appliance's local brain. I DO real Odoo things - try:\n"
             "\"Request 2 days leave starting next Monday\"\n"
             "\"Create a task called Prepare budget review\"\n"
             "\"How many documents do we have?\"\n\n"
-            "For free-form conversation an admin can connect a real LLM key in "
-            "Admin -> AI Models - it takes effect immediately, no restart.")
+            "Everything stays inside your own access level - I cannot and will not "
+            "show other people's private data. An admin can connect a real LLM key "
+            "in Admin -> AI Models for free-form conversation power."
+            % (who_en, dept_en))
 
 
 class Handler(BaseHTTPRequestHandler):

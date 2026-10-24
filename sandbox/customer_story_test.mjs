@@ -173,8 +173,9 @@ async function customerPart(){
   const msgs = ()=>[...doc.querySelectorAll(".msg-text")].map(d=>d.textContent).join("\n");
   setVal(ta(), "hello");
   ta().dispatchEvent(new w.KeyboardEvent("keydown", {key:"Enter", bubbles:true}));
-  await waitFor(()=>msgs().includes("Hi! I'm Nova"), "Nova's greeting arrives (streaming)", 30000);
-  check("Sara chats: Nova answers her greeting", true);
+  // the assistant is access-aware: it greets the user PERSONALLY
+  await waitFor(()=>/I'm Nova/.test(msgs()) && msgs().includes("Sara"), "Nova's personal greeting arrives (streaming)", 30000);
+  check("Sara chats: Nova greets HER by name (persona)", true, msgs().split("\n").filter(l=>/Nova/.test(l))[0].slice(0,80));
 
   // 5. she attaches the PDF and asks about it
   const pdfBytes = readFileSync("/tmp/ctest/warranty.pdf");
