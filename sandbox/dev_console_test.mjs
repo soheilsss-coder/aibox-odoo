@@ -42,6 +42,8 @@ async function loadPage(path){
   const w = dom.window;
   w.fetch = (u,o)=>jarFetch(new URL(String(u), BASE).href, o);
   w.confirm = ()=>true;
+  w.scrollTo = ()=>{};                    // jsdom: not implemented
+  w.Element.prototype.scrollIntoView = w.Element.prototype.scrollIntoView || function(){};
   for (const sc of [...w.document.querySelectorAll("script")].map(s=>s.textContent))
     if (sc && sc.trim()) { try { w.eval(sc); } catch(e){ console.log("eval err:", e.message); } }
   return {dom, w};
@@ -72,15 +74,19 @@ const DEV_PW = process.env.DEV_PW || "Developer2026";
 
 console.log("=== 2) DEVELOPER at the SAME /admin: routed to the developer console ===");
 COOKIES = {};
-const dev = await loadPage("/admin"); const dw = dev.w; const d$id=(i)=>dw.document.getElementById(i);
-await sleep(500);
-type(d$id("lu"), "developer"); type(d$id("lp"), DEV_PW); click(d$id("lb"));
+await jarFetch(BASE+"/admin");
 {
   const r = await jarFetch(BASE+"/api/admin/panel/login", {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({username:"developer", password:DEV_PW})});
   const d = await r.json();
   check("login says role=developer", d.role==="developer", "role="+(d.role||"?"));
 }
+// docs/admin.html routes this session to ./devconsole.html — the same
+// navigation a real browser performs; jsdom cannot follow it, so we open
+// the exact page the browser would land on, WITH the same session cookie.
+const devNavCode = await (await jarFetch(BASE+"/admin")).text();
+check("/admin routing code sends developers to devconsole",
+  devNavCode.includes('r.role === "developer"') && devNavCode.includes("./devconsole.html"));
 { // devconsole.html itself, loaded with the developer session
   COOKIES = {};
   await jarFetch(BASE+"/admin");
@@ -107,17 +113,29 @@ type(d$id("lu"), "developer"); type(d$id("lp"), DEV_PW); click(d$id("lb"));
   await sleep(400);
   check("live search filters the catalogue", $id("m_rows").children.length<totalRows,
     $id("m_rows").children.length+" match 'marketing'");
-  const instBtn = [...$id("m_rows").querySelectorAll("button[data-i]")][0];
-  const instName = instBtn && instBtn.dataset.i;
+  // on a full-catalogue box everything real is already installed: free a
+  // small module via the API, then install it back THROUGH THE UI
+  const jarFetchNow = jarFetch;
+  const cookieHeader = Object.entries(COOKIES).map(([k,v])=>k+"="+v).join("; ");
+  await jarFetchNow(BASE+"/api/admin/panel/modules/act", {method:"POST",
+    headers:{"Content-Type":"application/json", cookie: cookieHeader},
+    body: JSON.stringify({names:["marketing_card"], action:"uninstall"})});
+  // the uninstall happened outside this page view: a real user re-opens
+  // the Modules page to see the fresh state - do exactly that
+  [...$id("nav").querySelectorAll(".nav-item")].find(a=>a.textContent.includes("Modules")).dispatchEvent(new w.MouseEvent("click",{bubbles:true}));
+  await waitFor(()=>$id("m_rows") && $id("m_rows").children.length>50, "modules page reopened", 60000);
+  type($id("m_q"), "marketing_card");
+  await sleep(400);
+  const instBtn = [...$id("m_rows").querySelectorAll("button[data-i]")].find(b=>b.dataset.i==="marketing_card");
   if (instBtn){
     type($id("m_q"), "");
     await sleep(300);
-    const btn = [...$id("m_rows").querySelectorAll('button[data-i]')].find(b=>b.dataset.i===instName);
-    btn.scrollIntoView = ()=>{};
+    const btn = [...$id("m_rows").querySelectorAll('button[data-i]')].find(b=>b.dataset.i==="marketing_card");
     click(btn);
     await waitFor(()=>$id("m_msg").textContent.includes("done"), "module install finishes", 120000);
-    check("module '"+instName+"' installed FROM the UI", true, $id("m_msg").textContent.slice(0,80));
-  } else check("module install button found", false, "everything already installed");
+    check("module 'marketing_card' installed FROM the UI", true, $id("m_msg").textContent.slice(0,80));
+  } else check("install button for marketing_card appeared", false,
+    $id("m_rows") ? $id("m_rows").textContent.slice(0,80) : "no rows");
 
   // --- Registry explorer ---
   [...w.document.querySelectorAll("#nav .nav-item")].find(a=>a.textContent.includes("Data & Models"))

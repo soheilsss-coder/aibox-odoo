@@ -597,4 +597,5 @@ class AdminPanelController(http.Controller):
         except Exception:  # noqa: BLE001
             return _json({"error": "invalid body"}, status=400)
         return _json(_panel_env().user_set_role(
-            (body.get("login") or "").strip(), bool(body.get("developer"))))
+            (body.get("login") or "").strip(), bool(body.get("developer")),
+            acting_user_id=user.id))

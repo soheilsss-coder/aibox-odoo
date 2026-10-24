@@ -225,6 +225,7 @@ function setHead(title, desc){
   $id("phTitle").textContent = title; $id("phDesc").textContent = desc||"";
 }
 function renderSection(){
+  if (_logTimer){ clearInterval(_logTimer); _logTimer = null; }  // leave Logs cleanly
   const view = $id("view");
   view.innerHTML = '<div class="card"><span class="muted">Loading…</span></div>';
   const fn = {overview:secOverview, engine:secEngine, branding:secBranding, modules:secModules,
@@ -379,8 +380,8 @@ async function secModules(view){
       let act = "";
       if (m.state==="uninstalled") act = '<button class="btn-sm btn-primary" data-i="'+esc(m.name)+'">Install</button>';
       else if (m.state==="installed") act = '<button class="btn-sm" data-u="'+esc(m.name)+'">Upgrade</button>';
-      $id("m_rows").insertAdjacentHTML("beforeend", "<tr><td class='mono small'>"+esc(m.name)+
-        "</td><td class='small muted'>"+esc(m.short_desc)+"</td><td>"+st+"</td><td>"+act+"</td></tr>");
+      return "<tr><td class='mono small'>"+esc(m.name)+
+        "</td><td class='small muted'>"+esc(m.short_desc)+"</td><td>"+st+"</td><td>"+act+"</td></tr>";
     }).join("");
   };
   paint(rows);
@@ -461,6 +462,7 @@ async function secLogs(view){
     '<select id="l_n" style="max-width:110px"><option>200</option><option>400</option><option>500</option></select></div>'+
     '<div class="term" id="l_out">loading…</div></div>';
   const load = async ()=>{
+    if (!$id("l_out")) return;             // section switched away
     try { const r = await api("/api/dev/logs?lines="+$id("l_n").value);
       if (r.error){ $id("l_out").textContent = r.error + " " + (r.path||""); return; }
       $id("l_path").textContent = r.path;

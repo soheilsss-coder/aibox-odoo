@@ -177,6 +177,17 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                  "state": m.state, "version": (m.latest_version or "")[:12]}
                 for m in apps]
 
+    def _finish_pending_apply(self):
+        """Rebuild the registry with update_module so half-applied module
+        operations (module stuck in 'to install'/'to upgrade'/'to remove')
+        actually complete.  Odoo's immediate functions commit mid-flight;
+        if anything interrupts them the state stays pending until this
+        runs.  Mirrors what _button_immediate_function does internally."""
+        import odoo.modules
+        self.env.cr.commit()
+        odoo.modules.registry.Registry.new(self.env.cr.dbname, update_module=True)
+        self.env.cr.commit()
+
     def modules_act(self, names, action):
         """action in install|upgrade|uninstall (uninstall allowed only for
         non-critical custom addons - never base/web/mail)."""
@@ -187,15 +198,49 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
         done, errors = [], []
         for m in mods:
             try:
-                if action == "uninstall" and (m.name in PROTECTED or m.state != "installed"):
-                    errors.append({"name": m.name, "error": "protected or not installed"})
-                    continue
-                if action == "install" and m.state not in ("uninstalled",):
+                if action == "uninstall":
+                    if m.name in PROTECTED:
+                        errors.append({"name": m.name, "error": "protected module"})
+                        continue
+                    if m.state == "to remove":
+                        # a previous attempt got interrupted - finish it now
+                        self._finish_pending_apply()
+                        m.invalidate_recordsets()
+                        if m.state == "uninstalled":
+                            done.append(m.name)
+                            continue
+                        errors.append({"name": m.name, "error": "still pending removal"})
+                        continue
+                    if m.state != "installed":
+                        errors.append({"name": m.name, "error": "not installed"})
+                        continue
+                elif action == "install" and m.state not in ("uninstalled",):
                     if m.state == "installed":
                         done.append(m.name)
+                        continue
+                    if m.state in ("to install", "to upgrade"):
+                        self._finish_pending_apply()
+                        m.invalidate_recordsets()
+                        if m.state == "installed":
+                            done.append(m.name)
+                            continue
+                    errors.append({"name": m.name, "error": "state '%s'" % m.state})
                     continue
-                getattr(m, "button_" + ("uninstall" if action == "uninstall" else action))()
-                done.append(m.name)
+                try:
+                    m.button_immediate_uninstall() if action == "uninstall" \
+                        else getattr(m, "button_immediate_" + action)()
+                    done.append(m.name)
+                except Exception:  # noqa: BLE001
+                    # immediate functions commit mid-flight; report the truth
+                    self.env.cr.rollback()
+                    m.invalidate_recordsets()
+                    if m.state in ("to remove", "to install", "to upgrade"):
+                        self._finish_pending_apply()
+                        m.invalidate_recordsets()
+                    if m.state in ("installed", "uninstalled"):
+                        done.append(m.name)
+                    else:
+                        raise
             except Exception as exc:  # noqa: BLE001
                 errors.append({"name": m.name, "error": str(exc)[:200]})
         return {"done": done, "errors": errors}
@@ -212,17 +257,20 @@ class AiGatewayAdminPanelOps(models.AbstractModel):
                  "developer": bool(dev_group) and u.has_group("ai_gateway.group_developer_admin"),
                  "active": u.active} for u in users]
 
-    def user_set_role(self, login, developer):
+    def user_set_role(self, login, developer, acting_user_id=None):
         """Grant or revoke the Appliance Developer Admin role.
 
         Only a logged-in developer can call this (controller enforces it).
         Self-demotion is refused: the last thing the vendor needs is to
         lock themselves out of the developer console by a misclick.
+        ``acting_user_id`` is the panel-session user; it must be passed
+        explicitly because the panel model itself runs under the
+        superuser env (env.uid is never the human behind the console).
         """
         user = self.env["res.users"].sudo().search([("login", "=", login)], limit=1)
         if not user:
             return {"error": "user not found"}
-        if user.id == self.env.uid:
+        if acting_user_id is not None and user.id == int(acting_user_id):
             return {"error": "you cannot change your own developer role"}
         group = self.env.ref("ai_gateway.group_developer_admin", raise_if_not_found=False)
         if not group:

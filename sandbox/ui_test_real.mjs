@@ -56,7 +56,7 @@ await sleep(600);
 const auth = $id("auth"), shell = $id("shell");
 check("login card shown first", auth && !auth.hidden && shell && shell.hidden);
 check("appliance address field exists (GitHub usage)", !!$id("lbase"));
-check("brand badge is v8", w.document.body.textContent.includes("vendor console · v8"));
+check("brand badge is v9", w.document.body.textContent.includes("vendor console · v9"));
 check("theme stylesheet really loads", (await jarFetch(BASE+"/assets/index-B7tjfh8Z.css")).status===200);
 
 console.log("=== 2) WRONG PASSWORD (as a user would try) ===");
