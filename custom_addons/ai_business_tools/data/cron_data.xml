@@ -10,7 +10,7 @@
         <field name="login">ai-automation@service.local</field>
         <field name="email">ai-automation@service.local</field>
         <field name="active">True</field>
-        <field name="groups_id" eval="[(6, 0, [ref('base.group_user')])]"/>
+        <field name="groups_id" eval="[(6, 0, [ref('base.group_user'), ref('ai_gateway.group_ai_automation')])]"/>
     </record>
 
     <!-- noupdate="1" protects the record above from updates, which means a
@@ -21,7 +21,7 @@
          <function> re-asserts the intended minimal group on every
          install/upgrade (idempotent: (4, ...) only ADDS it). -->
     <function model="res.users" name="write"
-              eval="[[ref('ai_automation_service_user')], {'groups_id': [(4, ref('base.group_user'))]}]"/>
+              eval="[[ref('ai_automation_service_user')], {'groups_id': [(4, ref('base.group_user')), (4, ref('ai_gateway.group_ai_automation'))]}]"/>
 
     <record id="cron_notify_overdue_tasks" model="ir.cron">
         <field name="name">AI: Notify overdue tasks</field>

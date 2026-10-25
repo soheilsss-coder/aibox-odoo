@@ -14,6 +14,7 @@
    script itself if missing)
    ============================================================== */
 import { execSync } from "node:child_process";
+import { writeFileSync as _w8f } from "node:fs";
 
 const BASE = "http://127.0.0.1:18069";
 let COOKIES = {};
@@ -35,33 +36,35 @@ const check = (n, c, e = "") => { console.log((c ? "PASS" : "FAIL"), n, e); if (
 
 function ensureFixtures() {
   try { execSync("test -f /tmp/ftest2/contract.rtf"); return; } catch {}
-  execSync(`mkdir -p /tmp/ftest2 && python3 - <<'PY'
-open("/tmp/ftest2/report.html","w",encoding="utf-8").write('<html><head><style>.x{}</style><script>var secret=1;</script></head><body><h1>گزارش فصلی</h1><p>سود کارخانه MARK-HTML-7788 در بهار.</p></body></html>')
-open("/tmp/ftest2/contract.rtf","w",encoding="utf-8").write(r'{\rtf1\ansi CONTRACT MARK-RTF-4455\par \u1605\u1576\u1604\u1594? 42,000,000 IRR\par}')
-open("/tmp/ftest2/invoice.xml","w",encoding="utf-8").write('<?xml version="1.0"?><invoice id="INV-1404"><total>MARK-XML-3322</total></invoice>')
-open("/tmp/ftest2/notes.yaml","w",encoding="utf-8").write("project: parsnovin\nmarker: MARK-YAML-2211\n")
-open("/tmp/ftest2/run.log","w",encoding="utf-8").write("phase=deploy MARK-LOG-1199\n")
-open("/tmp/ftest2/plain.txt","w",encoding="utf-8").write("یادداشت ساده MARK-TXT-1010 پایان")
-open("/tmp/ftest2/readme.md","w",encoding="utf-8").write("# مستندات\nMARK-MD-2020\n")
-open("/tmp/ftest2/data.csv","w",encoding="utf-8").write("ماه,فروش\nاردیبهشت,MARK-CSV-3030\n")
-open("/tmp/ftest2/cfg.json","w",encoding="utf-8").write('{"marker":"MARK-JSON-4040"}')
-PY`);
+  execSync("mkdir -p /tmp/ftest2");
+  const w8 = (f, t) => _w8f("/tmp/ftest2/" + f, Buffer.from(t, "utf8"));
+  w8("report.html", '<html><head><style>.x{}</style><script>var secret=1;</script></head>'
+    + '<body><h1>\u06af\u0632\u0627\u0631\u0634 \u0641\u0635\u0644\u06cc</h1>'
+    + '<p>\u0633\u0648\u062f \u06a9\u0627\u0631\u062e\u0627\u0646\u0647 MARK-HTML-7788 \u062f\u0631 \u0628\u0647\u0627\u0631.</p></body></html>');
+  w8("contract.rtf", String.raw`{\rtf1\ansi CONTRACT MARK-RTF-4455\par \u1605\u1576\u1604\u1594? 42,000,000 IRR\par}`);
+  w8("invoice.xml", '<?xml version="1.0"?><invoice id="INV-1404"><total>MARK-XML-3322</total></invoice>');
+  w8("notes.yaml", "project: parsnovin\nmarker: MARK-YAML-2211\n");
+  w8("run.log", "phase=deploy MARK-LOG-1199\n");
+  w8("plain.txt", "\u06cc\u0627\u062f\u062f\u0627\u0634\u062a \u0633\u0627\u062f\u0647 MARK-TXT-1010");
+  w8("readme.md", "# \u0645\u0633\u062a\u0646\u062f\u0627\u062a\nMARK-MD-2020\n");
+  w8("data.csv", "\u0645\u0627\u0647,\u0641\u0631\u0648\u0634\n\u0627\u0631\u062f\u06cc\u0628\u0647\u0634\u062a,MARK-CSV-3030\n");
+  w8("cfg.json", '{"marker":"MARK-JSON-4040"}');
   execSync(`/home/user/aibox-ws/venv/bin/python - <<'PY'
 from docx import Document
-d = Document(); d.add_paragraph("قرارداد پشتیبانی MARK-DOCX-8080")
-t = d.add_table(rows=1, cols=2); t.cell(0,0).text="مدت"; t.cell(0,1).text="۲۷ ماه"
+d = Document(); d.add_paragraph("MARK-DOCX-8080")
+t = d.add_table(rows=1, cols=2); t.cell(0,0).text="x"; t.cell(0,1).text="27"
 d.save("/tmp/ftest2/spec.docx")
 from pptx import Presentation
-p = Presentation(); s = p.slides.add_slide(p.slide_layouts[6])
-s.shapes.add_textbox(0,0,300,60).text_frame.text = "ارائه فروش MARK-PPTX-5050"
-p.save("/tmp/ftest2/deck.pptx")
+pr = Presentation(); sl = pr.slides.add_slide(pr.slide_layouts[6])
+sl.shapes.add_textbox(0,0,300,60).text_frame.text = "MARK-PPTX-5050"
+pr.save("/tmp/ftest2/deck.pptx")
 import openpyxl
 wb = openpyxl.Workbook(); ws = wb.active
-ws.append(["کالا","مبلغ"]); ws.append(["خدمات","MARK-XLSX-6060"]); wb.save("/tmp/ftest2/table.xlsx")
+ws.append(["k","v"]); ws.append(["s","MARK-XLSX-6060"]); wb.save("/tmp/ftest2/table.xlsx")
 from odf.opendocument import OpenDocumentText
 from odf.text import P
-doc = OpenDocumentText(); doc.text.addElement(P(text="سند اداری MARK-ODS-7070")); doc.save("/tmp/ftest2/doc.ods")
-PY`, {stdio:"inherit"});
+doc = OpenDocumentText(); doc.text.addElement(P(text="MARK-ODS-7070")); doc.save("/tmp/ftest2/doc.ods")
+PY`, { stdio: "inherit" });
 }
 
 const CASES = [

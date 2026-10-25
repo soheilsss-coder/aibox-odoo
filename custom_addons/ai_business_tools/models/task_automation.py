@@ -3,6 +3,21 @@ import logging
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
+
+class ProjectTaskTypeCompat(models.Model):
+    """Odoo 18 renamed project.task.type.is_closed to `fold`; every AI
+    escalation path still reasons in terms of is_closed - keep ONE thin
+    non-stored alias so the vocabulary survives and search domains use
+    fold directly (computed aliases cannot be searched)."""
+    _inherit = "project.task.type"
+
+    is_closed = fields.Boolean(compute="_compute_is_closed")
+
+    def _compute_is_closed(self):
+        for stage in self:
+            stage.is_closed = stage.fold
+
+
 _logger = logging.getLogger(__name__)
 
 
@@ -193,7 +208,7 @@ class ProjectTaskAutomation(models.Model):
 
         overdue = self.env["project.task"].sudo().search([
             ("date_deadline", "<", today),
-            ("stage_id.is_closed", "=", False),
+            ("stage_id.fold", "=", False),
         ])
         escalated = 0
         for task in overdue:

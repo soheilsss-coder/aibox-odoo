@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Dedicated group for the cron service account (see
+         ai_business_tools ai_automation_service_user). Odoo 18 runs a
+         check_access("write") on a server action's model BEFORE the
+         action code, so minimal-privilege maintenance jobs need a
+         minimal, EXPLICIT write grant on exactly the models they
+         maintain - never admin, never a broad group. -->
+    <record id="group_ai_automation" model="res.groups">
+        <field name="name">AI Automation (cron service)</field>
+        <field name="comment">Held only by the ai-automation@service.local
+            cron account. Grants write on the specific maintenance models
+            the scheduled AI jobs touch (overdue notifications, grant
+            expiry, capability discovery).</field>
+    </record>
+</odoo>

@@ -16,6 +16,12 @@ def _ensure_xmlid(env, module, name, record):
 
 
 def migrate(cr, version):
+    try:
+        _safe_migrate(cr, version)
+    except Exception:  # noqa: BLE001 - a jump-install (e.g. 1.5 -> 1.9) runs
+        return  # intermediate migrations against NEWER code; be inert
+
+def _safe_migrate(cr, version):
     env = api.Environment(cr, SUPERUSER_ID, {})
     Groups = env["res.groups"].sudo()
     category = env.ref("ai_business_tools.role_category", raise_if_not_found=False)

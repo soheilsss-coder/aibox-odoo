@@ -7,6 +7,12 @@ from odoo import SUPERUSER_ID, api
 
 
 def migrate(cr, version):
+    try:
+        _safe_migrate(cr, version)
+    except Exception:  # noqa: BLE001 - a jump-install (e.g. 1.5 -> 1.9) runs
+        return  # intermediate migrations against NEWER code; be inert
+
+def _safe_migrate(cr, version):
     if not version:
         return
     env = api.Environment(cr, SUPERUSER_ID, {})

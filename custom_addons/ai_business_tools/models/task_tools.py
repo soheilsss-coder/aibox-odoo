@@ -239,7 +239,7 @@ class LLMToolTask(models.Model):
         today = fields.Date.context_today(self)
         tasks = self.env["project.task"].search([
             ("date_deadline", "<", today),
-            ("stage_id.is_closed", "=", False),
+            ("stage_id.fold", "=", False),
         ])
         return {"count": len(tasks), "overdue": [
             {"id": t.id, "title": t.name,
@@ -269,15 +269,15 @@ class LLMToolTask(models.Model):
         """
         domain = [("user_ids", "in", [self.env.user.id])]
         if not include_done:
-            domain.append(("stage_id.is_closed", "=", False))
+            domain.append(("stage_id.fold", "=", False))
         today = fields.Date.context_today(self)
         tasks = self.env["project.task"].search(domain, order="date_deadline")
         return {"count": len(tasks), "tasks": [
             {"id": t.id, "title": t.name,
              "project": t.project_id.name or "",
              "deadline": str(t.date_deadline) if t.date_deadline else None,
-             "overdue": bool(t.date_deadline and t.date_deadline < today and not t.stage_id.is_closed),
-             "stage": t.stage_id.name or "", "done": bool(t.stage_id.is_closed)}
+             "overdue": bool(t.date_deadline and t.date_deadline < today and not t.stage_id.fold),
+             "stage": t.stage_id.name or "", "done": bool(t.stage_id.fold)}
             for t in tasks
         ]}
 
@@ -291,7 +291,7 @@ class LLMToolTask(models.Model):
         today = fields.Date.context_today(self)
         overdue = self.env["project.task"].sudo().search([
             ("date_deadline", "<", today),
-            ("stage_id.is_closed", "=", False),
+            ("stage_id.fold", "=", False),
         ])
         for task in overdue:
             for user in task.user_ids:

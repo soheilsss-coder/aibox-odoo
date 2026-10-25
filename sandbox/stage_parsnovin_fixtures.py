@@ -84,10 +84,14 @@ ROLE_MAP = maryam.groups_id.get_external_id()  # {id: xmlid}
 print("ROLES maryam-finance:", any((x or "").endswith("role_finance_manager")
                                    for x in ROLE_MAP.values()))
 
-# ali is the leave approver of the sales pair (suite: manager sees the team)
-for u in (sara, kian):
-    if u.leave_manager_id.id != ali.id:
-        u.write({"leave_manager_id": ali.id})
+# ali is the leave approver of the sales pair (suite: manager sees the
+# team). The approver lives on hr.employee (leave_manager_id is a
+# res.users M2O on the EMPLOYEE - writing it on res.users does nothing
+# for approvals).
+for uu in (sara, kian):
+    emp_u = Emp.search([("user_id", "=", uu.id)], limit=1)
+    if emp_u and emp_u.leave_manager_id.id != ali.id:
+        emp_u.write({"leave_manager_id": ali.id})
 env.cr.commit()
 
 # ---- 4) documents (markers the suites grep for) ---------------------------
