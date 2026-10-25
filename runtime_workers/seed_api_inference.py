@@ -232,6 +232,22 @@ if assistant.model_id != chat_model:
     assistant.model_id = chat_model.id
 print("  assistant bound to %s / %s" % (provider_name, chat_model.name))
 
+# -- tool catalog on the assistant ---------------------------------------
+# Without this the assistant chats but can never DO anything (threads
+# inherit tool_ids from the assistant). The risk engine re-trims per
+# user/thread on every turn (allowed_tool_ids_for_user), so binding the
+# full vetted catalog here is the DEFAULT CAPABILITY SURFACE, not a
+# bypass: users still only ever execute what their own authorization
+# allows.
+if "ai.gateway.tool.risk" in env:
+    _risk = env["ai.gateway.tool.risk"]
+    _catalog = _risk.sudo().allowed_tool_ids_for_user()
+    if _catalog and set(assistant.tool_ids.ids) != set(_catalog):
+        assistant.tool_ids = [(6, 0, _catalog)]
+    print("  assistant tools bound:", len(assistant.tool_ids))
+else:
+    print("  (ai.gateway.tool.risk not installed - no tool catalog)")
+
 
 # -- production router profiles ----------------------------------------
 # The production router only authorizes profiles that are both `production`

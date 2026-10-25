@@ -223,8 +223,13 @@ def _run_chat_env(env, message, thread_id=None, attachment_ids=None):
     """
     t0 = time.time()
     user_id = env.uid
+    # active=True is REQUIRED: the odoo-llm demo data ships its own
+    # inactive "Company Assistant" with NO provider binding - picking
+    # that one makes every thread.generate() finish silently empty
+    # ("generation failed" for the user) even though a perfectly good
+    # active assistant with a live provider sits right next to it.
     assistant = env["llm.assistant"].search(
-        [("name", "=", "Company Assistant")], limit=1
+        [("name", "=", "Company Assistant"), ("active", "=", True)], limit=1
     )
     if not assistant:
         return {"error": "Company Assistant not found - check AI module install"}
