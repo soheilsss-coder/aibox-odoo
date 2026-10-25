@@ -23,12 +23,21 @@ class AiGatewayAuditLog(models.Model):
     _name = "ai.gateway.audit.log"
     _description = "AI Gateway Audit Log"
     _order = "create_date desc"
-    _log_access = False  # this model must never call itself recursively
+    # keep Odoo's automatic create_date/create_uid population ON: every
+    # time-windowed consumer (token report, rate limiting, admin console)
+    # filters on create_date - with _log_access=False the ORM leaves it
+    # NULL and every such query silently returns nothing.
 
     user_id = fields.Many2one("res.users", required=True, index=True, ondelete="cascade")
     source = fields.Selection(
-        [("tool", "AI Tool Call"), ("rpc", "Gateway RPC"), ("chat", "Gateway Chat")],
+        [("tool", "AI Tool Call"), ("rpc", "Gateway RPC"), ("chat", "Gateway Chat"),
+         ("execution_gate", "Execution Gate"), ("authorization", "Authorization"),
+         ("workflow", "Workflow"), ("event_bus", "Event Bus"),
+         ("customer_control_plane", "Customer Control Plane")],
         required=True, index=True,
+        help="Every writer must have its value listed here - an unlisted "
+             "source raises ValueError and its audit entry is LOST "
+             "(this exact bug silently dropped execution-gate audit trail).",
     )
     action = fields.Char(required=True, index=True, help="Tool name, or 'model.operation' for rpc")
     payload = fields.Text(help="JSON-encoded parameters, truncated to 2000 chars")

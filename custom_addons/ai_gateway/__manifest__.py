@@ -6,6 +6,7 @@
     "depends": ["base", "web", "llm_thread", "llm_assistant", "company_ai_demo"],
     "data": [
         "security/ir.model.access.csv",
+        "security/dev_admin_group.xml",
         "data/api_key_data.xml",
     ],
     "installable": True,

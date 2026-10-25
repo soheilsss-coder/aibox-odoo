@@ -1,0 +1,16 @@
+[Unit]
+Description=AIBox Appliance (Odoo + Nova brain + embeddings + Redis)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/aibox
+EnvironmentFile=/etc/aibox.env
+ExecStart=/usr/bin/env bash /opt/aibox/sandbox/run_services_fg.sh
+Restart=always
+RestartSec=5
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

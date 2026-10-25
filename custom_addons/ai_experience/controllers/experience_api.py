@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime
 
@@ -17,6 +18,8 @@ _logger = logging.getLogger(__name__)
 
 
 def _model(env, name):
+    """env[name] is an empty (falsy) recordset for an existing model -
+    registry membership is the only correct existence test."""
     return env[name] if name in env else None
 
 
@@ -159,6 +162,50 @@ def _artifact_bytes(kind, title, payload):
     raise ValueError(f"unsupported artifact type: {kind}")
 
 
+def _rtf_to_text(raw):
+    """Minimal dependency-free RTF text extractor (contracts, letters).
+    Handles \\par / \\tab, \\uNNNN unicode, \\'hh hex bytes and literal
+    escapes; ignores formatting groups. Not a layout engine - the goal is
+    every piece of TEXT in the file, honestly extracted."""
+    s = raw.decode("ascii", errors="replace")
+    out, i, n = [], 0, len(s)
+    while i < n:
+        ch = s[i]
+        if ch == "\\":
+            if s[i:i + 2] in ("\\\\", "\\{", "\\}"):
+                out.append(s[i + 1]); i += 2; continue
+            m = re.match(r"\\'([0-9a-fA-F]{2})", s[i:])
+            if m:
+                out.append(chr(int(m.group(1), 16))); i += 4; continue
+            m = re.match(r"\\u(-?\d+)", s[i:])
+            if m:
+                cp = int(m.group(1))
+                if cp < 0:
+                    cp += 65536
+                out.append(chr(cp))
+                i += m.end()
+                if i < n and s[i] not in "\\{}":
+                    i += 1  # \\uc1 fallback char
+                continue
+            m = re.match(r"\\([a-zA-Z]+)(-?\d+)? ?", s[i:])
+            if m:
+                if m.group(1) == "par":
+                    out.append("\n")
+                elif m.group(1) == "tab":
+                    out.append("\t")
+                i += m.end(); continue
+            i += 1
+        elif ch in "{}\r":
+            i += 1
+        elif ch == "\n":
+            i += 1
+        else:
+            out.append(ch); i += 1
+    return re.sub(r"\n{3,}", "\n\n", "".join(out)).strip()
+
+
+
+
 class AiExperienceApi(http.Controller):
     @http.route("/api/workspace", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def workspace(self, **kwargs):
@@ -166,7 +213,7 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         user = env.user
-        employee = _model(env, "hr.employee").search([("user_id", "=", user.id)], limit=1) if _model(env, "hr.employee") else None
+        employee = _model(env, "hr.employee").search([("user_id", "=", user.id)], limit=1) if "hr.employee" in env else None
         capabilities = env["ai.control.capability.resolver"].effective_capabilities(user=user) if "ai.control.capability.resolver" in env else []
         return _json_response({
             "user": {"id": user.id, "name": user.name, "login": user.login},
@@ -182,7 +229,7 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         dept_model = _model(env, "hr.department")
-        if not dept_model: return _json_response({"departments": []})
+        if dept_model is None: return _json_response({"departments": []})
         employee = _model(env, "hr.employee").search([("user_id", "=", env.user.id)], limit=1)
         privileged = env.user.has_group("base.group_system")
         depts = dept_model.search([]) if privileged else (employee.department_id | employee.child_ids.mapped("department_id"))
@@ -206,7 +253,7 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         model = _model(env, "project.task")
-        if not model: return _json_response({"tasks": []})
+        if model is None: return _json_response({"tasks": []})
         if request.httprequest.method == "POST":
             payload = json.loads(request.httprequest.data or b"{}")
             vals = {"name": payload.get("name"), "description": payload.get("description", "")}
@@ -223,7 +270,7 @@ class AiExperienceApi(http.Controller):
         env, err = _require_auth()
         if err: return err
         model = _model(env, "ai.gateway.approval")
-        if not model: return _json_response({"approvals": []})
+        if model is None: return _json_response({"approvals": []})
         recs = model.search([], order="create_date desc", limit=100)
         fields_map = {f: True for f in ("name", "state", "status", "risk_level", "requester_id", "expires_at") if f in model._fields}
         out=[]
@@ -238,7 +285,7 @@ class AiExperienceApi(http.Controller):
         if err: return err
         model = _model(env, "mail.notification")
         out=[]
-        if model:
+        if model is not None:
             recs = model.search([("res_partner_id", "=", env.user.partner_id.id)], order="id desc", limit=100)
             for r in recs:
                 msg = r.mail_message_id
@@ -252,7 +299,7 @@ class AiExperienceApi(http.Controller):
         if err: return err
         model = _model(env, "ai.model.profile")
         out=[]
-        if model:
+        if model is not None:
             for m in model.sudo().search([], order="purpose,name"):
                 out.append({"id": m.id, "name": m.name, "provider": m.provider, "model_id": m.model_id, "purpose": m.purpose, "quantization": m.quantization, "production": m.production, "active": m.active})
         return _json_response({"models": out})
@@ -267,10 +314,12 @@ class AiExperienceApi(http.Controller):
             payload = json.loads(request.httprequest.data or b"{}")
             filename = _safe_name(payload.get("filename", "file"), "file")
             raw = base64.b64decode(payload.get("data_base64", ""), validate=True)
+            if len(raw) > 20 * 1024 * 1024:
+                return _json_response({"error": "file too large (max 20 MB)"}, status=413)
             question = payload.get("question", "خلاصه و نکات مهم این فایل را توضیح بده")
             lower = filename.lower()
             text = ""
-            if lower.endswith((".txt", ".md", ".csv", ".json")):
+            if lower.endswith((".txt", ".md", ".csv", ".json", ".yml", ".yaml", ".log")):
                 text = raw.decode("utf-8", errors="replace")
             elif lower.endswith(".pdf"):
                 try:
@@ -282,9 +331,78 @@ class AiExperienceApi(http.Controller):
             elif lower.endswith(".docx"):
                 try:
                     from docx import Document
-                    doc = Document(io.BytesIO(raw)); text = "\n".join(p.text for p in doc.paragraphs)
+                    doc = Document(io.BytesIO(raw))
+                    text = "\n".join(p.text for p in doc.paragraphs)
+                    if doc.tables:
+                        for t in doc.tables:
+                            for row in t.rows:
+                                text += "\n" + " | ".join(c.text for c in row.cells)
                 except ImportError:
                     return _json_response({"error": "DOCX reader is not installed"}, status=501)
+            elif lower.endswith((".html", ".htm")):
+                # stdlib HTMLParser - no new dependency; script/style are
+                # dropped and block tags become newlines so a saved report
+                # page reads like its visible text.
+                from html.parser import HTMLParser
+
+                class _HTMLText(HTMLParser):
+                    _BLOCKS = {"p", "div", "br", "tr", "li", "h1", "h2", "h3",
+                               "h4", "h5", "h6", "table", "ul", "ol", "section", "article"}
+                    def __init__(self):
+                        super().__init__(convert_charrefs=True)
+                        self.parts, self._skip = [], 0
+                    def handle_starttag(self, tag, attrs):
+                        if tag in ("script", "style"):
+                            self._skip += 1
+                        elif tag in self._BLOCKS:
+                            self.parts.append("\n")
+                    def handle_endtag(self, tag):
+                        if tag in ("script", "style") and self._skip:
+                            self._skip -= 1
+                    def handle_data(self, data):
+                        if not self._skip:
+                            self.parts.append(data)
+
+                parser = _HTMLText()
+                parser.feed(raw.decode("utf-8", errors="replace"))
+                text = re.sub(r"\n{3,}", "\n\n", "".join(parser.parts)).strip()
+            elif lower.endswith(".rtf"):
+                text = _rtf_to_text(raw)
+            elif lower.endswith(".xml"):
+                # e-invoices, integrations, exports - ElementTree itertext,
+                # honest failure on malformed XML rather than tag soup
+                import xml.etree.ElementTree as ET
+
+                try:
+                    root = ET.fromstring(raw)
+                    text = " ".join(t.strip() for t in root.itertext() if t and t.strip())
+                except ET.ParseError as exc:
+                    return _json_response({"error": f"malformed XML: {exc}"}, status=415)
+            elif lower.endswith(".pptx"):
+                try:
+                    from pptx import Presentation
+                    prs = Presentation(io.BytesIO(raw))
+                    text = ""
+                    for i, slide in enumerate(prs.slides, 1):
+                        text += "\n[Slide %d]\n" % i + "\n".join(
+                            shape.text for shape in slide.shapes if shape.has_text_frame and shape.text.strip())
+                except ImportError:
+                    return _json_response({"error": "PPTX reader is not installed"}, status=501)
+            elif lower.endswith((".ods", ".odt")):
+                try:
+                    from odf.opendocument import load as odf_load
+                    from odf import text as odf_text, table as odf_table, teletype
+                    doc = odf_load(io.BytesIO(raw))
+                    parts = [teletype.extractText(p) for p in doc.getElementsByType(odf_text.P)]
+                    for tbl in doc.getElementsByType(odf_table.Table):
+                        rows = []
+                        for r in tbl.getElementsByType(odf_table.TableRow):
+                            cells = [teletype.extractText(c) for c in r.getElementsByType(odf_table.TableCell)]
+                            rows.append(" | ".join(cells))
+                        parts.append("\n".join(rows))
+                    text = "\n".join(parts)
+                except ImportError:
+                    return _json_response({"error": "ODF reader is not installed"}, status=501)
             elif lower.endswith((".xlsx", ".xls")):
                 try:
                     import openpyxl
@@ -296,12 +414,34 @@ class AiExperienceApi(http.Controller):
                     text = "\n".join(chunks)
                 except ImportError:
                     return _json_response({"error": "XLSX reader is not installed"}, status=501)
-            elif lower.endswith((".png", ".jpg", ".jpeg", ".webp")):
-                import requests
-                base = env["ir.config_parameter"].sudo().get_param("company_ai_demo.vision_api_base", "http://127.0.0.1:8001/v1")
-                mime = "image/png" if lower.endswith(".png") else "image/jpeg"
-                resp = requests.post(f"{base}/chat/completions", json={"model":env["ai.model.router"].route(purpose="vision").model_id,"messages":[{"role":"user","content":[{"type":"text","text":question},{"type":"image_url","image_url":{"url":f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],"max_tokens":1500}, timeout=90)
-                resp.raise_for_status(); answer=resp.json()["choices"][0]["message"]["content"]
+            elif lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")):
+                # ALWAYS-available, instant vision-lite: exact image facts
+                # (format/dimensions/mode) via Pillow. When a REAL vision
+                # LLM is configured (api_base != the local brain) the file
+                # is additionally described by that model; with only the
+                # local brain connected we answer with the true facts and
+                # honestly say free-text vision needs a real LLM key.
+                from PIL import Image as PILImage
+                img = PILImage.open(io.BytesIO(raw))
+                w, h = img.size
+                info = "image: %s %dx%d px (%s mode, %.1f KB)" % (
+                    img.format or "?", w, h, img.mode, len(raw) / 1024.0)
+                vbase = env["ir.config_parameter"].sudo().get_param(
+                    "company_ai_demo.vision_api_base", "http://127.0.0.1:8001/v1")
+                if "127.0.0.1:8001" in vbase:
+                    return _json_response({"filename": filename, "kind": "image-info",
+                                           "analysis": info})
+                import requests as _rq
+                mime = {"png": "image/png", "gif": "image/gif", "bmp": "image/bmp",
+                        "webp": "image/webp"}.get(lower.rsplit(".", 1)[-1], "image/jpeg")
+                resp = _rq.post(f"{vbase}/chat/completions", json={
+                    "model": env["ai.model.router"].route(purpose="vision").model_id,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": question},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(raw).decode()}"}}]}],
+                    "max_tokens": 1500}, timeout=90)
+                resp.raise_for_status()
+                answer = resp.json()["choices"][0]["message"]["content"]
                 return _json_response({"filename": filename, "kind": "vision", "analysis": answer})
             else:
                 return _json_response({"error": "unsupported file type"}, status=415)

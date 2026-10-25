@@ -1,0 +1,11 @@
+# Keep the build context small and reproducible. frontend/dist is rebuilt
+# inside the image, so the copy in git is irrelevant here.
+.git
+**/node_modules
+frontend/node_modules
+frontend/dist
+**/__pycache__
+*.pyc
+/data
+/tmp
+*.log

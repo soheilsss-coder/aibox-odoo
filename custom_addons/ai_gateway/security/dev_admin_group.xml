@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Developer Admin: the appliance VENDOR's own technical account.
+       Grants the developer console (devconsole.html) on top of the
+       system-admin console. The appliance installer grants it to the
+       "developer" account; it is never given to customer staff. -->
+  <record id="group_developer_admin" model="res.groups">
+    <field name="name">Appliance Developer Admin</field>
+    <field name="category_id" ref="base.module_category_hidden"/>
+  </record>
+</odoo>
