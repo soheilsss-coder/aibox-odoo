@@ -13,6 +13,16 @@
         <field name="groups_id" eval="[(6, 0, [ref('base.group_user')])]"/>
     </record>
 
+    <!-- noupdate="1" protects the record above from updates, which means a
+         database created BEFORE the groups line existed keeps a service
+         user with ZERO groups forever - and Odoo 18 server actions run a
+         check_access("write") on the action's model before executing, so
+         every cron of this account then dies with an AccessError. This
+         <function> re-asserts the intended minimal group on every
+         install/upgrade (idempotent: (4, ...) only ADDS it). -->
+    <function model="res.users" name="write"
+              eval="[[ref('ai_automation_service_user')], {'groups_id': [(4, ref('base.group_user'))]}]"/>
+
     <record id="cron_notify_overdue_tasks" model="ir.cron">
         <field name="name">AI: Notify overdue tasks</field>
         <field name="model_id" ref="model_llm_tool"/>

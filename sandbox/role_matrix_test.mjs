@@ -211,6 +211,28 @@ async function saraPart(ids){
   check("tool: semantic search finds HER department doc", JSON.stringify(sr).includes("تماس") || JSON.stringify(sr).includes("راهنمای"), JSON.stringify(sr).slice(0,90));
   const sr2 = await T("search_documents_semantic", {query:"سود خالص بدهی بانکی", top_k:"5"});
   check("tool: semantic search CANNOT reach the financial doc", !JSON.stringify(sr2).includes(MARK_FIN), JSON.stringify(sr2).slice(0,90));
+
+  // --- hardening: try to bypass via API tricks (all must fail) ---
+  const bp1 = await T("Get_Document", {document_id: ids[FIN_DOC] || 15});
+  check("bypass: tool-name casing trick DENIED", /error|unknown|not/i.test(JSON.stringify(bp1)), JSON.stringify(bp1).slice(0,80));
+  const bp2 = await T("get_document ", {document_id: ids[FIN_DOC] || 15});
+  check("bypass: trailing-space tool name still DENIED", JSON.stringify(bp2).includes("access_denied") || /error/.test(JSON.stringify(bp2)), JSON.stringify(bp2).slice(0,80));
+  const rawRpc = await jarFetch(s.jar, BASE+"/api/rpc", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({jsonrpc:"2.0", method:"call", params:{model:"company.document", method:"search_read", args:[[],["name","content"]]}})});
+  check("bypass: legacy generic /api/rpc is a tombstone (410)", rawRpc.status===410, "status="+rawRpc.status);
+  const gr3 = await T("generic_read", {model:"company.document", fields:"name,content", limit:"20"});
+  check("bypass: generic_read on company.document DENIED", /error|AccessError|denied/i.test(JSON.stringify(gr3)), JSON.stringify(gr3).slice(0,90));
+
+  // --- assistant SPEED (real chat, same UI path) ---
+  const lat = [];
+  for (const q of ["سلام، حالت چطوره؟", "لیست اسناد من را نشان بده", "خلاصه حضور این هفته‌ام چقدر است؟"]) {
+    const t0 = Date.now();
+    await s.sendAndGet(q, 60000);
+    lat.push(Date.now()-t0);
+  }
+  const avg = Math.round(lat.reduce((a,b)=>a+b,0)/lat.length);
+  check("speed: 3 real chats answered fast (avg<8s, each<15s)",
+    lat.every(t=>t<15000) && avg<8000, "ms="+JSON.stringify(lat)+" avg="+avg);
 }
 
 /* ================= MARYAM: the finance manager ================= */

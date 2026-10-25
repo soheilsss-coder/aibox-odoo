@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime
 
@@ -161,6 +162,50 @@ def _artifact_bytes(kind, title, payload):
     raise ValueError(f"unsupported artifact type: {kind}")
 
 
+def _rtf_to_text(raw):
+    """Minimal dependency-free RTF text extractor (contracts, letters).
+    Handles \\par / \\tab, \\uNNNN unicode, \\'hh hex bytes and literal
+    escapes; ignores formatting groups. Not a layout engine - the goal is
+    every piece of TEXT in the file, honestly extracted."""
+    s = raw.decode("ascii", errors="replace")
+    out, i, n = [], 0, len(s)
+    while i < n:
+        ch = s[i]
+        if ch == "\\":
+            if s[i:i + 2] in ("\\\\", "\\{", "\\}"):
+                out.append(s[i + 1]); i += 2; continue
+            m = re.match(r"\\'([0-9a-fA-F]{2})", s[i:])
+            if m:
+                out.append(chr(int(m.group(1), 16))); i += 4; continue
+            m = re.match(r"\\u(-?\d+)", s[i:])
+            if m:
+                cp = int(m.group(1))
+                if cp < 0:
+                    cp += 65536
+                out.append(chr(cp))
+                i += m.end()
+                if i < n and s[i] not in "\\{}":
+                    i += 1  # \\uc1 fallback char
+                continue
+            m = re.match(r"\\([a-zA-Z]+)(-?\d+)? ?", s[i:])
+            if m:
+                if m.group(1) == "par":
+                    out.append("\n")
+                elif m.group(1) == "tab":
+                    out.append("\t")
+                i += m.end(); continue
+            i += 1
+        elif ch in "{}\r":
+            i += 1
+        elif ch == "\n":
+            i += 1
+        else:
+            out.append(ch); i += 1
+    return re.sub(r"\n{3,}", "\n\n", "".join(out)).strip()
+
+
+
+
 class AiExperienceApi(http.Controller):
     @http.route("/api/workspace", type="http", auth="none", csrf=False, methods=["GET", "OPTIONS"])
     def workspace(self, **kwargs):
@@ -274,7 +319,7 @@ class AiExperienceApi(http.Controller):
             question = payload.get("question", "خلاصه و نکات مهم این فایل را توضیح بده")
             lower = filename.lower()
             text = ""
-            if lower.endswith((".txt", ".md", ".csv", ".json")):
+            if lower.endswith((".txt", ".md", ".csv", ".json", ".yml", ".yaml", ".log")):
                 text = raw.decode("utf-8", errors="replace")
             elif lower.endswith(".pdf"):
                 try:
@@ -294,6 +339,45 @@ class AiExperienceApi(http.Controller):
                                 text += "\n" + " | ".join(c.text for c in row.cells)
                 except ImportError:
                     return _json_response({"error": "DOCX reader is not installed"}, status=501)
+            elif lower.endswith((".html", ".htm")):
+                # stdlib HTMLParser - no new dependency; script/style are
+                # dropped and block tags become newlines so a saved report
+                # page reads like its visible text.
+                from html.parser import HTMLParser
+
+                class _HTMLText(HTMLParser):
+                    _BLOCKS = {"p", "div", "br", "tr", "li", "h1", "h2", "h3",
+                               "h4", "h5", "h6", "table", "ul", "ol", "section", "article"}
+                    def __init__(self):
+                        super().__init__(convert_charrefs=True)
+                        self.parts, self._skip = [], 0
+                    def handle_starttag(self, tag, attrs):
+                        if tag in ("script", "style"):
+                            self._skip += 1
+                        elif tag in self._BLOCKS:
+                            self.parts.append("\n")
+                    def handle_endtag(self, tag):
+                        if tag in ("script", "style") and self._skip:
+                            self._skip -= 1
+                    def handle_data(self, data):
+                        if not self._skip:
+                            self.parts.append(data)
+
+                parser = _HTMLText()
+                parser.feed(raw.decode("utf-8", errors="replace"))
+                text = re.sub(r"\n{3,}", "\n\n", "".join(parser.parts)).strip()
+            elif lower.endswith(".rtf"):
+                text = _rtf_to_text(raw)
+            elif lower.endswith(".xml"):
+                # e-invoices, integrations, exports - ElementTree itertext,
+                # honest failure on malformed XML rather than tag soup
+                import xml.etree.ElementTree as ET
+
+                try:
+                    root = ET.fromstring(raw)
+                    text = " ".join(t.strip() for t in root.itertext() if t and t.strip())
+                except ET.ParseError as exc:
+                    return _json_response({"error": f"malformed XML: {exc}"}, status=415)
             elif lower.endswith(".pptx"):
                 try:
                     from pptx import Presentation

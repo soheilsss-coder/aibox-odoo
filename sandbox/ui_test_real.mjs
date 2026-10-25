@@ -87,6 +87,7 @@ const navTo = async (label, cls) => {
 console.log("=== 4) SYSTEM HEALTH (landing section) ===");
 check("health tiles show db/redis/engine", w.document.body.textContent.includes("Database")
   && w.document.body.textContent.includes("Redis") && w.document.body.textContent.includes("Modules installed"));
+await waitFor(()=>/ready/i.test(w.document.getElementById("view").textContent), "ready banner", 8000);
 check("ready banner", /ready/i.test(w.document.getElementById("view").textContent));
 
 console.log("=== 5) AI ENGINE: test connection + save ===");
@@ -153,6 +154,20 @@ const presetBtn = w.document.querySelector("button[data-preset='sales']");
 click(presetBtn);
 await waitFor(()=>/done:|nothing|failed/.test($id("preset_msg").textContent), "preset done", 60000);
 check("preset bundle (sales) applies", /done:/.test($id("preset_msg").textContent), $id("preset_msg").textContent.slice(0,60));
+
+console.log("=== 8b) USAGE: REAL per-department & per-employee token report ===");
+await navTo("Token Usage");
+await waitFor(()=>w.document.getElementById("view").textContent.includes("By employee"), "usage tables render", 15000);
+const usageApi = await (await jarFetch(BASE+"/api/admin/panel/usage?days=30")).json();
+const usageTxt = w.document.getElementById("view").textContent;
+const fmtN = (n)=>String(n==null?0:n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+const saraRow = (usageApi.users||[]).find(x=>x.login==="sara@parsnovin.test");
+const deptRow = (usageApi.departments||[]).find(d=>d.department==="فروش");
+check("usage: By-department table lists «فروش»", usageTxt.includes("By department") && usageTxt.includes("فروش"));
+check("usage: By-employee table lists «سارا محمدی»", usageTxt.includes("By employee") && usageTxt.includes("سارا محمدی"));
+check("usage: sara's REAL token count visible in DOM", saraRow && usageTxt.includes(fmtN(saraRow.tokens)), saraRow && ("api="+saraRow.tokens));
+check("usage: department «فروش» token count visible in DOM", deptRow && usageTxt.includes(fmtN(deptRow.tokens)), deptRow && ("api="+deptRow.tokens));
+check("usage: department row has non-zero REAL tokens", deptRow && deptRow.tokens>0, deptRow && String(deptRow.tokens));
 
 console.log("=== 9) USERS: create a customer user from the form ===");
 await navTo("Users");
