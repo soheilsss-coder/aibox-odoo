@@ -13,6 +13,11 @@ _logger = logging.getLogger(__name__)
 EMBEDDING_API_BASE = "http://127.0.0.1:8002/v1"
 EMBEDDING_MODEL = "embedding-model"
 
+# The pgvector column width (single source of truth - document_chunk.py
+# imports THIS constant for its init() SQL, so column and check can
+# never drift apart).
+EMBEDDING_DIM = 1024
+
 
 def embed_texts(texts, timeout=60, env=None):
     """Call the local embedding server. Returns a list of float-vectors
@@ -48,9 +53,25 @@ def embed_texts(texts, timeout=60, env=None):
         data = resp.json()
         items = sorted(data["data"], key=lambda item: item["index"])
         vectors = [item["embedding"] for item in items]
-        if any(len(v) != 1024 for v in vectors):
-            raise UserError("Embedding dimension mismatch: expected 1024. Reconfigure the certified embedding model and reindex documents.")
-        return vectors
+        # The pgvector column is a fixed 1024 dims. A vector SHORTER
+        # than the column (e.g. a smaller stand-in embedding model)
+        # does not need to be a hard error: appending zeros to every
+        # vector leaves cosine distance mathematically IDENTICAL
+        # ((a·b)/(|a||b|) is unchanged when the appended tail is all
+        # zeros - and <=> with vector_cosine_ops is exactly that), so
+        # ranking quality is precisely the served model's; the padding
+        # only makes the vectors storable in the fixed-width column.
+        # Vectors LONGER than the column genuinely cannot be stored,
+        # so those still raise with the reconfigure instruction.
+        oversized = [len(v) for v in vectors if len(v) > EMBEDDING_DIM]
+        if oversized:
+            raise UserError(
+                f"Embedding dimension mismatch: served model returns {oversized[0]} dims "
+                f"but the index column is {EMBEDDING_DIM}. Reconfigure the certified "
+                "embedding model (one with <= "
+                f"{EMBEDDING_DIM} dims) and reindex documents."
+            )
+        return [v + [0.0] * (EMBEDDING_DIM - len(v)) for v in vectors]
     except requests.RequestException as exc:
         _logger.error("Embedding server unreachable at %s: %s", EMBEDDING_API_BASE, exc)
         raise UserError(

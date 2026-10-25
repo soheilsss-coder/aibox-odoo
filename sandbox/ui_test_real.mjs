@@ -204,14 +204,18 @@ check("admin pw change works (user must note it down)", true);
 await navTo("Users");
 await waitFor(()=>$id("nu_name"), "users form");
 type($id("nu_name"), "Wipe Target");
-type($id("nu_login"), "wipe.me+"+Date.now()+"@acme.test");
+const wstamp = Date.now();
+type($id("nu_login"), "wipe.me+"+wstamp+"@acme.test");
 type($id("nu_pw"), "Wipe123456");
 click($id("nu_go"));
 await waitFor(()=>/created|exists|failed/.test($id("nu_msg").textContent), "wipe target created");
 await sleep(1200);
 await navTo("Handover");
 await waitFor(()=>w.document.querySelectorAll("#view .arc-chk").length>0, "archive checkboxes");
-const chk = [...w.document.querySelectorAll(".arc-chk")].find(c=>c.value.includes("wipe.me+"));
+// pin the EXACT throwaway this run created - a leftover wipe.me from a
+// previous run must never satisfy the search (it is already archived,
+// so the wipe would report "blocked 0" and prove nothing)
+const chk = [...w.document.querySelectorAll(".arc-chk")].find(c=>c.value.includes("wipe.me+"+wstamp));
 if (chk) chk.checked = true;
 click($id("wipe_go"));
 await waitFor(()=>/Deleted:/.test($id("wipe_msg").textContent), "wipe done", 60000);

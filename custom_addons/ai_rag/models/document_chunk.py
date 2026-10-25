@@ -1,17 +1,20 @@
 import logging
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
-from .embedding_client import embed_texts, to_pgvector_literal
+from .embedding_client import embed_texts, to_pgvector_literal  # noqa: F401 (EMBEDDING_DIM imported below the comment)
 
 _logger = logging.getLogger(__name__)
 
-# Must match the served embedding model in /opt/start_vllm_embed.sh
-# (Qwen3-Embedding-0.6B -> 1024-dim native output). If you switch to
-# the 4B (2560-dim) or 8B (4096-dim) sibling, change this AND reindex
-# everything - vectors of different dimensions cannot coexist in one
-# pgvector column.
-EMBEDDING_DIM = 1024
+# Column width - imported from embedding_client (single source of
+# truth so the dimension check there and the CREATE TABLE ... vector(N)
+# here can never drift apart). The certified model is
+# Qwen3-Embedding-0.6B (1024-dim native); shorter stand-in models are
+# zero-padded by embed_texts (cosine-preserving), LONGER ones are
+# rejected there. Switching to a longer model means a NEW column +
+# full reindex - vectors of different dimensions cannot coexist.
+from .embedding_client import EMBEDDING_DIM
 
 
 class AiDocumentChunk(models.Model):
@@ -136,9 +139,17 @@ class AiDocumentChunk(models.Model):
 
         from odoo.addons.ai_business_tools.models.context_firewall import scrub_value
         safe_query = scrub_value(query_text)
-        vectors = embed_texts([safe_query], env=self.env)
+        try:
+            vectors = embed_texts([safe_query], env=self.env)
+        except UserError:
+            vectors = []
         if not vectors:
-            return []
+            # Embedding server down / no certified model: degrade to a
+            # keyword search over the SAME access-filtered chunk set
+            # instead of hard-failing the whole tool (labeled
+            # mode=keyword_fallback so callers know the ranking is
+            # lexical, not semantic - never a silent fake of semantics).
+            return self._keyword_fallback(safe_query, allowed_doc_ids, top_k)
         query_literal = to_pgvector_literal(vectors[0])
 
         self.env.cr.execute(
@@ -168,6 +179,42 @@ class AiDocumentChunk(models.Model):
                 "document_name": doc_names.get(r["document_id"], ""),
                 "excerpt": r["content"],
                 "similarity": round(float(r["similarity"]), 4),
+                "mode": "semantic",
+            }
+            for r in rows
+        ]
+
+    def _keyword_fallback(self, query, allowed_doc_ids, top_k):
+        # Access semantics IDENTICAL to the vector path: only chunks
+        # whose document_id is in the already-ir.rule-filtered
+        # allowed_doc_ids are ever touched - the fallback can never
+        # surface more than semantic search could.
+        tokens = [t for t in query.replace("؟", " ").split() if len(t) >= 3][:6]
+        if not tokens:
+            return []
+        conds = ["document_id = ANY(%s)"] + ["content ILIKE %s"] * len(tokens)
+        params = [allowed_doc_ids] + ["%" + t + "%" for t in tokens]
+        self.env.cr.execute(
+            "SELECT c.id, c.document_id, c.content FROM ai_document_chunk c "
+            "WHERE " + " AND ".join(conds) + " ORDER BY c.document_id, c.sequence LIMIT %s",
+            params + [top_k],
+        )
+        rows = self.env.cr.fetchall()
+        if not rows:
+            return []
+        docs = self.env["company.document"].browse([r[1] for r in rows])
+        doc_names = {d.id: d.name for d in docs}
+        _logger.warning(
+            "RAG semantic embedding unavailable - keyword fallback returned "
+            "%s hits (user %s)", len(rows), self.env.user.login,
+        )
+        return [
+            {
+                "document_id": r[1],
+                "document_name": doc_names.get(r[1], ""),
+                "excerpt": r[2],
+                "similarity": None,
+                "mode": "keyword_fallback",
             }
             for r in rows
         ]
